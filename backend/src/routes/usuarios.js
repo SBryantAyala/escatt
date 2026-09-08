@@ -164,10 +164,22 @@ router.put("/:id", (req, res) => {
     cambios.correo = cambios.correo.trim();
   }
 
-  if ("tipo" in cambios && !TIPOS_VALIDOS.includes(cambios.tipo)) {
-    return res.status(400).json({
-      error: `tipo inválido: "${cambios.tipo}". Debe ser uno de: ${TIPOS_VALIDOS.join(", ")}`,
-    });
+  if ("tipo" in cambios) {
+    if (!TIPOS_VALIDOS.includes(cambios.tipo)) {
+      return res.status(400).json({
+        error: `tipo inválido: "${cambios.tipo}". Debe ser uno de: ${TIPOS_VALIDOS.join(", ")}`,
+      });
+    }
+
+    // Si cambia el tipo, los campos específicos del tipo anterior ya no
+    // aplican: se limpian a NULL salvo que el propio request ya haya
+    // mandado un valor nuevo para ese campo (entonces se respeta ese valor).
+    const camposDelNuevoTipo = CAMPOS_POR_TIPO[cambios.tipo];
+    for (const campo of CAMPOS_ESPECIFICOS) {
+      if (!camposDelNuevoTipo.includes(campo) && !(campo in cambios)) {
+        cambios[campo] = null;
+      }
+    }
   }
 
   if ("activo" in cambios) {
