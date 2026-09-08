@@ -1,1 +1,64 @@
 @import "tailwindcss";
+
+html {
+  scroll-behavior: smooth;
+}
+
+/* Blobs de fondo en el azul de ESCATT (#1878B6 -> #4FB3E8).
+   Movimiento real y lento en loop, no estatico. */
+@keyframes escatt-blob-1 {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  33% {
+    transform: translate3d(6%, -5%, 0) scale(1.12);
+  }
+  66% {
+    transform: translate3d(-4%, 4%, 0) scale(0.92);
+  }
+}
+
+@keyframes escatt-blob-2 {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  40% {
+    transform: translate3d(-7%, 4%, 0) scale(1.15);
+  }
+  70% {
+    transform: translate3d(5%, -6%, 0) scale(0.9);
+  }
+}
+
+@keyframes escatt-blob-3 {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1.05);
+  }
+  50% {
+    transform: translate3d(4%, 6%, 0) scale(0.95);
+  }
+}
+
+.escatt-blob-1 {
+  animation: escatt-blob-1 18s ease-in-out infinite;
+}
+.escatt-blob-2 {
+  animation: escatt-blob-2 22s ease-in-out infinite;
+}
+.escatt-blob-3 {
+  animation: escatt-blob-3 16s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  .escatt-blob-1,
+  .escatt-blob-2,
+  .escatt-blob-3 {
+    animation: none;
+  }
+}
