@@ -1,0 +1,6 @@
+# CODEOWNERS — quién revisa qué.
+# GitHub pide automáticamente revisión a estas personas al abrir un Pull Request.
+# Docs: https://docs.github.com/es/repositories/managing-your-repositories-settings-and-features/customizing-your-repository/about-code-owners
+
+# Todo el repositorio lo revisa SBryantAyala (scrum master / admin).
+*       @SBryantAyala
