@@ -21,7 +21,11 @@ Este repositorio contiene **únicamente el código** del proyecto ESCATT.
     └── src/
         ├── main.jsx
         ├── App.jsx      # pantalla base: muestra el estado del backend
-        └── index.css    # @import "tailwindcss";
+        ├── index.css    # @import "tailwindcss";
+        └── pages/        # una carpeta por pantalla, cada quien vive en la suya
+            ├── Listado/   # Edgar: listado + revocar acceso + eliminar
+            ├── Alta/      # Joshua: alta (registro) de usuario
+            └── Detalle/   # Eduardo: consultar + modificar
 ```
 
 ## Requisitos
@@ -61,15 +65,16 @@ en desarrollo. Si el backend está corriendo, la pantalla base muestra
 - `main` — rama estable e integradora. **Protegida**: solo se actualiza vía Pull Request aprobado.
 - Cada integrante trabaja en su rama y abre PR a `main`:
 
-  | Rama | Pantalla |
-  |------|----------|
-  | `feature/listado-revocar-eliminar` | listado / revocar / eliminar |
-  | `feature/alta-usuario`             | alta de usuario |
-  | `feature/consultar-modificar`      | consultar / modificar |
+  | Rama | Pantalla | Carpeta |
+  |------|----------|---------|
+  | `feature/listado-revocar-eliminar` | listado / revocar / eliminar | `frontend/src/pages/Listado/` |
+  | `feature/alta-usuario`             | alta de usuario               | `frontend/src/pages/Alta/` |
+  | `feature/consultar-modificar`      | consultar / modificar         | `frontend/src/pages/Detalle/` |
 
 - Antes de empezar a trabajar y seguido: `git fetch origin && git merge origin/main`.
-- Cada quien registra **su** router en `backend/src/index.js` y crea **su** archivo
-  en `backend/src/routes/`, para no chocar con los demás.
+- Cada quien trabaja solo dentro de **su** carpeta en `frontend/src/pages/`
+  (tabla de arriba) y consume la API ya fija bajo `/api/usuarios` — no toques
+  archivos de los demás ni el router del backend, eso ya está cerrado.
 
 ## Documentación del proyecto
 
