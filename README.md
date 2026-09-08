@@ -22,6 +22,8 @@ Este repositorio contiene **únicamente el código** del proyecto ESCATT.
         ├── main.jsx
         ├── App.jsx      # pantalla base: muestra el estado del backend
         ├── index.css    # @import "tailwindcss";
+        ├── components/
+        │   └── NexusLogo.jsx  # logo de Nexus Solutions (identidad visual)
         └── pages/        # una carpeta por pantalla, cada quien vive en la suya
             ├── Listado/   # Edgar: listado + revocar acceso + eliminar
             ├── Alta/      # Joshua: alta (registro) de usuario
