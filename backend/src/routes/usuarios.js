@@ -1,17 +1,8 @@
 import { Router } from "express";
 import { db } from "../db/index.js";
+import { TIPOS_VALIDOS, CAMPOS_POR_TIPO } from "../lib/tipos-usuario.js";
 
 const router = Router();
-
-const TIPOS_VALIDOS = ["alumno", "sinodal", "personal"];
-
-// Campos que solo aplican a cierto tipo de usuario. Para los demás tipos
-// se guardan como NULL (ver esquema en ../db/index.js).
-const CAMPOS_POR_TIPO = {
-  alumno: ["boleta", "carrera", "protocolo_tt"],
-  sinodal: ["numero_empleado", "especialidad"],
-  personal: ["numero_empleado", "cargo"],
-};
 
 // Todas las columnas específicas de tipo, en conjunto.
 const CAMPOS_ESPECIFICOS = [

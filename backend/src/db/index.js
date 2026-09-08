@@ -41,4 +41,24 @@ db.exec(`
   );
 `);
 
+// Autenticación (aditivo, Sprint 2). No modifica la tabla `usuarios`:
+//   - credenciales: hash/salt de la contraseña, 1 fila por usuario.
+//   - sesiones: tokens Bearer activos con su fecha de expiración.
+// Ambas se ligan por usuario_id con ON DELETE CASCADE (foreign_keys ya está ON).
+db.exec(`
+  CREATE TABLE IF NOT EXISTS credenciales (
+    usuario_id     INTEGER PRIMARY KEY REFERENCES usuarios(id) ON DELETE CASCADE,
+    password_hash  TEXT NOT NULL,
+    password_salt  TEXT NOT NULL,
+    creado_en      TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS sesiones (
+    token      TEXT PRIMARY KEY,
+    usuario_id INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+    creado_en  TEXT NOT NULL DEFAULT (datetime('now')),
+    expira_en  TEXT NOT NULL
+  );
+`);
+
 console.log(`[db] SQLite lista en ${dbPath}`);
