@@ -34,77 +34,6 @@ const ETAPAS = [
   },
 ];
 
-const TIPOS = [
-  {
-    rol: "Alumno",
-    texto:
-      "Registra su Protocolo de Trabajo Terminal y avanza por las etapas TT-I y TT-II hasta su presentación final.",
-  },
-  {
-    rol: "Sinodal",
-    texto: "Asesora el desarrollo del trabajo y evalúa al alumno en cada presentación.",
-  },
-  {
-    rol: "Personal CATT",
-    texto:
-      "Administra registros, calendarios y aprueba modificaciones a lo largo de todo el proceso.",
-  },
-];
-
-// Íconos minimalistas (1-2 trazos) para el grid de operaciones.
-const OPERACIONES = [
-  {
-    etiqueta: "Listar",
-    icono: (
-      <>
-        <path d="M8 7h11M8 12h11M8 17h11" />
-        <circle cx="4.5" cy="7" r="1.1" fill="currentColor" stroke="none" />
-        <circle cx="4.5" cy="12" r="1.1" fill="currentColor" stroke="none" />
-        <circle cx="4.5" cy="17" r="1.1" fill="currentColor" stroke="none" />
-      </>
-    ),
-  },
-  { etiqueta: "Dar de alta", icono: <path d="M12 5v14M5 12h14" /> },
-  {
-    etiqueta: "Consultar",
-    icono: (
-      <>
-        <circle cx="11" cy="11" r="6" />
-        <path d="M20 20l-4.3-4.3" />
-      </>
-    ),
-  },
-  {
-    etiqueta: "Modificar",
-    icono: (
-      <>
-        <path d="M4 20h4L19 9a2 2 0 0 0-3-3L5 17v3z" />
-        <path d="M14 6l3 3" />
-      </>
-    ),
-  },
-  {
-    etiqueta: "Revocar acceso",
-    icono: (
-      <>
-        <circle cx="12" cy="12" r="8" />
-        <path d="M7 7l10 10" />
-      </>
-    ),
-  },
-  {
-    etiqueta: "Eliminar",
-    icono: (
-      <>
-        <path d="M5 7h14M10 7V5h4v2" />
-        <path d="M8 7l1 12h6l1-12" />
-      </>
-    ),
-  },
-];
-
-const CHIPS = ["React + Node.js + SQLite", "100% local", "Sin dependencias externas"];
-
 // Insignia de co-marca: aquí es donde vive el amarillo de Nexus, sobre fondo
 // oscuro para que el #FDD40A sea legible.
 function InsigniaNexus({ logo = 20, texto = "text-xs" }) {
@@ -146,30 +75,8 @@ async function api(ruta, { method = "GET", body } = {}) {
   return datos;
 }
 
-const OPCIONES_TIPO = [
-  { valor: "alumno", etiqueta: "Alumno" },
-  { valor: "sinodal", etiqueta: "Sinodal" },
-  { valor: "personal", etiqueta: "Personal CATT" },
-];
-
+// Las 3 carreras reales de ESCOM (espejo de CARRERAS_VALIDAS del backend).
 const CARRERAS = ["ISC", "IIA", "LCD"];
-
-// Campos extra que pide el registro según el tipo (espejo de REQUERIDOS_REGISTRO
-// del backend). protocolo_tt no se pide aquí.
-const CAMPOS_EXTRA_POR_TIPO = {
-  alumno: [
-    { name: "boleta", label: "Boleta", tipo: "text" },
-    { name: "carrera", label: "Carrera", tipo: "select", opciones: CARRERAS },
-  ],
-  sinodal: [
-    { name: "numero_empleado", label: "Número de empleado", tipo: "text" },
-    { name: "especialidad", label: "Especialidad", tipo: "text" },
-  ],
-  personal: [
-    { name: "numero_empleado", label: "Número de empleado", tipo: "text" },
-    { name: "cargo", label: "Cargo", tipo: "text" },
-  ],
-};
 
 const CORREO_RE_FRONT = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -270,6 +177,74 @@ function SelectLive({ label, value, onChange, onBlur, opciones, placeholder, err
   );
 }
 
+// Ícono de "ojo" para mostrar/ocultar contraseña (SVG propio, sin emoji).
+function OjoIcono({ visible }) {
+  return (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      {visible ? (
+        <>
+          <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" />
+          <circle cx="12" cy="12" r="3" />
+        </>
+      ) : (
+        <>
+          <path d="M3 3l18 18" />
+          <path d="M10.6 6.1A9.8 9.8 0 0 1 12 6c6.5 0 10 6 10 6a17.7 17.7 0 0 1-3.06 3.72" />
+          <path d="M6.24 6.27A17.6 17.6 0 0 0 2 12s3.5 7 10 7a9.7 9.7 0 0 0 3.86-.8" />
+          <path d="M9.9 9.9a3 3 0 0 0 4.2 4.2" />
+        </>
+      )}
+    </svg>
+  );
+}
+
+// Igual que CampoLive pero para contraseñas: botón "ojo" para revelar el valor.
+function CampoPassword({ label, value, onChange, onBlur, error, valido }) {
+  const [visible, setVisible] = useState(false);
+  const estado = error ? "error" : valido ? "ok" : "base";
+  return (
+    <label className="block">
+      <span className="mb-1 flex items-center justify-between text-xs font-semibold uppercase tracking-wide text-slate-500">
+        <span>{label}</span>
+        {estado === "ok" && (
+          <span className="text-emerald-500">
+            <IconoOk />
+          </span>
+        )}
+      </span>
+      <div className="relative">
+        <input
+          type={visible ? "text" : "password"}
+          value={value}
+          onChange={onChange}
+          onBlur={onBlur}
+          aria-invalid={estado === "error"}
+          className={`${clasesInput(estado)} pr-11`}
+        />
+        <button
+          type="button"
+          onClick={() => setVisible((v) => !v)}
+          aria-label={visible ? "Ocultar contraseña" : "Mostrar contraseña"}
+          className="absolute inset-y-0 right-0 flex w-11 items-center justify-center text-slate-400 transition hover:text-slate-600"
+        >
+          <OjoIcono visible={visible} />
+        </button>
+      </div>
+      {error && <span className="mt-1 block text-xs text-red-500">{error}</span>}
+    </label>
+  );
+}
+
 function ListaRequisitos({ req }) {
   const items = [
     ["Al menos 9 caracteres", req.largo],
@@ -299,19 +274,19 @@ function ListaRequisitos({ req }) {
 
 // Páginas dedicadas (no modal) para iniciar sesión y registrarse. Comparten
 // layout; `modo` decide qué campos aparecen. Validación en vivo + alertas.
+// El registro es SOLO para alumnos (sinodal/personal los da de alta un admin).
 function AuthPage({ modo, onAutenticado, onSalir, onCambiarModo }) {
   const esRegistro = modo === "registro";
 
   const [form, setForm] = useState({
     nombre: "",
+    apellidoPaterno: "",
+    apellidoMaterno: "",
     correo: "",
     password: "",
-    tipo: "alumno",
+    confirmarPassword: "",
     boleta: "",
     carrera: "",
-    numero_empleado: "",
-    especialidad: "",
-    cargo: "",
   });
   const [tocado, setTocado] = useState({});
   const [intentado, setIntentado] = useState(false);
@@ -335,12 +310,19 @@ function AuthPage({ modo, onAutenticado, onSalir, onCambiarModo }) {
 
   // --- Validación en vivo: se recalcula en cada tecla ---
   const nombre = form.nombre.trim();
+  const apellidoPaterno = form.apellidoPaterno.trim();
+  const apellidoMaterno = form.apellidoMaterno.trim();
   const correo = form.correo.trim();
+  const boleta = form.boleta.trim();
   const reqPassword = requisitosPassword(form.password);
-  const camposExtra = esRegistro ? CAMPOS_EXTRA_POR_TIPO[form.tipo] : [];
+  const passwordsCoinciden = form.confirmarPassword === form.password;
 
   const errores = {};
-  if (esRegistro && !nombre) errores.nombre = "Escribe tu nombre.";
+  if (esRegistro) {
+    if (!nombre) errores.nombre = "Escribe tu nombre.";
+    if (!apellidoPaterno) errores.apellidoPaterno = "Escribe tu apellido paterno.";
+    if (!apellidoMaterno) errores.apellidoMaterno = "Escribe tu apellido materno.";
+  }
   if (!correo) errores.correo = "Escribe tu correo.";
   else if (!CORREO_RE_FRONT.test(correo)) {
     errores.correo = "Ese correo no tiene un formato válido.";
@@ -350,11 +332,12 @@ function AuthPage({ modo, onAutenticado, onSalir, onCambiarModo }) {
     errores.password = "La contraseña no cumple los requisitos.";
   }
   if (esRegistro) {
-    for (const campo of camposExtra) {
-      if (String(form[campo.name] ?? "").trim() === "") {
-        errores[campo.name] = `Completa ${campo.label.toLowerCase()}.`;
-      }
+    if (!form.confirmarPassword) errores.confirmarPassword = "Confirma tu contraseña.";
+    else if (!passwordsCoinciden) {
+      errores.confirmarPassword = "Las contraseñas no coinciden.";
     }
+    if (!boleta) errores.boleta = "Escribe tu boleta.";
+    if (!form.carrera) errores.carrera = "Elige tu carrera.";
   }
 
   const formOk = Object.keys(errores).length === 0;
@@ -376,12 +359,12 @@ function AuthPage({ modo, onAutenticado, onSalir, onCambiarModo }) {
     const cuerpo = esRegistro
       ? {
           nombre,
+          apellidoPaterno,
+          apellidoMaterno,
           correo,
           password: form.password,
-          tipo: form.tipo,
-          ...Object.fromEntries(
-            camposExtra.map((c) => [c.name, String(form[c.name]).trim()]),
-          ),
+          boleta,
+          carrera: form.carrera,
         }
       : { correo, password: form.password };
 
@@ -399,6 +382,12 @@ function AuthPage({ modo, onAutenticado, onSalir, onCambiarModo }) {
       setEnviando(false);
     }
   };
+
+  // El botón queda bloqueado también si las contraseñas no coinciden todavía.
+  const bloqueado =
+    enviando ||
+    (intentado && !formOk) ||
+    (esRegistro && form.confirmarPassword.length > 0 && !passwordsCoinciden);
 
   return (
     <div className="relative min-h-screen bg-white text-slate-800">
@@ -431,7 +420,7 @@ function AuthPage({ modo, onAutenticado, onSalir, onCambiarModo }) {
           </h1>
           <p className="mt-1 text-sm text-slate-500">
             {esRegistro
-              ? "Regístrate para acceder a tu panel de ESCATT."
+              ? "Regístrate como alumno para dar seguimiento a tu Trabajo Terminal."
               : "Entra con tu correo y contraseña."}
           </p>
 
@@ -465,14 +454,34 @@ function AuthPage({ modo, onAutenticado, onSalir, onCambiarModo }) {
 
           <form onSubmit={enviar} noValidate className="mt-5 space-y-4">
             {esRegistro && (
-              <CampoLive
-                label="Nombre"
-                value={form.nombre}
-                onChange={set("nombre")}
-                onBlur={alSalirCampo("nombre")}
-                error={mostrar("nombre")}
-                valido={valido("nombre")}
-              />
+              <>
+                <CampoLive
+                  label="Nombre"
+                  value={form.nombre}
+                  onChange={set("nombre")}
+                  onBlur={alSalirCampo("nombre")}
+                  error={mostrar("nombre")}
+                  valido={valido("nombre")}
+                />
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <CampoLive
+                    label="Apellido paterno"
+                    value={form.apellidoPaterno}
+                    onChange={set("apellidoPaterno")}
+                    onBlur={alSalirCampo("apellidoPaterno")}
+                    error={mostrar("apellidoPaterno")}
+                    valido={valido("apellidoPaterno")}
+                  />
+                  <CampoLive
+                    label="Apellido materno"
+                    value={form.apellidoMaterno}
+                    onChange={set("apellidoMaterno")}
+                    onBlur={alSalirCampo("apellidoMaterno")}
+                    error={mostrar("apellidoMaterno")}
+                    valido={valido("apellidoMaterno")}
+                  />
+                </div>
+              </>
             )}
 
             <CampoLive
@@ -486,9 +495,8 @@ function AuthPage({ modo, onAutenticado, onSalir, onCambiarModo }) {
             />
 
             <div>
-              <CampoLive
+              <CampoPassword
                 label="Contraseña"
-                type="password"
                 value={form.password}
                 onChange={set("password")}
                 onBlur={alSalirCampo("password")}
@@ -503,44 +511,42 @@ function AuthPage({ modo, onAutenticado, onSalir, onCambiarModo }) {
             </div>
 
             {esRegistro && (
-              <SelectLive
-                label="Tipo de usuario"
-                value={form.tipo}
-                onChange={set("tipo")}
-                opciones={OPCIONES_TIPO}
+              <CampoPassword
+                label="Confirmar contraseña"
+                value={form.confirmarPassword}
+                onChange={set("confirmarPassword")}
+                onBlur={alSalirCampo("confirmarPassword")}
+                error={mostrar("confirmarPassword")}
+                valido={form.confirmarPassword.length > 0 && passwordsCoinciden}
               />
             )}
 
-            {esRegistro &&
-              camposExtra.map((campo) =>
-                campo.tipo === "select" ? (
-                  <SelectLive
-                    key={campo.name}
-                    label={campo.label}
-                    value={form[campo.name]}
-                    onChange={set(campo.name)}
-                    onBlur={alSalirCampo(campo.name)}
-                    opciones={campo.opciones}
-                    placeholder="Selecciona…"
-                    error={mostrar(campo.name)}
-                    valido={valido(campo.name)}
-                  />
-                ) : (
-                  <CampoLive
-                    key={campo.name}
-                    label={campo.label}
-                    value={form[campo.name]}
-                    onChange={set(campo.name)}
-                    onBlur={alSalirCampo(campo.name)}
-                    error={mostrar(campo.name)}
-                    valido={valido(campo.name)}
-                  />
-                ),
-              )}
+            {esRegistro && (
+              <>
+                <CampoLive
+                  label="Boleta"
+                  value={form.boleta}
+                  onChange={set("boleta")}
+                  onBlur={alSalirCampo("boleta")}
+                  error={mostrar("boleta")}
+                  valido={valido("boleta")}
+                />
+                <SelectLive
+                  label="Carrera"
+                  value={form.carrera}
+                  onChange={set("carrera")}
+                  onBlur={alSalirCampo("carrera")}
+                  opciones={CARRERAS}
+                  placeholder="Selecciona…"
+                  error={mostrar("carrera")}
+                  valido={valido("carrera")}
+                />
+              </>
+            )}
 
             <button
               type="submit"
-              disabled={enviando || (intentado && !formOk)}
+              disabled={bloqueado}
               className="mt-1 inline-flex w-full items-center justify-center rounded-full px-5 py-3
                          font-semibold text-white shadow-lg shadow-[#1878B6]/30 transition
                          hover:-translate-y-0.5 hover:shadow-xl disabled:cursor-not-allowed disabled:opacity-60"
@@ -549,6 +555,12 @@ function AuthPage({ modo, onAutenticado, onSalir, onCambiarModo }) {
               {enviando ? "Enviando…" : esRegistro ? "Crear cuenta" : "Entrar"}
             </button>
           </form>
+
+          {esRegistro && (
+            <p className="mt-4 text-center text-xs text-slate-400">
+              ¿Eres sinodal o personal de la CATT? Tu cuenta la asigna un administrador.
+            </p>
+          )}
 
           <p className="mt-5 text-center text-sm text-slate-500">
             {esRegistro ? "¿Ya tienes cuenta? " : "¿No tienes cuenta? "}
@@ -932,9 +944,6 @@ export default function App() {
             <a href="#catt" className="transition hover:text-slate-900">
               ¿Qué es la CATT?
             </a>
-            <a href="#operaciones" className="transition hover:text-slate-900">
-              Operaciones
-            </a>
           </nav>
 
           <div className="ml-auto flex items-center gap-2 sm:gap-3">
@@ -987,42 +996,13 @@ export default function App() {
       </header>
 
       <main>
-        {/* HERO */}
-        <section
-          id="inicio"
-          className="mx-auto flex min-h-[88vh] max-w-3xl scroll-mt-24 flex-col items-center
-                     justify-center px-4 pb-16 pt-28 text-center"
-        >
-          <div
-            className="mb-6 flex h-20 w-20 items-center justify-center rounded-3xl shadow-lg shadow-[#1878B6]/25"
-            style={{ background: GRAD_AZUL }}
-          >
-            {/* Documento con check: protocolos de Trabajo Terminal gestionados */}
-            <svg width="34" height="34" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-              <path
-                d="M6 3.5h8l4 4V19a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 4 19V5A1.5 1.5 0 0 1 5.5 3.5H6Z"
-                stroke="white"
-                strokeWidth="1.6"
-                strokeLinejoin="round"
-              />
-              <path
-                d="M14 3.5V7a1 1 0 0 0 1 1h3.5"
-                stroke="white"
-                strokeWidth="1.6"
-                strokeLinejoin="round"
-              />
-              <path
-                d="M8.2 13.6l2.3 2.3 5-5"
-                stroke="white"
-                strokeWidth="1.8"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          </div>
-
+        {/* INICIO: encabezado breve + banner de etapas */}
+        <section id="inicio" className="mx-auto max-w-5xl scroll-mt-24 px-4 pb-10 pt-28">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#1878B6]">
+            ESCOM · Comisión Académica de Trabajos Terminales
+          </p>
           <h1
-            className="text-5xl font-bold tracking-tight sm:text-6xl"
+            className="mt-2 text-4xl font-bold tracking-tight sm:text-5xl"
             style={{
               backgroundImage: `linear-gradient(135deg, ${AZUL_OSCURO} 0%, ${AZUL_MEDIO} 60%, ${AZUL_CLARO} 100%)`,
               WebkitBackgroundClip: "text",
@@ -1032,22 +1012,10 @@ export default function App() {
           >
             ESCATT
           </h1>
-
-          <p className="mt-4 max-w-xl text-lg text-slate-600">
-            Administra a los participantes del proceso de titulación de la CATT — alumnos con
-            protocolo de Trabajo Terminal, sinodales y personal de coordinación.
+          <p className="mt-2 max-w-xl text-base text-slate-600 sm:text-lg">
+            Consulta el estado y las etapas de tu proceso de Trabajo Terminal.
           </p>
-
-          <button
-            type="button"
-            onClick={() => setPage("listado")}
-            className="mt-8 inline-flex items-center justify-center rounded-full px-7 py-3
-                       font-semibold text-white shadow-lg shadow-[#1878B6]/30 transition
-                       hover:-translate-y-0.5 hover:shadow-xl"
-            style={{ background: GRAD_AZUL }}
-          >
-            Ver listado de usuarios
-          </button>
+          <CarruselEtapas />
         </section>
 
         {/* ¿QUÉ ES LA CATT? */}
@@ -1056,89 +1024,18 @@ export default function App() {
           <p className="mt-4 text-lg leading-relaxed text-slate-600">
             La Comisión Académica de Trabajos Terminales (CATT) administra el proceso de
             titulación curricular de ESCOM: desde el registro del Protocolo, pasando por Trabajo
-            Terminal I y II, hasta la presentación final ante sinodales. ESCATT digitaliza el
-            registro y seguimiento de quienes participan en ese proceso.
+            Terminal I y II, hasta la presentación final ante sinodales. En este proceso participan
+            los alumnos con protocolo de Trabajo Terminal registrado, los sinodales designados y el
+            personal de coordinación de la CATT. ESCATT digitaliza el registro y seguimiento de
+            quienes participan en él.
           </p>
-          <CarruselEtapas />
-        </section>
-
-        {/* TARJETAS DE TIPOS DE USUARIO */}
-        <section className="mx-auto max-w-6xl px-4 py-16">
-          <div className="grid gap-6 sm:grid-cols-3">
-            {TIPOS.map((tipo) => (
-              <div
-                key={tipo.rol}
-                className={`rounded-3xl p-6 transition duration-300 hover:-translate-y-1 hover:shadow-xl ${VIDRIO}`}
-              >
-                <div
-                  className="mb-4 flex h-11 w-11 items-center justify-center rounded-2xl text-sm font-bold text-white"
-                  style={{ backgroundImage: GRAD_AZUL }}
-                >
-                  {tipo.rol[0]}
-                </div>
-                <h3 className="text-lg font-bold text-slate-800">{tipo.rol}</h3>
-                <p className="mt-1.5 text-sm leading-relaxed text-slate-600">{tipo.texto}</p>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {/* GRID DE OPERACIONES */}
-        <section id="operaciones" className="mx-auto max-w-6xl scroll-mt-24 px-4 py-20">
-          <h2 className="text-3xl font-bold text-slate-800 sm:text-4xl">Operaciones</h2>
-          <p className="mt-3 text-slate-600">
-            Todo lo que ESCATT permite hacer sobre el padrón de participantes.
-          </p>
-          <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-            {OPERACIONES.map((op) => (
-              <div
-                key={op.etiqueta}
-                className={`flex flex-col items-center gap-3 rounded-2xl p-5 text-center transition
-                           duration-300 hover:-translate-y-1 hover:shadow-lg ${VIDRIO}`}
-              >
-                <svg
-                  width="26"
-                  height="26"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.6"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  style={{ color: AZUL_MEDIO }}
-                  aria-hidden="true"
-                >
-                  {op.icono}
-                </svg>
-                <span className="text-sm font-semibold text-slate-700">{op.etiqueta}</span>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {/* CHIPS DE STACK */}
-        <section className="mx-auto max-w-6xl px-4 pb-16">
-          <div className="flex flex-wrap justify-center gap-3">
-            {CHIPS.map((chip) => (
-              <span
-                key={chip}
-                className="rounded-full border border-[#1878B6]/20 bg-[#4FB3E8]/10 px-4 py-1.5
-                           text-sm font-medium text-[#0F5C8C]"
-              >
-                {chip}
-              </span>
-            ))}
-          </div>
         </section>
       </main>
 
       {/* FOOTER */}
       <footer className="border-t border-white/50 bg-white/50 px-4 py-8 backdrop-blur-sm">
         <div className="mx-auto flex max-w-6xl flex-col items-center gap-4 text-center text-sm text-slate-500 sm:flex-row sm:justify-between sm:text-left">
-          <p>
-            ESCATT — Escuela Superior de Cómputo, IPN · Desarrollado por Bryan, Edgar, Joshua y
-            Eduardo — Nexus Solutions
-          </p>
+          <p>© 2026 ESCATT — Sistema desarrollado por Nexus Solutions para ESCOM-IPN.</p>
           <InsigniaNexus />
         </div>
       </footer>

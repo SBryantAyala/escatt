@@ -2,7 +2,6 @@ import { Router } from "express";
 import crypto from "node:crypto";
 
 import { db } from "../db/index.js";
-import { TIPOS_VALIDOS, CAMPOS_POR_TIPO } from "../lib/tipos-usuario.js";
 
 const router = Router();
 
@@ -11,24 +10,6 @@ const CORREO_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 // Las 3 carreras reales de ESCOM.
 const CARRERAS_VALIDAS = ["ISC", "IIA", "LCD"];
-
-// Campos específicos OBLIGATORIOS en el registro, por tipo. Es un subconjunto de
-// CAMPOS_POR_TIPO: p.ej. protocolo_tt (alumno) no se pide aquí, se llena después
-// desde el panel administrativo y queda NULL en el alta.
-const REQUERIDOS_REGISTRO = {
-  alumno: ["boleta", "carrera"],
-  sinodal: ["numero_empleado", "especialidad"],
-  personal: ["numero_empleado", "cargo"],
-};
-
-const COLUMNAS_ESPECIFICAS = [
-  "boleta",
-  "carrera",
-  "protocolo_tt",
-  "numero_empleado",
-  "especialidad",
-  "cargo",
-];
 
 // --- Helpers de contraseña (scrypt + comparación en tiempo constante) ---
 
@@ -96,18 +77,29 @@ function usuarioDeToken(token) {
 }
 
 // POST /api/auth/registro
+// El registro público SOLO crea alumnos. El `tipo` NUNCA se lee del body: nadie
+// puede auto-asignarse una cuenta de sinodal/personal desde aquí (esas se dan de
+// alta por la vía administrativa + scripts/asignar-credenciales.js).
 router.post("/registro", (req, res) => {
   const cuerpo = req.body ?? {};
   const nombre = typeof cuerpo.nombre === "string" ? cuerpo.nombre.trim() : "";
+  const apellidoPaterno =
+    typeof cuerpo.apellidoPaterno === "string" ? cuerpo.apellidoPaterno.trim() : "";
+  const apellidoMaterno =
+    typeof cuerpo.apellidoMaterno === "string" ? cuerpo.apellidoMaterno.trim() : "";
   const correo = typeof cuerpo.correo === "string" ? cuerpo.correo.trim() : "";
   const password = typeof cuerpo.password === "string" ? cuerpo.password : "";
-  const tipo = typeof cuerpo.tipo === "string" ? cuerpo.tipo.trim() : "";
+  const boleta = typeof cuerpo.boleta === "string" ? cuerpo.boleta.trim() : "";
+  const carrera = typeof cuerpo.carrera === "string" ? cuerpo.carrera.trim() : "";
 
   const faltantes = [];
   if (!nombre) faltantes.push("nombre");
+  if (!apellidoPaterno) faltantes.push("apellidoPaterno");
+  if (!apellidoMaterno) faltantes.push("apellidoMaterno");
   if (!correo) faltantes.push("correo");
   if (!password) faltantes.push("password");
-  if (!tipo) faltantes.push("tipo");
+  if (!boleta) faltantes.push("boleta");
+  if (!carrera) faltantes.push("carrera");
   if (faltantes.length > 0) {
     return res
       .status(400)
@@ -125,49 +117,27 @@ router.post("/registro", (req, res) => {
     });
   }
 
-  if (!TIPOS_VALIDOS.includes(tipo)) {
-    return res.status(400).json({
-      error: `tipo inválido: "${tipo}". Debe ser uno de: ${TIPOS_VALIDOS.join(", ")}`,
-    });
-  }
-
-  // Campos específicos: partimos todo en NULL y llenamos los requeridos del tipo.
-  const especificos = Object.fromEntries(COLUMNAS_ESPECIFICAS.map((c) => [c, null]));
-  const faltantesTipo = [];
-  for (const campo of REQUERIDOS_REGISTRO[tipo]) {
-    const bruto = cuerpo[campo];
-    const valor = typeof bruto === "string" ? bruto.trim() : bruto;
-    if (valor === undefined || valor === null || valor === "") {
-      faltantesTipo.push(campo);
-    } else {
-      especificos[campo] = valor;
-    }
-  }
-  if (faltantesTipo.length > 0) {
-    return res.status(400).json({
-      error: `Faltan campos requeridos para tipo "${tipo}": ${faltantesTipo.join(", ")}`,
-    });
-  }
-
-  if (tipo === "alumno" && !CARRERAS_VALIDAS.includes(especificos.carrera)) {
+  if (!CARRERAS_VALIDAS.includes(carrera)) {
     return res.status(400).json({
       error: `carrera inválida: debe ser una de ${CARRERAS_VALIDAS.join(", ")}`,
     });
   }
+
+  // Los 3 nombres van juntos a la columna `usuarios.nombre` (sin cambiar su tipo).
+  const nombreCompleto = `${nombre} ${apellidoPaterno} ${apellidoMaterno}`;
 
   const salt = crypto.randomBytes(16).toString("hex");
   const passwordHash = derivar(password, salt).toString("hex");
 
   try {
     const registrar = db.transaction(() => {
+      // Solo alumno: boleta y carrera; el resto de campos específicos van NULL.
       const info = db
         .prepare(
-          `INSERT INTO usuarios
-             (nombre, correo, tipo, boleta, carrera, protocolo_tt, numero_empleado, especialidad, cargo)
-           VALUES
-             (@nombre, @correo, @tipo, @boleta, @carrera, @protocolo_tt, @numero_empleado, @especialidad, @cargo)`,
+          `INSERT INTO usuarios (nombre, correo, tipo, boleta, carrera)
+           VALUES (@nombre, @correo, 'alumno', @boleta, @carrera)`,
         )
-        .run({ nombre, correo, tipo, ...especificos });
+        .run({ nombre: nombreCompleto, correo, boleta, carrera });
 
       const usuarioId = Number(info.lastInsertRowid);
       db.prepare(
