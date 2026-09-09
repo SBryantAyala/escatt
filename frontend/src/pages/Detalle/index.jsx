@@ -2,35 +2,9 @@ import React, { useState } from "react";
 
 const API_BASE_URL = "/usuarios";
 
-/** Error genérico de la API, con el status HTTP para que la interfaz decida cómo reaccionar. */
-export class ApiError extends Error {
-  constructor(message, status) {
-    super(message);
-    this.name = "ApiError";
-    this.status = status;
-  }
-}
-
-/** Error específico para 404 (usuario no encontrado), útil para mostrar un mensaje distinto. */
-export class NotFoundError extends ApiError {
-  constructor(message = "El usuario no existe.") {
-    super(message, 404);
-    this.name = "NotFoundError";
-  }
-}
-
-/** Intenta leer un mensaje de error del cuerpo de la respuesta; si no hay, devuelve null. */
-async function readErrorMessage(response) {
-  try {
-    const body = await response.json();
-    return body?.message || body?.error || null;
-  } catch {
-    return null;
-  }
-}
 
 export const userService = {
-  /** GET /usuarios/:id */
+  /* GET /usuarios/:id */
   async getUser(id) {
     const response = await fetch(`${API_BASE_URL}/${id}`);
 
@@ -49,10 +23,7 @@ export const userService = {
     return response.json();
   },
 
-  /**
-   * PUT /usuarios/:id
-   * `data` debe contener únicamente los campos que se quieren modificar.
-   */
+  /* PUT /usuarios/:id */
   async updateUser(id, data) {
     const response = await fetch(`${API_BASE_URL}/${id}`, {
       method: "PUT",
@@ -72,8 +43,6 @@ export const userService = {
       );
     }
 
-    // Algunos backends responden 200 sin cuerpo (o con un cuerpo vacío);
-    // en ese caso simplemente no hay datos adicionales que fusionar.
     try {
       return await response.json();
     } catch {
@@ -262,7 +231,7 @@ function FieldEdit({ def, value, error, onChange }) {
   );
 }
 
-/* Fila en modo edición para un campo de selección (dropdown). */
+/* Fila en modo edición para un campo de selección. */
 function SelectEdit({ def, value, error, onChange }) {
   return (
     <div className="py-3">
@@ -302,7 +271,7 @@ function SelectEdit({ def, value, error, onChange }) {
   );
 }
 
-/* Fila de solo lectura para "Creado en": nunca es editable. */
+/* Fila de solo lectura para "Creado en". */
 function ReadOnlyField({ label, value }) {
   return (
     <div className="py-3">
@@ -406,7 +375,6 @@ const SECCION_TITULOS = {
 };
 
 export default function UserProfileForm({userId, onVolver}) {
-  //const userId = 1;
 
   const [originalData, setOriginalData] = useState(null);
   const [formData, setFormData] = useState(null);
@@ -452,7 +420,6 @@ export default function UserProfileForm({userId, onVolver}) {
 
   function handleTipoChange(nuevoTipo) {
     setFormData((prev) => ({ ...prev, tipo: nuevoTipo }));
-    // Al cambiar de tipo, los errores de los campos específicos del tipo anterior ya no aplican y se descartan.
     setErrors((prev) => {
       const next = { ...prev };
       delete next.tipo;
@@ -605,8 +572,6 @@ export default function UserProfileForm({userId, onVolver}) {
                   </p>
                 </div>
               )}
-
-              {/* Creado en: siempre de solo lectura */}
               <ReadOnlyField
                 label="Creado en"
                 value={formatFecha(originalData.creado_en)}
