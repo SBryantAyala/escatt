@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 // Pantalla: Listado (+ Revocar acceso + Reactivar + Eliminar)
 // Responsable: Edgar (rama feature/listado-revocar-eliminar)
@@ -39,8 +39,8 @@ async function api(ruta, { method = "GET", body } = {}) {
   return datos;
 }
 
-// Los 3 tipos de usuario, en el orden en que se muestran las secciones.
-const SECCIONES = [
+// Los 3 tipos de usuario, en el orden en que se muestran las pestañas.
+const PESTANAS = [
   { tipo: "alumno", titulo: "Alumnos" },
   { tipo: "sinodal", titulo: "Sinodales" },
   { tipo: "personal", titulo: "Personal CATT" },
@@ -51,6 +51,14 @@ function formatFecha(valor) {
   const fecha = new Date(valor.replace(" ", "T"));
   if (Number.isNaN(fecha.getTime())) return valor;
   return fecha.toLocaleDateString("es-MX", { year: "numeric", month: "short", day: "2-digit" });
+}
+
+// Sin acentos y en minúsculas, para que buscar "jose" también encuentre "José".
+function normalizar(texto) {
+  return texto
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase();
 }
 
 function EstadoBadge({ activo }) {
@@ -178,53 +186,12 @@ function FilaUsuario({ usuario, avisoFila, onPedirConfirmacion }) {
   );
 }
 
-// Una sección por tipo de usuario (alumno / sinodal / personal), cada una
-// con su propia tabla — así no se mezclan entre sí.
-function SeccionTipo({ titulo, usuarios, avisoFila, onPedirConfirmacion }) {
-  return (
-    <div className="mt-6">
-      <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-[#0F5C8C]">
-        {titulo}
-        <span className="rounded-full bg-[#4FB3E8]/15 px-2 py-0.5 text-xs font-medium text-[#0F5C8C]">
-          {usuarios.length}
-        </span>
-      </h2>
-
-      <div className="mt-2 overflow-x-auto rounded-2xl bg-white/60">
-        {usuarios.length === 0 ? (
-          <p className="p-4 text-sm text-slate-400">No hay {titulo.toLowerCase()} registrados.</p>
-        ) : (
-          <table className="w-full text-left text-sm">
-            <thead>
-              <tr className="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-400">
-                <th className="py-2 pl-4 pr-4 font-medium">Nombre</th>
-                <th className="py-2 pr-4 font-medium">Correo</th>
-                <th className="py-2 pr-4 font-medium">Estado</th>
-                <th className="py-2 pr-4 font-medium">Alta</th>
-                <th className="py-2 pr-4 text-right font-medium">Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              {usuarios.map((usuario) => (
-                <FilaUsuario
-                  key={usuario.id}
-                  usuario={usuario}
-                  avisoFila={avisoFila}
-                  onPedirConfirmacion={onPedirConfirmacion}
-                />
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
-    </div>
-  );
-}
-
 export default function ListadoPage({ onVolver }) {
   const [usuarios, setUsuarios] = useState(null);
   const [cargando, setCargando] = useState(true);
   const [errorCarga, setErrorCarga] = useState(null);
+  const [tabActiva, setTabActiva] = useState("alumno");
+  const [busqueda, setBusqueda] = useState("");
   const [accionPendiente, setAccionPendiente] = useState(null); // { tipo: 'revocar'|'reactivar'|'eliminar', usuario }
   const [procesando, setProcesando] = useState(false);
   const [avisoFila, setAvisoFila] = useState(null); // { id, tipo: 'ok'|'error', mensaje }
@@ -241,6 +208,29 @@ export default function ListadoPage({ onVolver }) {
   useEffect(() => {
     cargarUsuarios();
   }, [cargarUsuarios]);
+
+  function cambiarTab(tipo) {
+    setTabActiva(tipo);
+    setBusqueda(""); // cada pestaña empieza sin filtro de búsqueda
+  }
+
+  // Conteo por tipo (sobre el total, no sobre lo filtrado) para el número en la pestaña.
+  const conteosPorTipo = useMemo(() => {
+    const conteo = { alumno: 0, sinodal: 0, personal: 0 };
+    for (const u of usuarios ?? []) {
+      if (conteo[u.tipo] !== undefined) conteo[u.tipo] += 1;
+    }
+    return conteo;
+  }, [usuarios]);
+
+  const usuariosDeLaTab = useMemo(() => {
+    const deLaTab = (usuarios ?? []).filter((u) => u.tipo === tabActiva);
+    const consulta = normalizar(busqueda.trim());
+    if (!consulta) return deLaTab;
+    return deLaTab.filter(
+      (u) => normalizar(u.nombre).includes(consulta) || normalizar(u.correo).includes(consulta),
+    );
+  }, [usuarios, tabActiva, busqueda]);
 
   function pedirConfirmacion(tipo, usuario) {
     setAccionPendiente({ tipo, usuario });
@@ -283,6 +273,8 @@ export default function ListadoPage({ onVolver }) {
         setAccionPendiente(null);
       });
   }
+
+  const tituloTabActiva = PESTANAS.find((p) => p.tipo === tabActiva)?.titulo ?? "";
 
   return (
     <div className="relative min-h-screen bg-white text-slate-800">
@@ -340,16 +332,74 @@ export default function ListadoPage({ onVolver }) {
             <p className="mt-6 p-4 text-sm text-slate-400">Consultando /api/usuarios…</p>
           )}
 
-          {usuarios &&
-            SECCIONES.map(({ tipo, titulo }) => (
-              <SeccionTipo
-                key={tipo}
-                titulo={titulo}
-                usuarios={usuarios.filter((u) => u.tipo === tipo)}
-                avisoFila={avisoFila}
-                onPedirConfirmacion={pedirConfirmacion}
-              />
-            ))}
+          {usuarios && (
+            <>
+              {/* Pestañas */}
+              <div className="mt-6 flex flex-wrap gap-2 border-b border-slate-200 pb-3">
+                {PESTANAS.map(({ tipo, titulo }) => {
+                  const activa = tipo === tabActiva;
+                  return (
+                    <button
+                      key={tipo}
+                      type="button"
+                      onClick={() => cambiarTab(tipo)}
+                      className={`rounded-full px-4 py-1.5 text-sm font-semibold transition ${
+                        activa
+                          ? "text-white shadow-md shadow-[#1878B6]/30"
+                          : "border border-slate-200 text-slate-600 hover:bg-slate-50"
+                      }`}
+                      style={activa ? { background: GRAD_AZUL } : undefined}
+                    >
+                      {titulo} <span className={activa ? "text-white/80" : "text-slate-400"}>({conteosPorTipo[tipo]})</span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Búsqueda */}
+              <div className="mt-4">
+                <input
+                  type="search"
+                  value={busqueda}
+                  onChange={(e) => setBusqueda(e.target.value)}
+                  placeholder={`Buscar en ${tituloTabActiva.toLowerCase()} por nombre o correo…`}
+                  className="w-full rounded-full border border-slate-200 bg-white px-4 py-2 text-sm text-slate-700 placeholder:text-slate-400 focus:border-[#4FB3E8] focus:outline-none focus:ring-2 focus:ring-[#4FB3E8]/30"
+                />
+              </div>
+
+              <div className="mt-4 overflow-x-auto rounded-2xl bg-white/60">
+                {usuariosDeLaTab.length === 0 ? (
+                  <p className="p-4 text-sm text-slate-400">
+                    {busqueda.trim()
+                      ? "No hay resultados para tu búsqueda."
+                      : `No hay ${tituloTabActiva.toLowerCase()} registrados.`}
+                  </p>
+                ) : (
+                  <table className="w-full text-left text-sm">
+                    <thead>
+                      <tr className="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-400">
+                        <th className="py-2 pl-4 pr-4 font-medium">Nombre</th>
+                        <th className="py-2 pr-4 font-medium">Correo</th>
+                        <th className="py-2 pr-4 font-medium">Estado</th>
+                        <th className="py-2 pr-4 font-medium">Alta</th>
+                        <th className="py-2 pr-4 text-right font-medium">Acciones</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {usuariosDeLaTab.map((usuario) => (
+                        <FilaUsuario
+                          key={usuario.id}
+                          usuario={usuario}
+                          avisoFila={avisoFila}
+                          onPedirConfirmacion={pedirConfirmacion}
+                        />
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            </>
+          )}
         </div>
       </div>
 
