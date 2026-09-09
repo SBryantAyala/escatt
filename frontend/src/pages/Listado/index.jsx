@@ -39,11 +39,12 @@ async function api(ruta, { method = "GET", body } = {}) {
   return datos;
 }
 
-const ETIQUETA_TIPO = {
-  alumno: "Alumno",
-  sinodal: "Sinodal",
-  personal: "Personal CATT",
-};
+// Los 3 tipos de usuario, en el orden en que se muestran las secciones.
+const SECCIONES = [
+  { tipo: "alumno", titulo: "Alumnos" },
+  { tipo: "sinodal", titulo: "Sinodales" },
+  { tipo: "personal", titulo: "Personal CATT" },
+];
 
 function formatFecha(valor) {
   if (!valor) return "—";
@@ -122,6 +123,99 @@ function ConfirmDialog({ accion, onCancelar, onConfirmar, procesando }) {
             {procesando ? "Procesando…" : TITULO_CONFIRMACION[tipo]}
           </button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function FilaUsuario({ usuario, avisoFila, onPedirConfirmacion }) {
+  return (
+    <tr className="border-b border-slate-100 last:border-0">
+      <td className="py-3 pl-4 pr-4 font-medium text-slate-700">{usuario.nombre}</td>
+      <td className="py-3 pr-4 text-slate-500">{usuario.correo}</td>
+      <td className="py-3 pr-4">
+        <EstadoBadge activo={usuario.activo} />
+      </td>
+      <td className="py-3 pr-4 text-slate-500">{formatFecha(usuario.creado_en)}</td>
+      <td className="py-3 pr-4">
+        <div className="flex justify-end gap-2">
+          {usuario.activo ? (
+            <button
+              type="button"
+              onClick={() => onPedirConfirmacion("revocar", usuario)}
+              className="rounded-full border border-amber-200 px-2.5 py-1 text-xs font-medium text-amber-700 hover:bg-amber-50"
+            >
+              Revocar acceso
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => onPedirConfirmacion("reactivar", usuario)}
+              className="rounded-full border border-[#1878B6]/30 px-2.5 py-1 text-xs font-medium text-[#0F5C8C] hover:bg-[#4FB3E8]/10"
+            >
+              Reactivar acceso
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => onPedirConfirmacion("eliminar", usuario)}
+            className="rounded-full border border-red-200 px-2.5 py-1 text-xs font-medium text-red-700 hover:bg-red-50"
+          >
+            Eliminar
+          </button>
+        </div>
+        {avisoFila?.id === usuario.id && (
+          <p
+            className={`mt-1 text-right text-xs ${
+              avisoFila.tipo === "ok" ? "text-emerald-600" : "text-red-600"
+            }`}
+          >
+            {avisoFila.mensaje}
+          </p>
+        )}
+      </td>
+    </tr>
+  );
+}
+
+// Una sección por tipo de usuario (alumno / sinodal / personal), cada una
+// con su propia tabla — así no se mezclan entre sí.
+function SeccionTipo({ titulo, usuarios, avisoFila, onPedirConfirmacion }) {
+  return (
+    <div className="mt-6">
+      <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-[#0F5C8C]">
+        {titulo}
+        <span className="rounded-full bg-[#4FB3E8]/15 px-2 py-0.5 text-xs font-medium text-[#0F5C8C]">
+          {usuarios.length}
+        </span>
+      </h2>
+
+      <div className="mt-2 overflow-x-auto rounded-2xl bg-white/60">
+        {usuarios.length === 0 ? (
+          <p className="p-4 text-sm text-slate-400">No hay {titulo.toLowerCase()} registrados.</p>
+        ) : (
+          <table className="w-full text-left text-sm">
+            <thead>
+              <tr className="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-400">
+                <th className="py-2 pl-4 pr-4 font-medium">Nombre</th>
+                <th className="py-2 pr-4 font-medium">Correo</th>
+                <th className="py-2 pr-4 font-medium">Estado</th>
+                <th className="py-2 pr-4 font-medium">Alta</th>
+                <th className="py-2 pr-4 text-right font-medium">Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              {usuarios.map((usuario) => (
+                <FilaUsuario
+                  key={usuario.id}
+                  usuario={usuario}
+                  avisoFila={avisoFila}
+                  onPedirConfirmacion={onPedirConfirmacion}
+                />
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
     </div>
   );
@@ -242,82 +336,20 @@ export default function ListadoPage({ onVolver }) {
             </p>
           )}
 
-          <div className="mt-6 overflow-x-auto rounded-2xl bg-white/60">
-            {cargando && !usuarios && (
-              <p className="p-4 text-sm text-slate-400">Consultando /api/usuarios…</p>
-            )}
+          {cargando && !usuarios && (
+            <p className="mt-6 p-4 text-sm text-slate-400">Consultando /api/usuarios…</p>
+          )}
 
-            {usuarios && usuarios.length === 0 && (
-              <p className="p-4 text-sm text-slate-400">No hay usuarios registrados.</p>
-            )}
-
-            {usuarios && usuarios.length > 0 && (
-              <table className="w-full text-left text-sm">
-                <thead>
-                  <tr className="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-400">
-                    <th className="py-2 pl-4 pr-4 font-medium">Nombre</th>
-                    <th className="py-2 pr-4 font-medium">Correo</th>
-                    <th className="py-2 pr-4 font-medium">Tipo</th>
-                    <th className="py-2 pr-4 font-medium">Estado</th>
-                    <th className="py-2 pr-4 font-medium">Alta</th>
-                    <th className="py-2 pr-4 text-right font-medium">Acciones</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {usuarios.map((usuario) => (
-                    <tr key={usuario.id} className="border-b border-slate-100 last:border-0">
-                      <td className="py-3 pl-4 pr-4 font-medium text-slate-700">{usuario.nombre}</td>
-                      <td className="py-3 pr-4 text-slate-500">{usuario.correo}</td>
-                      <td className="py-3 pr-4 text-slate-500">
-                        {ETIQUETA_TIPO[usuario.tipo] ?? usuario.tipo}
-                      </td>
-                      <td className="py-3 pr-4">
-                        <EstadoBadge activo={usuario.activo} />
-                      </td>
-                      <td className="py-3 pr-4 text-slate-500">{formatFecha(usuario.creado_en)}</td>
-                      <td className="py-3 pr-4">
-                        <div className="flex justify-end gap-2">
-                          {usuario.activo ? (
-                            <button
-                              type="button"
-                              onClick={() => pedirConfirmacion("revocar", usuario)}
-                              className="rounded-full border border-amber-200 px-2.5 py-1 text-xs font-medium text-amber-700 hover:bg-amber-50"
-                            >
-                              Revocar acceso
-                            </button>
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={() => pedirConfirmacion("reactivar", usuario)}
-                              className="rounded-full border border-[#1878B6]/30 px-2.5 py-1 text-xs font-medium text-[#0F5C8C] hover:bg-[#4FB3E8]/10"
-                            >
-                              Reactivar acceso
-                            </button>
-                          )}
-                          <button
-                            type="button"
-                            onClick={() => pedirConfirmacion("eliminar", usuario)}
-                            className="rounded-full border border-red-200 px-2.5 py-1 text-xs font-medium text-red-700 hover:bg-red-50"
-                          >
-                            Eliminar
-                          </button>
-                        </div>
-                        {avisoFila?.id === usuario.id && (
-                          <p
-                            className={`mt-1 text-right text-xs ${
-                              avisoFila.tipo === "ok" ? "text-emerald-600" : "text-red-600"
-                            }`}
-                          >
-                            {avisoFila.mensaje}
-                          </p>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
+          {usuarios &&
+            SECCIONES.map(({ tipo, titulo }) => (
+              <SeccionTipo
+                key={tipo}
+                titulo={titulo}
+                usuarios={usuarios.filter((u) => u.tipo === tipo)}
+                avisoFila={avisoFila}
+                onPedirConfirmacion={pedirConfirmacion}
+              />
+            ))}
         </div>
       </div>
 
