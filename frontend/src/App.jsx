@@ -973,6 +973,7 @@ export default function App() {
   const [scrolled, setScrolled] = useState(false);
   const [usuario, setUsuario] = useState(null);
   const [cargandoSesion, setCargandoSesion] = useState(true);
+  const [confirmandoSalida, setConfirmandoSalida] = useState(false);
 
   useEffect(() => {
     const alHacerScroll = () => setScrolled(window.scrollY > 8);
@@ -1109,7 +1110,7 @@ export default function App() {
                 </button>
                 <button
                   type="button"
-                  onClick={cerrarSesion}
+                  onClick={() => setConfirmandoSalida(true)}
                   className="rounded-full px-3 py-1.5 text-xs font-semibold text-white shadow-md
                              shadow-[#1878B6]/30 transition hover:-translate-y-0.5 hover:shadow-lg sm:px-4 sm:text-sm"
                   style={{ backgroundImage: GRAD_AZUL }}
@@ -1192,6 +1193,38 @@ export default function App() {
           <InsigniaNexus />
         </div>
       </footer>
+
+      {/* Confirmación antes de cerrar sesión */}
+      {confirmandoSalida && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4 backdrop-blur-sm">
+          <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl">
+            <h3 className="text-lg font-semibold text-slate-800">¿Cerrar sesión?</h3>
+            <p className="mt-2 text-sm text-slate-500">
+              Vas a salir de tu cuenta. Puedes volver a iniciar sesión cuando quieras.
+            </p>
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setConfirmandoSalida(false)}
+                className="rounded-full px-4 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-100"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setConfirmandoSalida(false);
+                  cerrarSesion();
+                }}
+                className="rounded-full bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow-md
+                           shadow-red-600/30 transition hover:-translate-y-0.5 hover:bg-red-700 hover:shadow-lg"
+              >
+                Cerrar sesión
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
