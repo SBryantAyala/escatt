@@ -292,11 +292,14 @@ const SECCIONES = [
         props: { embebido: true },
       },
       {
+        // Ya no es un ítem propio del sidebar: se llega aquí desde el botón
+        // "Registrar <tipo>" de la pestaña activa en Usuarios (Listado).
         clave: "alta",
         etiqueta: "Alta",
         icono: IconoAltaUsuario,
         roles: ["personal"],
         Componente: AltaPage,
+        oculto: true,
       },
       {
         clave: "detalle",
