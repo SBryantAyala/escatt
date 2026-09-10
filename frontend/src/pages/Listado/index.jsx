@@ -1,43 +1,17 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { api } from "../../lib/api";
+import { AZUL_CLARO, AZUL_MEDIO, GRAD_AZUL, VIDRIO } from "../../lib/theme";
 
 // Pantalla: Listado (+ Revocar acceso + Reactivar + Eliminar)
 // Responsable: Edgar (rama feature/listado-revocar-eliminar)
 // Consume /api/usuarios ya implementado por Bryan:
 //   GET /usuarios, PATCH /usuarios/:id/revocar, PUT /usuarios/:id, DELETE /usuarios/:id
-
-const API_BASE = import.meta.env.VITE_API_URL ?? "";
-
-// Paleta institucional de ESCATT (mismos valores que frontend/src/App.jsx,
-// duplicados aquí porque App.jsx no los exporta).
-const AZUL_MEDIO = "#1878B6";
-const AZUL_CLARO = "#4FB3E8";
-const GRAD_AZUL = `linear-gradient(135deg, ${AZUL_MEDIO} 0%, ${AZUL_CLARO} 100%)`;
-const VIDRIO = "border border-white/60 bg-white/70 backdrop-blur-xl shadow-lg shadow-[#1878B6]/10";
-
-// Cliente HTTP mínimo, mismo patrón que el resto de la app (adjunta el
-// token si existe y normaliza errores para mostrarlos en la UI, nunca alert()).
-async function api(ruta, { method = "GET", body } = {}) {
-  const headers = { "Content-Type": "application/json" };
-  const token = localStorage.getItem("escatt_token");
-  if (token) headers.Authorization = `Bearer ${token}`;
-
-  const resp = await fetch(`${API_BASE}${ruta}`, {
-    method,
-    headers,
-    body: body ? JSON.stringify(body) : undefined,
-  });
-
-  let datos = null;
-  try {
-    datos = await resp.json();
-  } catch {
-    datos = null;
-  }
-  if (!resp.ok) {
-    throw new Error(datos?.error || `Error ${resp.status}`);
-  }
-  return datos;
-}
+//
+// Se usa de dos formas:
+//   - Suelta (con su propio marco de pantalla completa), pasando `onVolver`.
+//   - Embebida como la sección "Alumnos" del panel (pages/Panel), pasando
+//     `embebido` — entonces sólo renderiza la tarjeta, sin marco ni fondo.
+// La paleta, la clase VIDRIO y el cliente `api()` se importan de src/lib.
 
 // Los 3 tipos de usuario, en el orden en que se muestran las pestañas.
 const PESTANAS = [
@@ -136,7 +110,7 @@ function ConfirmDialog({ accion, onCancelar, onConfirmar, procesando }) {
   );
 }
 
-function FilaUsuario({ usuario, avisoFila, onPedirConfirmacion }) {
+function FilaUsuario({ usuario, avisoFila, onPedirConfirmacion, onVerDetalle }) {
   return (
     <tr className="border-b border-slate-100 last:border-0">
       <td className="py-3 pl-4 pr-4 font-medium text-slate-700">{usuario.nombre}</td>
@@ -147,6 +121,13 @@ function FilaUsuario({ usuario, avisoFila, onPedirConfirmacion }) {
       <td className="py-3 pr-4 text-slate-500">{formatFecha(usuario.creado_en)}</td>
       <td className="py-3 pr-4">
         <div className="flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={() => onVerDetalle?.(usuario)}
+            className="rounded-full border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"
+          >
+            Ver
+          </button>
           {usuario.activo ? (
             <button
               type="button"
@@ -186,7 +167,7 @@ function FilaUsuario({ usuario, avisoFila, onPedirConfirmacion }) {
   );
 }
 
-export default function ListadoPage({ onVolver }) {
+export default function ListadoPage({ onVolver, embebido = false, onVerDetalle }) {
   const [usuarios, setUsuarios] = useState(null);
   const [cargando, setCargando] = useState(true);
   const [errorCarga, setErrorCarga] = useState(null);
@@ -276,38 +257,23 @@ export default function ListadoPage({ onVolver }) {
 
   const tituloTabActiva = PESTANAS.find((p) => p.tipo === tabActiva)?.titulo ?? "";
 
-  return (
-    <div className="relative min-h-screen bg-white text-slate-800">
-      <div aria-hidden="true" className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
-        <div
-          className="absolute -left-24 -top-28 h-[30rem] w-[30rem] rounded-full blur-3xl"
-          style={{ background: `radial-gradient(circle at 30% 30%, ${AZUL_CLARO}55, transparent 70%)` }}
-        />
-        <div
-          className="absolute -right-32 top-1/3 h-[34rem] w-[34rem] rounded-full blur-3xl"
-          style={{ background: `radial-gradient(circle at 50% 50%, ${AZUL_MEDIO}44, transparent 70%)` }}
-        />
-      </div>
-
-      <div className="mx-auto flex min-h-screen max-w-5xl flex-col px-4 py-12">
-        {onVolver && (
-          <button
-            type="button"
-            onClick={onVolver}
-            className="mb-4 self-start rounded-full px-3 py-1.5 text-sm font-medium text-slate-500 transition hover:text-slate-800"
-          >
-            ← Volver
-          </button>
-        )}
-
-        <div className={`rounded-3xl p-8 ${VIDRIO} bg-white/85`}>
+  const panel = (
+    <div className={`rounded-3xl p-6 sm:p-8 ${VIDRIO} bg-white/85`}>
           <div className="flex flex-wrap items-baseline justify-between gap-4">
             <div>
-              <span className="inline-flex items-center rounded-full bg-[#4FB3E8]/15 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-[#0F5C8C]">
-                Panel · Listado de usuarios
-              </span>
-              <h1 className="mt-3 text-2xl font-bold text-slate-800 sm:text-3xl">Usuarios — CATT</h1>
-              <p className="mt-1 text-sm text-slate-600">
+              {/* Embebido en el dashboard: el breadcrumb y el sidebar ya dan
+                  este contexto (Panel / Usuarios), así que aquí no se repite
+                  el eyebrow ni el título — solo cuando esta pantalla se
+                  renderiza sola (embebido=false) los necesita. */}
+              {!embebido && (
+                <>
+                  <span className="inline-flex items-center rounded-full bg-[#4FB3E8]/15 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-[#0F5C8C]">
+                    Panel · Listado de usuarios
+                  </span>
+                  <h1 className="mt-3 text-2xl font-bold text-slate-800 sm:text-3xl">Usuarios — CATT</h1>
+                </>
+              )}
+              <p className={`text-sm text-slate-600 ${embebido ? "" : "mt-1"}`}>
                 Listado de usuarios, revocar/reactivar acceso y eliminar cuentas.
               </p>
             </div>
@@ -392,6 +358,7 @@ export default function ListadoPage({ onVolver }) {
                           usuario={usuario}
                           avisoFila={avisoFila}
                           onPedirConfirmacion={pedirConfirmacion}
+                          onVerDetalle={onVerDetalle}
                         />
                       ))}
                     </tbody>
@@ -400,15 +367,55 @@ export default function ListadoPage({ onVolver }) {
               </div>
             </>
           )}
-        </div>
+    </div>
+  );
+
+  const dialogo = (
+    <ConfirmDialog
+      accion={accionPendiente}
+      onCancelar={cancelarAccion}
+      onConfirmar={confirmarAccion}
+      procesando={procesando}
+    />
+  );
+
+  // Embebida en el panel: sólo la tarjeta + el diálogo, sin marco de pantalla.
+  if (embebido) {
+    return (
+      <>
+        {panel}
+        {dialogo}
+      </>
+    );
+  }
+
+  // Suelta: marco de pantalla completa con fondo de marca y botón "Volver".
+  return (
+    <div className="relative min-h-screen bg-white text-slate-800">
+      <div aria-hidden="true" className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
+        <div
+          className="absolute -left-24 -top-28 h-120 w-120 rounded-full blur-3xl"
+          style={{ background: `radial-gradient(circle at 30% 30%, ${AZUL_CLARO}55, transparent 70%)` }}
+        />
+        <div
+          className="absolute -right-32 top-1/3 h-136 w-136 rounded-full blur-3xl"
+          style={{ background: `radial-gradient(circle at 50% 50%, ${AZUL_MEDIO}44, transparent 70%)` }}
+        />
       </div>
 
-      <ConfirmDialog
-        accion={accionPendiente}
-        onCancelar={cancelarAccion}
-        onConfirmar={confirmarAccion}
-        procesando={procesando}
-      />
+      <div className="mx-auto flex min-h-screen max-w-5xl flex-col px-4 py-12">
+        {onVolver && (
+          <button
+            type="button"
+            onClick={onVolver}
+            className="mb-4 self-start rounded-full px-3 py-1.5 text-sm font-medium text-slate-500 transition hover:text-slate-800"
+          >
+            ← Volver
+          </button>
+        )}
+        {panel}
+      </div>
+      {dialogo}
     </div>
   );
 }

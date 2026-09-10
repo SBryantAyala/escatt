@@ -1,53 +1,16 @@
-import React, { useState } from "react";
+import { useEffect, useState } from "react";
+import { api } from "../../lib/api";
 
-const API_BASE_URL = "/usuarios";
-
-
+// Cliente contra /api/usuarios/:id (mismo contrato que Listado y Alta).
+// Antes usaba fetch() directo a /usuarios/:id (ruta incorrecta, sin /api) y
+// lanzaba NotFoundError/ApiError que nunca se definían en ningún lado; ahora
+// reutiliza el cliente compartido de lib/api.js, que ya normaliza errores.
 export const userService = {
-  /* GET /usuarios/:id */
   async getUser(id) {
-    const response = await fetch(`${API_BASE_URL}/${id}`);
-
-    if (response.status === 404) {
-      throw new NotFoundError();
-    }
-
-    if (!response.ok) {
-      const message = await readErrorMessage(response);
-      throw new ApiError(
-        message || "No se pudo obtener el usuario.",
-        response.status,
-      );
-    }
-
-    return response.json();
+    return api(`/api/usuarios/${id}`);
   },
-
-  /* PUT /usuarios/:id */
   async updateUser(id, data) {
-    const response = await fetch(`${API_BASE_URL}/${id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
-    });
-
-    if (response.status === 404) {
-      throw new NotFoundError();
-    }
-
-    if (!response.ok) {
-      const message = await readErrorMessage(response);
-      throw new ApiError(
-        message || "No se pudo guardar la información.",
-        response.status,
-      );
-    }
-
-    try {
-      return await response.json();
-    } catch {
-      return null;
-    }
+    return api(`/api/usuarios/${id}`, { method: "PUT", body: data });
   },
 };
 
@@ -385,7 +348,7 @@ export default function UserProfileForm({userId, onVolver}) {
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState(null);
 
-  React.useEffect(() => {
+  useEffect(() => {
     let active = true;
     setIsLoading(true);
     setLoadError(null);

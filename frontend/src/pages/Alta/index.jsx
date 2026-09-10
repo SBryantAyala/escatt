@@ -1,16 +1,14 @@
+import { useState } from "react";
+import { GRAD_AZUL, VIDRIO } from "../../lib/theme";
+import { api } from "../../lib/api";
+
 // Pantalla: Alta
 // Registra un nuevo usuario (alumno, sinodal o personal CATT) contra
 // POST /api/usuarios.
 //
-// Paleta y helpers duplicados aquí porque App.jsx no los exporta — mismo
-// patrón que ya usa pages/Listado/index.jsx en esta rama.
-import { useState } from "react";
-
-const API_BASE = import.meta.env.VITE_API_URL ?? "";
-const AZUL_MEDIO = "#1878B6";
-const AZUL_CLARO = "#4FB3E8";
-const GRAD_AZUL = `linear-gradient(135deg, ${AZUL_MEDIO} 0%, ${AZUL_CLARO} 100%)`;
-const VIDRIO = "border border-white/60 bg-white/70 backdrop-blur-xl shadow-lg shadow-[#1878B6]/10";
+// Ya está enganchada como la sección "Alta" del panel (pages/Panel). Usa la
+// paleta compartida de lib/theme.js y el cliente HTTP de lib/api.js en vez
+// de duplicarlos.
 
 // Las 3 carreras reales de ESCOM (espejo de CARRERAS_VALIDAS del backend).
 const CARRERAS = ["ISC", "IIA", "LCD"];
@@ -66,18 +64,7 @@ export default function AltaPage() {
     };
 
     try {
-      const resp = await fetch(`${API_BASE}/api/usuarios`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-
-      const data = await resp.json();
-
-      if (!resp.ok) {
-        throw new Error(data.error || "Error al registrar el usuario");
-      }
-
+      await api("/api/usuarios", { method: "POST", body: payload });
       setMensaje({ tipo: "exito", texto: "¡Usuario registrado correctamente!" });
       setFormData(CAMPOS_INICIALES);
     } catch (err) {

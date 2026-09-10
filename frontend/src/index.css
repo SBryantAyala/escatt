@@ -52,6 +52,39 @@ html {
   animation: escatt-blob-3 16s ease-in-out infinite;
 }
 
+/* Diagrama "Proceso de la CATT": los nodos y los conectores se revelan al
+   entrar en viewport (la clase .is-visible la pone un IntersectionObserver en
+   App.jsx). Aquí solo viven las transiciones; el estado objetivo (opacity /
+   transform / stroke-dashoffset) y el retardo escalonado se ponen inline. */
+.proceso-nodo {
+  opacity: 0;
+  transform: translateY(1.25rem);
+  transition:
+    opacity 600ms ease-out,
+    transform 600ms ease-out;
+}
+.is-visible .proceso-nodo {
+  opacity: 1;
+  transform: none;
+}
+
+/* La línea se "dibuja" con stroke-dashoffset (pathLength=1 -> va de 1 a 0);
+   la punta de flecha aparece con un fade justo después. */
+.proceso-conector-linea {
+  stroke-dashoffset: 1;
+  transition: stroke-dashoffset 650ms ease-in-out;
+}
+.proceso-conector-flecha {
+  opacity: 0;
+  transition: opacity 300ms ease-in;
+}
+.is-visible .proceso-conector-linea {
+  stroke-dashoffset: 0;
+}
+.is-visible .proceso-conector-flecha {
+  opacity: 1;
+}
+
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
@@ -60,5 +93,19 @@ html {
   .escatt-blob-2,
   .escatt-blob-3 {
     animation: none;
+  }
+  /* Sin animación de entrada: el contenido se muestra ya en su estado final. */
+  .proceso-nodo {
+    transition: none;
+    opacity: 1;
+    transform: none;
+  }
+  .proceso-conector-linea {
+    transition: none;
+    stroke-dashoffset: 0;
+  }
+  .proceso-conector-flecha {
+    transition: none;
+    opacity: 1;
   }
 }
