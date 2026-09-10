@@ -19,6 +19,8 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS usuarios (
     id               INTEGER PRIMARY KEY AUTOINCREMENT,
     nombre           TEXT    NOT NULL,
+    apellido_paterno TEXT    NOT NULL DEFAULT '',
+    apellido_materno TEXT    NOT NULL DEFAULT '',
     correo           TEXT    NOT NULL UNIQUE,
     telefono         TEXT,
     tipo             TEXT    NOT NULL CHECK (tipo IN ('alumno', 'sinodal', 'personal')),
@@ -42,14 +44,49 @@ db.exec(`
   );
 `);
 
-// Migración aditiva: columna `telefono` (opcional, aplica a los 3 tipos).
-// SQLite no soporta "ADD COLUMN IF NOT EXISTS", así que se consulta el esquema
-// actual antes de intentar el ALTER (las bases ya creadas no la tendrían).
-const tieneTelefono = db
-  .prepare("SELECT 1 FROM pragma_table_info('usuarios') WHERE name = 'telefono'")
-  .get();
-if (!tieneTelefono) {
+// Migraciones aditivas: SQLite no soporta "ADD COLUMN IF NOT EXISTS", así que se
+// consulta el esquema actual antes de cada ALTER (las bases ya creadas no
+// tendrían estas columnas).
+const columnasUsuarios = db
+  .prepare("SELECT name FROM pragma_table_info('usuarios')")
+  .all()
+  .map((c) => c.name);
+
+// Teléfono (opcional, aplica a los 3 tipos).
+if (!columnasUsuarios.includes("telefono")) {
   db.exec("ALTER TABLE usuarios ADD COLUMN telefono TEXT");
+}
+
+// Nombre separado en pila + apellido paterno + apellido materno.
+if (!columnasUsuarios.includes("apellido_paterno")) {
+  db.exec("ALTER TABLE usuarios ADD COLUMN apellido_paterno TEXT NOT NULL DEFAULT ''");
+}
+if (!columnasUsuarios.includes("apellido_materno")) {
+  db.exec("ALTER TABLE usuarios ADD COLUMN apellido_materno TEXT NOT NULL DEFAULT ''");
+
+  // Reparte los nombres que ya estaban guardados como una sola cadena: por
+  // convención en México, los 2 últimos tokens son los apellidos (o solo el
+  // paterno si hay 2 tokens). Es una heurística única para no perder datos.
+  const porRepartir = db
+    .prepare(
+      "SELECT id, nombre FROM usuarios WHERE apellido_paterno = '' AND instr(trim(nombre), ' ') > 0",
+    )
+    .all();
+  const repartir = db.prepare(
+    "UPDATE usuarios SET nombre = @nombre, apellido_paterno = @ap, apellido_materno = @am WHERE id = @id",
+  );
+  for (const fila of porRepartir) {
+    const partes = fila.nombre.trim().split(/\s+/);
+    let am = "";
+    let ap = "";
+    if (partes.length >= 3) {
+      am = partes.pop();
+      ap = partes.pop();
+    } else {
+      ap = partes.pop();
+    }
+    repartir.run({ id: fila.id, nombre: partes.join(" "), ap, am });
+  }
 }
 
 // Autenticación (aditivo, Sprint 2). No modifica la tabla `usuarios`:

@@ -123,21 +123,19 @@ router.post("/registro", (req, res) => {
     });
   }
 
-  // Los 3 nombres van juntos a la columna `usuarios.nombre` (sin cambiar su tipo).
-  const nombreCompleto = `${nombre} ${apellidoPaterno} ${apellidoMaterno}`;
-
   const salt = crypto.randomBytes(16).toString("hex");
   const passwordHash = derivar(password, salt).toString("hex");
 
   try {
     const registrar = db.transaction(() => {
-      // Solo alumno: boleta y carrera; el resto de campos específicos van NULL.
+      // Nombre de pila y apellidos van en columnas separadas. Solo alumno:
+      // boleta y carrera; el resto de campos específicos van NULL.
       const info = db
         .prepare(
-          `INSERT INTO usuarios (nombre, correo, tipo, boleta, carrera)
-           VALUES (@nombre, @correo, 'alumno', @boleta, @carrera)`,
+          `INSERT INTO usuarios (nombre, apellido_paterno, apellido_materno, correo, tipo, boleta, carrera)
+           VALUES (@nombre, @apellidoPaterno, @apellidoMaterno, @correo, 'alumno', @boleta, @carrera)`,
         )
-        .run({ nombre: nombreCompleto, correo, boleta, carrera });
+        .run({ nombre, apellidoPaterno, apellidoMaterno, correo, boleta, carrera });
 
       const usuarioId = Number(info.lastInsertRowid);
       db.prepare(

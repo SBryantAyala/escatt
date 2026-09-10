@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../../../lib/api";
+import { nombreCompleto } from "../../../lib/nombre";
 import { GRAD_AZUL, VIDRIO } from "../../../lib/theme";
 
 // Pantalla: Detalle / edición de un usuario.
@@ -48,7 +49,9 @@ const CARGO_OPTIONS = [
 ];
 
 const GENERAL_FIELD_DEFS = [
-  { key: "nombre", label: "Nombre", minLength: 2 },
+  { key: "nombre", label: "Nombre(s)", minLength: 2 },
+  { key: "apellido_paterno", label: "Apellido paterno", minLength: 2 },
+  { key: "apellido_materno", label: "Apellido materno", minLength: 2 },
   { key: "correo", label: "Correo electrónico", type: "email" },
   { key: "telefono", label: "Número de teléfono", optional: true },
 ];
@@ -581,7 +584,7 @@ export default function UserProfileForm({ userId, onVolver }) {
               <ActivoBadge activo={originalData.activo} />
             </div>
             <h1 className="mt-1.5 truncate text-xl font-bold text-slate-900">
-              {originalData.nombre}
+              {nombreCompleto(originalData)}
             </h1>
             <p className="mt-0.5 text-sm text-slate-500">
               Agregado el {formatFecha(originalData.creado_en)}
@@ -703,7 +706,7 @@ export default function UserProfileForm({ userId, onVolver }) {
 
       <ConfirmDialog
         accion={accionPeligro}
-        nombre={originalData.nombre}
+        nombre={nombreCompleto(originalData)}
         onCancelar={cancelarAccion}
         onConfirmar={confirmarAccion}
         procesando={procesandoPeligro}

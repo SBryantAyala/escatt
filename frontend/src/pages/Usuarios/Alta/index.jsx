@@ -15,6 +15,8 @@ const CARRERAS = ["ISC", "IIA", "LCD"];
 
 const CAMPOS_INICIALES = {
   nombre: "",
+  apellido_paterno: "",
+  apellido_materno: "",
   correo: "",
   telefono: "",
   boleta: "",
@@ -51,6 +53,8 @@ export default function AltaPage({ tipoInicial = "alumno" }) {
     // Mapeo de datos para que coincida con el backend (/api/usuarios)
     const payload = {
       nombre: formData.nombre.trim(),
+      apellido_paterno: formData.apellido_paterno.trim(),
+      apellido_materno: formData.apellido_materno.trim(),
       correo: formData.correo.trim(),
       telefono: formData.telefono.trim(),
       tipo,
@@ -99,7 +103,7 @@ export default function AltaPage({ tipoInicial = "alumno" }) {
 
       <form onSubmit={handleSubmit} className="mt-6 space-y-4">
         <div>
-          <label className={claseLabel}>Nombre completo</label>
+          <label className={claseLabel}>Nombre(s)</label>
           <input
             type="text"
             name="nombre"
@@ -108,6 +112,31 @@ export default function AltaPage({ tipoInicial = "alumno" }) {
             onChange={handleChange}
             className={claseInput}
           />
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div>
+            <label className={claseLabel}>Apellido paterno</label>
+            <input
+              type="text"
+              name="apellido_paterno"
+              required
+              value={formData.apellido_paterno}
+              onChange={handleChange}
+              className={claseInput}
+            />
+          </div>
+          <div>
+            <label className={claseLabel}>Apellido materno</label>
+            <input
+              type="text"
+              name="apellido_materno"
+              required
+              value={formData.apellido_materno}
+              onChange={handleChange}
+              className={claseInput}
+            />
+          </div>
         </div>
 
         <div>

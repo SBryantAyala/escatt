@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "../../../lib/api";
+import { nombreCompleto } from "../../../lib/nombre";
 import { AZUL_CLARO, AZUL_MEDIO, GRAD_AZUL, VIDRIO } from "../../../lib/theme";
 
 // Pantalla: Listado de usuarios (solo consulta + búsqueda por pestaña).
@@ -58,10 +59,10 @@ function FilaUsuario({ usuario, identificador, onVerDetalle }) {
       tabIndex={0}
       onClick={abrir}
       onKeyDown={alPresionar}
-      aria-label={`Ver detalle de ${usuario.nombre}`}
+      aria-label={`Ver detalle de ${nombreCompleto(usuario)}`}
       className="cursor-pointer border-b border-slate-100 transition-colors last:border-0 hover:bg-[#4FB3E8]/10 focus:bg-[#4FB3E8]/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#4FB3E8]/50"
     >
-      <td className="py-3 pl-4 pr-4 font-medium text-slate-700">{usuario.nombre}</td>
+      <td className="py-3 pl-4 pr-4 font-medium text-slate-700">{nombreCompleto(usuario)}</td>
       <td className="py-3 pr-4 text-slate-500">{identificador || "—"}</td>
       <td className="py-3 pr-4 text-slate-500">{usuario.telefono || "—"}</td>
       <td className="py-3 pr-4 text-slate-500">{usuario.correo}</td>
@@ -111,7 +112,9 @@ export default function ListadoPage({ onVolver, embebido = false, onVerDetalle, 
     const consulta = normalizar(busqueda.trim());
     if (!consulta) return deLaTab;
     return deLaTab.filter(
-      (u) => normalizar(u.nombre).includes(consulta) || normalizar(u.correo).includes(consulta),
+      (u) =>
+        normalizar(nombreCompleto(u)).includes(consulta) ||
+        normalizar(u.correo).includes(consulta),
     );
   }, [usuarios, tabActiva, busqueda]);
 

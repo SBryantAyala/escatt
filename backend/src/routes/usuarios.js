@@ -15,7 +15,19 @@ const CAMPOS_ESPECIFICOS = [
 ];
 
 // Columnas que se pueden tocar desde PUT /usuarios/:id.
-const CAMPOS_EDITABLES = ["nombre", "correo", "telefono", "tipo", ...CAMPOS_ESPECIFICOS, "activo"];
+const CAMPOS_EDITABLES = [
+  "nombre",
+  "apellido_paterno",
+  "apellido_materno",
+  "correo",
+  "telefono",
+  "tipo",
+  ...CAMPOS_ESPECIFICOS,
+  "activo",
+];
+
+// Campos de nombre obligatorios y no vacíos (comparten la misma validación).
+const CAMPOS_NOMBRE = ["nombre", "apellido_paterno", "apellido_materno"];
 
 // Convierte la fila de SQLite (activo llega como 1/0) al formato que consume el front.
 function serializar(fila) {
@@ -58,6 +70,10 @@ router.get("/:id", (req, res) => {
 router.post("/", (req, res) => {
   const cuerpo = req.body ?? {};
   const nombre = typeof cuerpo.nombre === "string" ? cuerpo.nombre.trim() : "";
+  const apellidoPaterno =
+    typeof cuerpo.apellido_paterno === "string" ? cuerpo.apellido_paterno.trim() : "";
+  const apellidoMaterno =
+    typeof cuerpo.apellido_materno === "string" ? cuerpo.apellido_materno.trim() : "";
   const correo = typeof cuerpo.correo === "string" ? cuerpo.correo.trim() : "";
   const tipo = typeof cuerpo.tipo === "string" ? cuerpo.tipo.trim() : "";
   // Teléfono opcional (aplica a los 3 tipos): si viene vacío o no viene, null.
@@ -66,6 +82,8 @@ router.post("/", (req, res) => {
 
   const faltantes = [];
   if (!nombre) faltantes.push("nombre");
+  if (!apellidoPaterno) faltantes.push("apellido_paterno");
+  if (!apellidoMaterno) faltantes.push("apellido_materno");
   if (!correo) faltantes.push("correo");
   if (!tipo) faltantes.push("tipo");
   if (faltantes.length > 0) {
@@ -98,11 +116,13 @@ router.post("/", (req, res) => {
     const info = db
       .prepare(
         `INSERT INTO usuarios
-           (nombre, correo, telefono, tipo, boleta, carrera, protocolo_tt, numero_empleado, especialidad, cargo)
+           (nombre, apellido_paterno, apellido_materno, correo, telefono, tipo,
+            boleta, carrera, protocolo_tt, numero_empleado, especialidad, cargo)
          VALUES
-           (@nombre, @correo, @telefono, @tipo, @boleta, @carrera, @protocolo_tt, @numero_empleado, @especialidad, @cargo)`,
+           (@nombre, @apellidoPaterno, @apellidoMaterno, @correo, @telefono, @tipo,
+            @boleta, @carrera, @protocolo_tt, @numero_empleado, @especialidad, @cargo)`,
       )
-      .run({ nombre, correo, telefono, tipo, ...especificos });
+      .run({ nombre, apellidoPaterno, apellidoMaterno, correo, telefono, tipo, ...especificos });
 
     res.status(201).json(serializar(buscarPorId(info.lastInsertRowid)));
   } catch (err) {
@@ -144,11 +164,12 @@ router.put("/:id", (req, res) => {
     });
   }
 
-  if ("nombre" in cambios) {
-    if (typeof cambios.nombre !== "string" || cambios.nombre.trim() === "") {
-      return res.status(400).json({ error: "nombre no puede quedar vacío" });
+  for (const campo of CAMPOS_NOMBRE) {
+    if (!(campo in cambios)) continue;
+    if (typeof cambios[campo] !== "string" || cambios[campo].trim() === "") {
+      return res.status(400).json({ error: `${campo} no puede quedar vacío` });
     }
-    cambios.nombre = cambios.nombre.trim();
+    cambios[campo] = cambios[campo].trim();
   }
 
   if ("correo" in cambios) {
