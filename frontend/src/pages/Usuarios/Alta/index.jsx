@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { GRAD_AZUL, VIDRIO } from "../../lib/theme";
-import { api } from "../../lib/api";
+import { GRAD_AZUL, VIDRIO } from "../../../lib/theme";
+import { api } from "../../../lib/api";
 
 // Pantalla: Alta
 // Registra un nuevo usuario (alumno, sinodal o personal CATT) contra

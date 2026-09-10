@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { api } from "../../lib/api";
-import { AZUL_CLARO, AZUL_MEDIO, GRAD_AZUL, VIDRIO } from "../../lib/theme";
+import { api } from "../../../lib/api";
+import { AZUL_CLARO, AZUL_MEDIO, GRAD_AZUL, VIDRIO } from "../../../lib/theme";
 
 // Pantalla: Listado (+ Revocar acceso + Reactivar + Eliminar)
 // Responsable: Edgar (rama feature/listado-revocar-eliminar)
