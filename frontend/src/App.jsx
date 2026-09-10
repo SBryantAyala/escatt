@@ -1,36 +1,42 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import NexusLogo from "./components/NexusLogo";
-import ListadoPage from "./pages/Listado";
+import PanelPage from "./pages/Panel";
+import { api, TOKEN_KEY } from "./lib/api";
+import { AZUL_CLARO, AZUL_MEDIO, AZUL_OSCURO, GRAD_AZUL, VIDRIO } from "./lib/theme";
 
-// Navegación mínima sin librerías externas: Sprint 1 solo necesita
-// Landing -> Listado (useState, sin react-router).
+// Navegación sin librerías externas (sin react-router): un useState("page")
+// conmuta entre landing / login / registro / panel. El panel administrativo
+// (PanelPage) trae su propia navegación interna por secciones — ver
+// src/pages/Panel/.
 //
-// Paleta DOMINANTE de ESCATT: azul institucional #1878B6 -> #4FB3E8.
-// El amarillo #FDD40A es identidad de Nexus Solutions y aparece ÚNICAMENTE
-// en su logo y en su crédito de texto, nunca como color de una sección.
-const AZUL_MEDIO = "#1878B6";
-const AZUL_CLARO = "#4FB3E8";
-const AZUL_OSCURO = "#0F5C8C";
-
-const GRAD_AZUL = `linear-gradient(135deg, ${AZUL_MEDIO} 0%, ${AZUL_CLARO} 100%)`;
-
-// Clases reutilizables para el efecto "vidrio esmerilado".
-const VIDRIO =
-  "border border-white/60 bg-white/70 backdrop-blur-xl shadow-lg shadow-[#1878B6]/10";
+// La identidad visual compartida (paleta azul + clase VIDRIO) vive en
+// src/lib/theme.js y el cliente HTTP en src/lib/api.js, para no duplicarlos
+// entre App.jsx y las páginas de src/pages/.
 
 const ETAPAS = [
-  { titulo: "Protocolo", texto: "El alumno registra su propuesta de Trabajo Terminal." },
+  {
+    titulo: "Protocolo",
+    texto: "El alumno registra su propuesta de Trabajo Terminal.",
+    imagen: "/images/noticias/registro-protocolo.webp",
+    alt: "Tres estudiantes de ESCOM revisan una propuesta frente a sus laptops.",
+  },
   {
     titulo: "Trabajo Terminal I",
     texto: "Inicia el desarrollo del proyecto con su sinodal asignado.",
+    imagen: "/images/noticias/laboratorio-computo.webp",
+    alt: "Dos estudiantes programan frente a un monitor en un laboratorio de cómputo.",
   },
   {
     titulo: "Trabajo Terminal II",
     texto: "Entrega el reporte técnico y avanza a la recta final.",
+    imagen: "/images/noticias/entrega-documentos.webp",
+    alt: "Persona firmando documentos impresos sobre un escritorio.",
   },
   {
     titulo: "Presentación final",
     texto: "El alumno presenta y es evaluado por el jurado de sinodales.",
+    imagen: "/images/noticias/presentacion-tt.webp",
+    alt: "Un alumno expone su proyecto ante un grupo en un aula con proyector.",
   },
 ];
 
@@ -46,34 +52,7 @@ function InsigniaNexus({ logo = 20, texto = "text-xs" }) {
 }
 
 // --- Autenticación (Sprint 2) ---------------------------------------------
-
-const API_BASE = import.meta.env.VITE_API_URL ?? "";
-const TOKEN_KEY = "escatt_token";
-
-// Cliente HTTP mínimo: adjunta el token Bearer si existe y normaliza errores
-// para poder mostrarlos en la UI (nunca un alert).
-async function api(ruta, { method = "GET", body } = {}) {
-  const headers = { "Content-Type": "application/json" };
-  const token = localStorage.getItem(TOKEN_KEY);
-  if (token) headers.Authorization = `Bearer ${token}`;
-
-  const resp = await fetch(`${API_BASE}${ruta}`, {
-    method,
-    headers,
-    body: body ? JSON.stringify(body) : undefined,
-  });
-
-  let datos = null;
-  try {
-    datos = await resp.json();
-  } catch {
-    datos = null;
-  }
-  if (!resp.ok) {
-    throw new Error(datos?.error || `Error ${resp.status}`);
-  }
-  return datos;
-}
+// El cliente HTTP `api()` y la clave TOKEN_KEY se importan de src/lib/api.js.
 
 // Las 3 carreras reales de ESCOM (espejo de CARRERAS_VALIDAS del backend).
 const CARRERAS = ["ISC", "IIA", "LCD"];
@@ -578,82 +557,9 @@ function AuthPage({ modo, onAutenticado, onSalir, onCambiarModo }) {
   );
 }
 
-function PanelPage({ usuario, onIrListado, onCerrarSesion, onVolver }) {
-  const esPersonal = usuario.tipo === "personal";
-  const etiquetaTipo =
-    usuario.tipo === "alumno"
-      ? "Alumno"
-      : usuario.tipo === "sinodal"
-        ? "Sinodal"
-        : "Personal CATT";
-
-  return (
-    <div className="relative min-h-screen bg-white text-slate-800">
-      <div aria-hidden="true" className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
-        <div
-          className="escatt-blob-1 absolute -left-24 -top-28 h-[30rem] w-[30rem] rounded-full blur-3xl"
-          style={{ background: `radial-gradient(circle at 30% 30%, ${AZUL_CLARO}55, transparent 70%)` }}
-        />
-        <div
-          className="escatt-blob-2 absolute -right-32 top-1/3 h-[34rem] w-[34rem] rounded-full blur-3xl"
-          style={{ background: `radial-gradient(circle at 50% 50%, ${AZUL_MEDIO}44, transparent 70%)` }}
-        />
-      </div>
-
-      <div className="mx-auto flex min-h-screen max-w-3xl flex-col items-center justify-center px-4 py-16">
-        <div className={`w-full rounded-3xl p-8 ${VIDRIO} bg-white/80`}>
-          <span className="inline-flex items-center rounded-full bg-[#4FB3E8]/15 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-[#0F5C8C]">
-            Panel · {etiquetaTipo}
-          </span>
-          <h1 className="mt-4 text-3xl font-bold text-slate-800 sm:text-4xl">
-            Bienvenido, {usuario.nombre}
-          </h1>
-
-          {esPersonal ? (
-            <>
-              <p className="mt-3 text-slate-600">
-                Desde aquí administras el padrón de participantes del proceso de titulación.
-              </p>
-              <button
-                type="button"
-                onClick={onIrListado}
-                className="mt-6 inline-flex items-center justify-center rounded-full px-6 py-3
-                           font-semibold text-white shadow-lg shadow-[#1878B6]/30 transition
-                           hover:-translate-y-0.5 hover:shadow-xl"
-                style={{ background: GRAD_AZUL }}
-              >
-                Ver listado de usuarios
-              </button>
-            </>
-          ) : (
-            <p className="mt-3 text-slate-600">
-              Tu panel de {etiquetaTipo} está en construcción — estará disponible en un próximo
-              sprint.
-            </p>
-          )}
-
-          <div className="mt-8 flex flex-wrap gap-3">
-            <button
-              type="button"
-              onClick={onCerrarSesion}
-              className="rounded-full border border-slate-200 bg-white/70 px-5 py-2 text-sm font-semibold
-                         text-slate-600 transition hover:bg-white"
-            >
-              Cerrar sesión
-            </button>
-            <button
-              type="button"
-              onClick={onVolver}
-              className="rounded-full px-5 py-2 text-sm font-medium text-slate-500 transition hover:text-slate-800"
-            >
-              Volver al inicio
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
+// PanelPage se movió a src/pages/Panel/: ahora es un dashboard con sidebar +
+// topbar + navegación interna por secciones (Listado, Alta, Detalle y las
+// secciones de "Proceso" que vendrán). App.jsx solo lo monta cuando page === "panel".
 
 // Fondo por diapositiva: el mismo trío de azules de marca, variando ángulo y
 // orden para que cada etapa se sienta distinta sin salirse de la identidad.
@@ -665,35 +571,15 @@ const FONDOS_BANNER = [
   `linear-gradient(160deg, ${AZUL_MEDIO} 0%, ${AZUL_OSCURO} 50%, ${AZUL_MEDIO} 100%)`,
 ];
 
-// Formas decorativas abstractas (solo blanco translúcido), una por diapositiva,
-// al costado derecho — como el "hueco" de la foto en el banner de ESCOM, pero
-// sin depender de imágenes ni assets externos.
-const DECORES_BANNER = [
-  <g key="d0" fill="none" stroke="#fff" strokeWidth="2">
-    <circle cx="300" cy="230" r="60" opacity="0.22" />
-    <circle cx="300" cy="230" r="115" opacity="0.15" />
-    <circle cx="300" cy="230" r="170" opacity="0.09" />
-    <circle cx="300" cy="230" r="225" opacity="0.05" />
-  </g>,
-  <g key="d1" fill="none" stroke="#fff" strokeLinecap="round" strokeWidth="3">
-    <path d="M60 110 C 160 40, 300 200, 460 110" opacity="0.18" />
-    <path d="M60 190 C 160 120, 300 280, 460 190" opacity="0.14" />
-    <path d="M60 270 C 160 200, 300 360, 460 270" opacity="0.10" />
-    <path d="M60 350 C 160 280, 300 440, 460 350" opacity="0.06" />
-  </g>,
-  <g key="d2" stroke="#fff" fill="#fff" strokeWidth="2">
-    <rect x="230" y="140" width="170" height="170" rx="22" transform="rotate(18 315 225)" fillOpacity="0.08" strokeOpacity="0.18" />
-    <rect x="265" y="175" width="170" height="170" rx="22" transform="rotate(-12 350 260)" fillOpacity="0.05" strokeOpacity="0.13" />
-  </g>,
-  <g key="d3" fill="#fff" stroke="#fff">
-    {Array.from({ length: 5 }).map((_, r) =>
-      Array.from({ length: 5 }).map((__, c) => (
-        <circle key={`${r}-${c}`} cx={210 + c * 46} cy={100 + r * 58} r="4.5" fillOpacity="0.16" stroke="none" />
-      )),
-    )}
-    <circle cx="330" cy="240" r="175" fill="none" strokeOpacity="0.12" strokeWidth="2" />
-  </g>,
-];
+// Mismo azul que domina cada diapositiva pero semitransparente, para teñir la
+// foto de la etapa y que combine con el degradado en vez de verse como una
+// imagen "de stock" ajena a la marca.
+const FONDOS_BANNER_TINTE = [`${AZUL_OSCURO}66`, `${AZUL_MEDIO}66`, `${AZUL_OSCURO}66`, `${AZUL_MEDIO}66`];
+
+// El costado derecho de cada diapositiva ya no usa formas SVG genéricas:
+// muestra la foto real de esa etapa (las mismas fotos libres de derechos que
+// se usan en la sección Noticias), atenuada con una máscara y un tinte azul
+// de marca para que se funda con el degradado en vez de verse "pegada".
 
 const ChevronBanner = ({ dir }) => (
   <svg
@@ -752,14 +638,35 @@ function CarruselEtapas() {
               className="relative h-full w-full shrink-0"
               style={{ backgroundImage: FONDOS_BANNER[i] }}
             >
-              <svg
-                viewBox="0 0 460 460"
-                preserveAspectRatio="xMidYMid slice"
-                className="pointer-events-none absolute right-0 top-0 h-full w-[72%] sm:w-1/2"
-                aria-hidden="true"
+              {/* Foto real de la etapa (una de las noticias principales), fundida
+                  con el degradado mediante una máscara para que no se vea como
+                  un recorte pegado encima del color de marca. */}
+              <div
+                className="pointer-events-none absolute inset-y-0 right-0 w-[78%] overflow-hidden sm:w-[55%]"
+                style={{
+                  WebkitMaskImage:
+                    "linear-gradient(to right, transparent 0%, rgba(0,0,0,0.55) 22%, #000 50%)",
+                  maskImage:
+                    "linear-gradient(to right, transparent 0%, rgba(0,0,0,0.55) 22%, #000 50%)",
+                }}
               >
-                {DECORES_BANNER[i]}
-              </svg>
+                <img
+                  src={etapa.imagen}
+                  alt={etapa.alt}
+                  loading={i === 0 ? "eager" : "lazy"}
+                  decoding="async"
+                  width="920"
+                  height="880"
+                  className="h-full w-full object-cover"
+                />
+                {/* Tinte de marca sobre la foto para no romper la paleta azul */}
+                <div
+                  className="absolute inset-0"
+                  style={{
+                    backgroundImage: `linear-gradient(115deg, ${FONDOS_BANNER_TINTE[i]} 0%, transparent 60%)`,
+                  }}
+                />
+              </div>
 
               {/* Refuerzo de contraste del lado del texto */}
               <div className="absolute inset-0 bg-gradient-to-r from-black/45 via-black/15 to-transparent" />
@@ -819,8 +726,250 @@ function CarruselEtapas() {
   );
 }
 
+// --- Noticias -----------------------------------------------------------------
+// Contenido de EJEMPLO para el proyecto escolar: todavía no hay backend de
+// noticias, así que los textos son ficticios pero verosímiles y coherentes con
+// lo que describe la sección "¿Qué es la CATT?". Las fotos son libres de
+// derechos (Unsplash) y viven en public/images/noticias/. Formato inspirado en
+// cómo ESCOM publica sus avisos: imagen destacada + categoría + título + fecha
+// + resumen breve.
+const NOTICIAS = [
+  {
+    categoria: "Convocatoria",
+    titulo: "Abre el registro de Protocolo para el semestre 2027/1",
+    fecha: "25 de agosto de 2026",
+    iso: "2026-08-25",
+    resumen:
+      "Los alumnos que cubran los créditos requeridos ya pueden subir su propuesta de Trabajo Terminal para revisión de la CATT.",
+    imagen: "/images/noticias/registro-protocolo.webp",
+    alt: "Tres estudiantes de ESCOM revisan una propuesta frente a sus laptops.",
+  },
+  {
+    categoria: "Trámites",
+    titulo: "Se actualizan los lineamientos de entrega del reporte técnico de TT II",
+    fecha: "12 de agosto de 2026",
+    iso: "2026-08-12",
+    resumen:
+      "El nuevo formato unifica portada, carta de liberación y bitácora en un solo expediente digital.",
+    imagen: "/images/noticias/entrega-documentos.webp",
+    alt: "Persona firmando documentos impresos sobre un escritorio.",
+  },
+  {
+    categoria: "Laboratorios",
+    titulo: "Nuevos horarios de laboratorios de cómputo para alumnos de TT I",
+    fecha: "5 de agosto de 2026",
+    iso: "2026-08-05",
+    resumen:
+      "Se amplía el acceso por las tardes para avanzar en el desarrollo de proyectos con equipo especializado.",
+    imagen: "/images/noticias/laboratorio-computo.webp",
+    alt: "Dos estudiantes programan frente a un monitor en un laboratorio de cómputo.",
+  },
+  {
+    categoria: "Trabajo Terminal",
+    titulo: "Se publican las nuevas fechas de presentación de Trabajo Terminal II",
+    fecha: "30 de julio de 2026",
+    iso: "2026-07-30",
+    resumen:
+      "El calendario de exposiciones ante el jurado de sinodales abarca de la semana 14 a la 17 del periodo.",
+    imagen: "/images/noticias/presentacion-tt.webp",
+    alt: "Un alumno expone su proyecto ante un grupo en un aula con proyector.",
+  },
+  {
+    categoria: "Difusión",
+    titulo: "Reunión informativa de la CATT para quienes se integran al proceso",
+    fecha: "22 de julio de 2026",
+    iso: "2026-07-22",
+    resumen:
+      "La coordinación explicará las etapas, el papel de los sinodales y el uso de ESCATT para dar seguimiento.",
+    imagen: "/images/noticias/campus-escom.webp",
+    alt: "Edificio principal del campus de ESCOM rodeado de áreas verdes.",
+  },
+  {
+    categoria: "Asesorías",
+    titulo: "Jornada de asesorías con sinodales para revisión de avances",
+    fecha: "15 de julio de 2026",
+    iso: "2026-07-15",
+    resumen:
+      "Espacios de 20 minutos por alumno para resolver dudas de metodología y redacción del reporte.",
+    imagen: "/images/noticias/alumnos-biblioteca.webp",
+    alt: "Un grupo de estudiantes trabaja junto a un librero en una biblioteca.",
+  },
+];
+
+// Tarjeta VIDRIO con foto destacada arriba. Hover: elevación sutil + zoom leve
+// de la imagen, en línea con el resto del sitio (rounded-3xl, sombra azul).
+function TarjetaNoticia({ noticia }) {
+  return (
+    <article
+      className={`group flex flex-col overflow-hidden rounded-3xl transition duration-300
+                  hover:-translate-y-1 hover:shadow-xl hover:shadow-[#1878B6]/20 ${VIDRIO}`}
+    >
+      <div className="aspect-[16/10] overflow-hidden">
+        <img
+          src={noticia.imagen}
+          alt={noticia.alt}
+          loading="lazy"
+          decoding="async"
+          width="800"
+          height="500"
+          className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
+        />
+      </div>
+      <div className="flex flex-1 flex-col p-5">
+        <span className="inline-flex w-fit items-center rounded-full bg-[#4FB3E8]/15 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-[#0F5C8C]">
+          {noticia.categoria}
+        </span>
+        <h3 className="mt-3 text-lg font-bold leading-snug text-slate-800">{noticia.titulo}</h3>
+        <time
+          dateTime={noticia.iso}
+          className="mt-1 block text-xs font-medium uppercase tracking-wide text-slate-400"
+        >
+          {noticia.fecha}
+        </time>
+        <p className="mt-2 text-sm leading-relaxed text-slate-600">{noticia.resumen}</p>
+      </div>
+    </article>
+  );
+}
+
+function SeccionNoticias() {
+  return (
+    <section id="noticias" className="mx-auto max-w-6xl scroll-mt-24 px-4 py-20">
+      <h2 className="text-3xl font-bold text-slate-800 sm:text-4xl">Noticias</h2>
+      <p className="mt-4 max-w-2xl text-lg leading-relaxed text-slate-600">
+        Avisos y fechas clave del proceso de titulación: convocatorias de Protocolo, entregas de
+        Trabajo Terminal, laboratorios y asesorías con sinodales.
+      </p>
+      <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        {NOTICIAS.map((noticia) => (
+          <TarjetaNoticia key={noticia.titulo} noticia={noticia} />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+// --- Proceso de la CATT: diagrama de flujo animado ---------------------------
+// Conector entre nodos: una línea que se "dibuja" (stroke-dasharray/offset con
+// pathLength=1) y una punta de flecha que aparece después. Las transiciones
+// viven en index.css (.proceso-conector-*); aquí solo el retardo escalonado.
+function ConectorProceso({ orientacion, delay }) {
+  const horizontal = orientacion === "horizontal";
+  const svgProps = horizontal
+    ? { viewBox: "0 0 64 32", className: "h-8 w-16" }
+    : { viewBox: "0 0 32 64", className: "h-16 w-8" };
+  return (
+    <svg {...svgProps} fill="none" aria-hidden="true">
+      <line
+        x1={horizontal ? 2 : 16}
+        y1={horizontal ? 16 : 2}
+        x2={horizontal ? 54 : 16}
+        y2={horizontal ? 16 : 54}
+        stroke={AZUL_MEDIO}
+        strokeWidth="2.5"
+        strokeLinecap="round"
+        pathLength="1"
+        strokeDasharray="1"
+        className="proceso-conector-linea"
+        style={{ transitionDelay: delay }}
+      />
+      <path
+        d={horizontal ? "M48 8l10 8-10 8" : "M8 48l8 10 8-10"}
+        stroke={AZUL_OSCURO}
+        strokeWidth="2.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className="proceso-conector-flecha"
+        style={{ transitionDelay: `calc(${delay} + 380ms)` }}
+      />
+    </svg>
+  );
+}
+
+function DiagramaProceso() {
+  // Revelado progresivo al hacer scroll, sin librerías: un IntersectionObserver
+  // pone la clase .is-visible en el <ol> y CSS se encarga del resto.
+  const [visible, setVisible] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    const nodo = ref.current;
+    if (!nodo) return undefined;
+    if (typeof IntersectionObserver === "undefined") {
+      setVisible(true);
+      return undefined;
+    }
+    const observador = new IntersectionObserver(
+      (entradas) => {
+        entradas.forEach((entrada) => {
+          if (entrada.isIntersecting) {
+            setVisible(true);
+            observador.disconnect();
+          }
+        });
+      },
+      { threshold: 0.25 },
+    );
+    observador.observe(nodo);
+    return () => observador.disconnect();
+  }, []);
+
+  return (
+    <section id="proceso" className="mx-auto max-w-5xl scroll-mt-24 px-4 py-20">
+      <h2 className="text-3xl font-bold text-slate-800 sm:text-4xl">Proceso de la CATT</h2>
+      <p className="mt-4 max-w-2xl text-lg leading-relaxed text-slate-600">
+        De principio a fin, la titulación curricular avanza por cuatro etapas encadenadas: cada una
+        habilita la siguiente.
+      </p>
+
+      <ol
+        ref={ref}
+        aria-label="Proceso de la CATT en cuatro etapas, en orden"
+        className={`mt-12 flex flex-col gap-12 md:flex-row md:items-stretch md:gap-6 ${
+          visible ? "is-visible" : ""
+        }`}
+      >
+        {ETAPAS.map((etapa, i) => (
+          <li
+            key={etapa.titulo}
+            aria-label={`Etapa ${i + 1} de ${ETAPAS.length}: ${etapa.titulo}. ${etapa.texto}`}
+            className="proceso-nodo relative md:flex-1"
+            style={{ transitionDelay: `${i * 130}ms` }}
+          >
+            <div className={`flex h-full flex-col rounded-2xl p-5 ${VIDRIO}`}>
+              <span
+                aria-hidden="true"
+                className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white"
+                style={{ backgroundImage: GRAD_AZUL }}
+              >
+                {i + 1}
+              </span>
+              <h3 className="mt-3 text-base font-bold" style={{ color: AZUL_OSCURO }}>
+                {etapa.titulo}
+              </h3>
+              <p className="mt-1.5 text-sm leading-relaxed text-slate-600">{etapa.texto}</p>
+            </div>
+
+            {i < ETAPAS.length - 1 && (
+              <>
+                {/* Conector horizontal (desktop) / vertical (móvil), decorativo. */}
+                <span className="pointer-events-none absolute right-0 top-1/2 z-10 hidden -translate-y-1/2 translate-x-1/2 md:block">
+                  <ConectorProceso orientacion="horizontal" delay={`${i * 130 + 260}ms`} />
+                </span>
+                <span className="pointer-events-none absolute bottom-0 left-1/2 z-10 -translate-x-1/2 translate-y-1/2 md:hidden">
+                  <ConectorProceso orientacion="vertical" delay={`${i * 130 + 260}ms`} />
+                </span>
+              </>
+            )}
+          </li>
+        ))}
+      </ol>
+    </section>
+  );
+}
+
 export default function App() {
-  const [page, setPage] = useState("landing"); // landing | listado | panel | login | registro
+  const [page, setPage] = useState("landing"); // landing | panel | login | registro
   const [scrolled, setScrolled] = useState(false);
   const [usuario, setUsuario] = useState(null);
   const [cargandoSesion, setCargandoSesion] = useState(true);
@@ -891,15 +1040,10 @@ export default function App() {
     );
   }
 
-  if (page === "listado") {
-    return <ListadoPage onVolver={() => setPage(usuario ? "panel" : "landing")} />;
-  }
-
   if (page === "panel" && usuario) {
     return (
       <PanelPage
         usuario={usuario}
-        onIrListado={() => setPage("listado")}
         onCerrarSesion={cerrarSesion}
         onVolver={() => setPage("landing")}
       />
@@ -943,6 +1087,12 @@ export default function App() {
             </a>
             <a href="#catt" className="transition hover:text-slate-900">
               ¿Qué es la CATT?
+            </a>
+            <a href="#noticias" className="transition hover:text-slate-900">
+              Noticias
+            </a>
+            <a href="#proceso" className="transition hover:text-slate-900">
+              Proceso
             </a>
           </nav>
 
@@ -988,9 +1138,6 @@ export default function App() {
                 </button>
               </>
             )}
-            <span className="hidden lg:inline-flex">
-              <InsigniaNexus logo={18} texto="text-[11px]" />
-            </span>
           </div>
         </div>
       </header>
@@ -1030,6 +1177,12 @@ export default function App() {
             quienes participan en él.
           </p>
         </section>
+
+        {/* NOTICIAS: avisos del proceso, formato tarjeta con foto real */}
+        <SeccionNoticias />
+
+        {/* PROCESO DE LA CATT: diagrama de flujo animado de las 4 etapas */}
+        <DiagramaProceso />
       </main>
 
       {/* FOOTER */}
