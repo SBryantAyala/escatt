@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api } from "../../lib/api";
+import { api } from "../../../lib/api";
 
 // Cliente contra /api/usuarios/:id (mismo contrato que Listado y Alta).
 // Antes usaba fetch() directo a /usuarios/:id (ruta incorrecta, sin /api) y

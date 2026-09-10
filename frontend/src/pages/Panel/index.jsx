@@ -10,9 +10,9 @@ import {
 } from "../../components/iconos";
 import { api } from "../../lib/api";
 import { AZUL_MEDIO, GRAD_AZUL, VIDRIO } from "../../lib/theme";
-import ListadoPage from "../Listado";
-import AltaPage from "../Alta";
-import DetallePage from "../Detalle";
+import ListadoPage from "../Usuarios/Listado";
+import AltaPage from "../Usuarios/Alta";
+import DetallePage from "../Usuarios/Detalle";
 
 // PanelPage: el centro de navegación del sistema. Deja de ser una tarjeta de
 // bienvenida suelta y pasa a ser un dashboard con sidebar + topbar + contenido.
