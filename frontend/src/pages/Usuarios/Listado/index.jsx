@@ -15,9 +15,9 @@ import { AZUL_CLARO, AZUL_MEDIO, GRAD_AZUL, VIDRIO } from "../../../lib/theme";
 
 // Los 3 tipos de usuario, en el orden en que se muestran las pestañas.
 const PESTANAS = [
-  { tipo: "alumno", titulo: "Alumnos" },
-  { tipo: "sinodal", titulo: "Sinodales" },
-  { tipo: "personal", titulo: "Personal CATT" },
+  { tipo: "alumno", titulo: "Alumnos", etiquetaAlta: "Registrar alumno" },
+  { tipo: "sinodal", titulo: "Sinodales", etiquetaAlta: "Registrar sinodal" },
+  { tipo: "personal", titulo: "Personal CATT", etiquetaAlta: "Registrar personal CATT" },
 ];
 
 function formatFecha(valor) {
@@ -167,7 +167,7 @@ function FilaUsuario({ usuario, avisoFila, onPedirConfirmacion, onVerDetalle }) 
   );
 }
 
-export default function ListadoPage({ onVolver, embebido = false, onVerDetalle }) {
+export default function ListadoPage({ onVolver, embebido = false, onVerDetalle, onDarDeAlta }) {
   const [usuarios, setUsuarios] = useState(null);
   const [cargando, setCargando] = useState(true);
   const [errorCarga, setErrorCarga] = useState(null);
@@ -255,7 +255,8 @@ export default function ListadoPage({ onVolver, embebido = false, onVerDetalle }
       });
   }
 
-  const tituloTabActiva = PESTANAS.find((p) => p.tipo === tabActiva)?.titulo ?? "";
+  const pestanaActiva = PESTANAS.find((p) => p.tipo === tabActiva);
+  const tituloTabActiva = pestanaActiva?.titulo ?? "";
 
   const panel = (
     <div className={`rounded-3xl p-6 sm:p-8 ${VIDRIO} bg-white/85`}>
@@ -277,15 +278,26 @@ export default function ListadoPage({ onVolver, embebido = false, onVerDetalle }
                 Listado de usuarios, revocar/reactivar acceso y eliminar cuentas.
               </p>
             </div>
-            <button
-              type="button"
-              onClick={cargarUsuarios}
-              disabled={cargando}
-              className="shrink-0 rounded-full px-5 py-2 text-sm font-semibold text-white shadow-md shadow-[#1878B6]/30 transition hover:-translate-y-0.5 disabled:opacity-50"
-              style={{ background: GRAD_AZUL }}
-            >
-              {cargando ? "Cargando…" : "Actualizar"}
-            </button>
+            <div className="flex shrink-0 items-center gap-2">
+              <button
+                type="button"
+                onClick={cargarUsuarios}
+                disabled={cargando}
+                className="rounded-full border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-50 disabled:opacity-50"
+              >
+                {cargando ? "Cargando…" : "Actualizar"}
+              </button>
+              {onDarDeAlta && (
+                <button
+                  type="button"
+                  onClick={() => onDarDeAlta(tabActiva)}
+                  className="rounded-full px-5 py-2 text-sm font-semibold text-white shadow-md shadow-[#1878B6]/30 transition hover:-translate-y-0.5"
+                  style={{ background: GRAD_AZUL }}
+                >
+                  {pestanaActiva?.etiquetaAlta ?? "Registrar usuario"}
+                </button>
+              )}
+            </div>
           </div>
 
           {errorCarga && !usuarios && (

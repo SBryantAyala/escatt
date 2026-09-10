@@ -28,8 +28,12 @@ const claseInput =
   "w-full rounded-xl border border-slate-200 bg-white/80 px-3 py-2.5 text-sm outline-none transition focus:border-[#1878B6] focus:ring-2 focus:ring-[#4FB3E8]/40";
 const claseLabel = "mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500";
 
-export default function AltaPage() {
-  const [tipo, setTipo] = useState("alumno");
+// tipoInicial: qué opción viene marcada al abrir el formulario. Se llega
+// aquí con un tipo ya definido cuando Personal CATT le da clic a "Registrar
+// alumno/sinodal/personal" desde la pestaña correspondiente del Listado
+// (ver pages/Panel); el selector sigue editable por si se abrió por error.
+export default function AltaPage({ tipoInicial = "alumno" }) {
+  const [tipo, setTipo] = useState(tipoInicial);
   const [formData, setFormData] = useState(CAMPOS_INICIALES);
   const [loading, setLoading] = useState(false);
   const [mensaje, setMensaje] = useState(null);
