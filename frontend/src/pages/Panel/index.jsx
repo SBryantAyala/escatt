@@ -354,6 +354,9 @@ export default function PanelPage({ usuario, onCerrarSesion, onVolver }) {
   // Primera sección visible según el rol (para todos los roles hoy es "inicio").
   const seccionInicial = navegacion[0]?.items[0]?.clave ?? "inicio";
   const [seccionActiva, setSeccionActiva] = useState(seccionInicial);
+  // Usuario seleccionado desde una fila del Listado, para la sección "detalle"
+  // (oculta del sidebar: solo se llega a ella dando clic en "Ver").
+  const [detalleUserId, setDetalleUserId] = useState(null);
 
   const seccion = TODAS.find((s) => s.clave === seccionActiva) ?? TODAS[0];
   const permitida = seccion?.roles.includes(usuario.tipo);
@@ -363,6 +366,11 @@ export default function PanelPage({ usuario, onCerrarSesion, onVolver }) {
     () => navegacion.flatMap((g) => g.items).filter((it) => it.clave !== "inicio"),
     [navegacion],
   );
+
+  const irADetalle = (usuarioSeleccionado) => {
+    setDetalleUserId(usuarioSeleccionado.id);
+    setSeccionActiva("detalle");
+  };
 
   let contenido;
   if (!seccion || !permitida) {
@@ -381,6 +389,12 @@ export default function PanelPage({ usuario, onCerrarSesion, onVolver }) {
     );
   } else if (seccion.clave === "inicio") {
     contenido = <PanelInicio usuario={usuario} accesos={accesos} onIrA={setSeccionActiva} />;
+  } else if (seccion.clave === "alumnos") {
+    contenido = <ListadoPage {...(seccion.props ?? {})} onVerDetalle={irADetalle} />;
+  } else if (seccion.clave === "detalle") {
+    contenido = (
+      <DetallePage userId={detalleUserId} onVolver={() => setSeccionActiva("alumnos")} />
+    );
   } else {
     const Componente = seccion.Componente;
     contenido = <Componente {...(seccion.props ?? {})} />;

@@ -110,7 +110,7 @@ function ConfirmDialog({ accion, onCancelar, onConfirmar, procesando }) {
   );
 }
 
-function FilaUsuario({ usuario, avisoFila, onPedirConfirmacion }) {
+function FilaUsuario({ usuario, avisoFila, onPedirConfirmacion, onVerDetalle }) {
   return (
     <tr className="border-b border-slate-100 last:border-0">
       <td className="py-3 pl-4 pr-4 font-medium text-slate-700">{usuario.nombre}</td>
@@ -121,6 +121,13 @@ function FilaUsuario({ usuario, avisoFila, onPedirConfirmacion }) {
       <td className="py-3 pr-4 text-slate-500">{formatFecha(usuario.creado_en)}</td>
       <td className="py-3 pr-4">
         <div className="flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={() => onVerDetalle?.(usuario)}
+            className="rounded-full border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"
+          >
+            Ver
+          </button>
           {usuario.activo ? (
             <button
               type="button"
@@ -160,7 +167,7 @@ function FilaUsuario({ usuario, avisoFila, onPedirConfirmacion }) {
   );
 }
 
-export default function ListadoPage({ onVolver, embebido = false }) {
+export default function ListadoPage({ onVolver, embebido = false, onVerDetalle }) {
   const [usuarios, setUsuarios] = useState(null);
   const [cargando, setCargando] = useState(true);
   const [errorCarga, setErrorCarga] = useState(null);
@@ -351,6 +358,7 @@ export default function ListadoPage({ onVolver, embebido = false }) {
                           usuario={usuario}
                           avisoFila={avisoFila}
                           onPedirConfirmacion={pedirConfirmacion}
+                          onVerDetalle={onVerDetalle}
                         />
                       ))}
                     </tbody>
