@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { nombreCompleto } from "../lib/nombre";
 import { AZUL_CLARO, AZUL_MEDIO, GRAD_AZUL } from "../lib/theme";
 import { IconoCerrar, IconoInicio, IconoMenu, IconoSalir } from "./iconos";
 
@@ -66,12 +67,12 @@ export default function DashboardLayout({
     }
   }, [menuAbierto]);
 
+  const nombreParaMostrar = nombreCompleto(usuario) || usuario.nombre || "";
   const iniciales =
-    (usuario.nombre ?? "")
-      .split(" ")
+    [usuario.nombre, usuario.apellido_paterno]
+      .map((parte) => (parte ?? "").trim()[0])
       .filter(Boolean)
-      .slice(0, 2)
-      .map((p) => p[0].toUpperCase())
+      .map((letra) => letra.toUpperCase())
       .join("") || "U";
 
   // El contenido de la sidebar se reutiliza tal cual en el drawer móvil.
@@ -220,13 +221,15 @@ export default function DashboardLayout({
 
           <div className="ml-auto flex items-center gap-3">
             <div className="hidden text-right sm:block">
-              <p className="text-sm font-semibold leading-tight text-slate-800">{usuario.nombre}</p>
+              <p className="text-sm font-semibold leading-tight text-slate-800">
+                {nombreParaMostrar}
+              </p>
               <p className="text-xs leading-tight text-[#0F5C8C]">{etiquetaRol}</p>
             </div>
             <span
               className="flex h-9 w-9 items-center justify-center rounded-full text-sm font-bold text-white"
               style={{ backgroundImage: GRAD_AZUL }}
-              aria-label={`${usuario.nombre} — ${etiquetaRol}`}
+              aria-label={`${nombreParaMostrar} — ${etiquetaRol}`}
             >
               <span aria-hidden="true">{iniciales}</span>
             </span>
