@@ -20,6 +20,7 @@ db.exec(`
     id               INTEGER PRIMARY KEY AUTOINCREMENT,
     nombre           TEXT    NOT NULL,
     correo           TEXT    NOT NULL UNIQUE,
+    telefono         TEXT,
     tipo             TEXT    NOT NULL CHECK (tipo IN ('alumno', 'sinodal', 'personal')),
 
     -- Específicos de alumno
@@ -40,6 +41,16 @@ db.exec(`
     creado_en        TEXT    NOT NULL DEFAULT (datetime('now'))
   );
 `);
+
+// Migración aditiva: columna `telefono` (opcional, aplica a los 3 tipos).
+// SQLite no soporta "ADD COLUMN IF NOT EXISTS", así que se consulta el esquema
+// actual antes de intentar el ALTER (las bases ya creadas no la tendrían).
+const tieneTelefono = db
+  .prepare("SELECT 1 FROM pragma_table_info('usuarios') WHERE name = 'telefono'")
+  .get();
+if (!tieneTelefono) {
+  db.exec("ALTER TABLE usuarios ADD COLUMN telefono TEXT");
+}
 
 // Autenticación (aditivo, Sprint 2). No modifica la tabla `usuarios`:
 //   - credenciales: hash/salt de la contraseña, 1 fila por usuario.

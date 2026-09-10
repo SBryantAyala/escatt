@@ -15,7 +15,7 @@ const CAMPOS_ESPECIFICOS = [
 ];
 
 // Columnas que se pueden tocar desde PUT /usuarios/:id.
-const CAMPOS_EDITABLES = ["nombre", "correo", "tipo", ...CAMPOS_ESPECIFICOS, "activo"];
+const CAMPOS_EDITABLES = ["nombre", "correo", "telefono", "tipo", ...CAMPOS_ESPECIFICOS, "activo"];
 
 // Convierte la fila de SQLite (activo llega como 1/0) al formato que consume el front.
 function serializar(fila) {
@@ -60,6 +60,9 @@ router.post("/", (req, res) => {
   const nombre = typeof cuerpo.nombre === "string" ? cuerpo.nombre.trim() : "";
   const correo = typeof cuerpo.correo === "string" ? cuerpo.correo.trim() : "";
   const tipo = typeof cuerpo.tipo === "string" ? cuerpo.tipo.trim() : "";
+  // Teléfono opcional (aplica a los 3 tipos): si viene vacío o no viene, null.
+  const telefonoRaw = typeof cuerpo.telefono === "string" ? cuerpo.telefono.trim() : "";
+  const telefono = telefonoRaw === "" ? null : telefonoRaw;
 
   const faltantes = [];
   if (!nombre) faltantes.push("nombre");
@@ -95,11 +98,11 @@ router.post("/", (req, res) => {
     const info = db
       .prepare(
         `INSERT INTO usuarios
-           (nombre, correo, tipo, boleta, carrera, protocolo_tt, numero_empleado, especialidad, cargo)
+           (nombre, correo, telefono, tipo, boleta, carrera, protocolo_tt, numero_empleado, especialidad, cargo)
          VALUES
-           (@nombre, @correo, @tipo, @boleta, @carrera, @protocolo_tt, @numero_empleado, @especialidad, @cargo)`,
+           (@nombre, @correo, @telefono, @tipo, @boleta, @carrera, @protocolo_tt, @numero_empleado, @especialidad, @cargo)`,
       )
-      .run({ nombre, correo, tipo, ...especificos });
+      .run({ nombre, correo, telefono, tipo, ...especificos });
 
     res.status(201).json(serializar(buscarPorId(info.lastInsertRowid)));
   } catch (err) {
@@ -153,6 +156,14 @@ router.put("/:id", (req, res) => {
       return res.status(400).json({ error: "correo no puede quedar vacío" });
     }
     cambios.correo = cambios.correo.trim();
+  }
+
+  // Teléfono es opcional: si llega vacío se guarda como null.
+  if ("telefono" in cambios) {
+    cambios.telefono =
+      typeof cambios.telefono === "string" && cambios.telefono.trim() !== ""
+        ? cambios.telefono.trim()
+        : null;
   }
 
   if ("tipo" in cambios) {

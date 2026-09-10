@@ -2,14 +2,14 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "../../../lib/api";
 import { AZUL_CLARO, AZUL_MEDIO, GRAD_AZUL, VIDRIO } from "../../../lib/theme";
 
-// Pantalla: Listado (+ Revocar acceso + Reactivar + Eliminar)
-// Responsable: Edgar (rama feature/listado-revocar-eliminar)
-// Consume /api/usuarios ya implementado por Bryan:
-//   GET /usuarios, PATCH /usuarios/:id/revocar, PUT /usuarios/:id, DELETE /usuarios/:id
+// Pantalla: Listado de usuarios (solo consulta + búsqueda por pestaña).
+// Consume GET /api/usuarios. Cada fila es clickeable y lleva al Detalle del
+// usuario; las acciones de revocar/reactivar/eliminar viven ahora en Detalle
+// (pages/Usuarios/Detalle), no aquí.
 //
 // Se usa de dos formas:
 //   - Suelta (con su propio marco de pantalla completa), pasando `onVolver`.
-//   - Embebida como la sección "Alumnos" del panel (pages/Panel), pasando
+//   - Embebida como la sección "Usuarios" del panel (pages/Panel), pasando
 //     `embebido` — entonces sólo renderiza la tarjeta, sin marco ni fondo.
 // La paleta, la clase VIDRIO y el cliente `api()` se importan de src/lib.
 
@@ -19,13 +19,6 @@ const PESTANAS = [
   { tipo: "sinodal", titulo: "Sinodales", etiquetaAlta: "Registrar sinodal" },
   { tipo: "personal", titulo: "Personal CATT", etiquetaAlta: "Registrar personal CATT" },
 ];
-
-function formatFecha(valor) {
-  if (!valor) return "—";
-  const fecha = new Date(valor.replace(" ", "T"));
-  if (Number.isNaN(fecha.getTime())) return valor;
-  return fecha.toLocaleDateString("es-MX", { year: "numeric", month: "short", day: "2-digit" });
-}
 
 // Sin acentos y en minúsculas, para que buscar "jose" también encuentre "José".
 function normalizar(texto) {
@@ -47,121 +40,33 @@ function EstadoBadge({ activo }) {
   );
 }
 
-const TEXTO_CONFIRMACION = {
-  eliminar: (nombre) => `Esta acción borra a "${nombre}" de forma permanente. No se puede deshacer.`,
-  revocar: (nombre) => `"${nombre}" perderá acceso al sistema hasta que se le vuelva a dar de alta.`,
-  reactivar: (nombre) => `"${nombre}" recupera su acceso al sistema de inmediato.`,
-};
-
-const TITULO_CONFIRMACION = {
-  eliminar: "Eliminar usuario",
-  revocar: "Revocar acceso",
-  reactivar: "Reactivar acceso",
-};
-
-function ConfirmDialog({ accion, onCancelar, onConfirmar, procesando }) {
-  if (!accion) return null;
-
-  const { tipo, usuario } = accion;
-  const esEliminar = tipo === "eliminar";
-  const esRevocar = tipo === "revocar";
-
-  const claseBoton = esEliminar
-    ? "bg-red-600 hover:bg-red-700"
-    : esRevocar
-      ? "bg-amber-600 hover:bg-amber-700"
-      : "shadow-md shadow-[#1878B6]/30 hover:-translate-y-0.5";
-  const estiloBoton = !esEliminar && !esRevocar ? { background: GRAD_AZUL } : undefined;
+// Fila clickeable: toda la <tr> lleva al detalle del usuario (antes había un
+// botón "Ver"). Accesible por teclado (role="button" + Enter/Espacio). Las
+// acciones de revocar/reactivar/eliminar ya no viven aquí, sino en Detalle.
+function FilaUsuario({ usuario, identificador, onVerDetalle }) {
+  const abrir = () => onVerDetalle?.(usuario);
+  const alPresionar = (e) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      abrir();
+    }
+  };
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4"
-      onClick={onCancelar}
+    <tr
+      role="button"
+      tabIndex={0}
+      onClick={abrir}
+      onKeyDown={alPresionar}
+      aria-label={`Ver detalle de ${usuario.nombre}`}
+      className="cursor-pointer border-b border-slate-100 transition-colors last:border-0 hover:bg-[#4FB3E8]/10 focus:bg-[#4FB3E8]/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#4FB3E8]/50"
     >
-      <div
-        role="dialog"
-        aria-modal="true"
-        className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-lg ring-1 ring-slate-200"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <h2 className="text-lg font-semibold text-slate-900">{TITULO_CONFIRMACION[tipo]}</h2>
-        <p className="mt-2 text-sm text-slate-600">{TEXTO_CONFIRMACION[tipo](usuario.nombre)}</p>
-        <div className="mt-6 flex justify-end gap-2">
-          <button
-            type="button"
-            onClick={onCancelar}
-            disabled={procesando}
-            className="rounded-lg px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100 disabled:opacity-50"
-          >
-            Cancelar
-          </button>
-          <button
-            type="button"
-            onClick={onConfirmar}
-            disabled={procesando}
-            style={estiloBoton}
-            className={`rounded-lg px-3 py-1.5 text-sm font-medium text-white transition disabled:opacity-50 ${claseBoton}`}
-          >
-            {procesando ? "Procesando…" : TITULO_CONFIRMACION[tipo]}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function FilaUsuario({ usuario, avisoFila, onPedirConfirmacion, onVerDetalle }) {
-  return (
-    <tr className="border-b border-slate-100 last:border-0">
       <td className="py-3 pl-4 pr-4 font-medium text-slate-700">{usuario.nombre}</td>
+      <td className="py-3 pr-4 text-slate-500">{identificador || "—"}</td>
+      <td className="py-3 pr-4 text-slate-500">{usuario.telefono || "—"}</td>
       <td className="py-3 pr-4 text-slate-500">{usuario.correo}</td>
       <td className="py-3 pr-4">
         <EstadoBadge activo={usuario.activo} />
-      </td>
-      <td className="py-3 pr-4 text-slate-500">{formatFecha(usuario.creado_en)}</td>
-      <td className="py-3 pr-4">
-        <div className="flex justify-end gap-2">
-          <button
-            type="button"
-            onClick={() => onVerDetalle?.(usuario)}
-            className="rounded-full border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"
-          >
-            Ver
-          </button>
-          {usuario.activo ? (
-            <button
-              type="button"
-              onClick={() => onPedirConfirmacion("revocar", usuario)}
-              className="rounded-full border border-amber-200 px-2.5 py-1 text-xs font-medium text-amber-700 hover:bg-amber-50"
-            >
-              Revocar acceso
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={() => onPedirConfirmacion("reactivar", usuario)}
-              className="rounded-full border border-[#1878B6]/30 px-2.5 py-1 text-xs font-medium text-[#0F5C8C] hover:bg-[#4FB3E8]/10"
-            >
-              Reactivar acceso
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={() => onPedirConfirmacion("eliminar", usuario)}
-            className="rounded-full border border-red-200 px-2.5 py-1 text-xs font-medium text-red-700 hover:bg-red-50"
-          >
-            Eliminar
-          </button>
-        </div>
-        {avisoFila?.id === usuario.id && (
-          <p
-            className={`mt-1 text-right text-xs ${
-              avisoFila.tipo === "ok" ? "text-emerald-600" : "text-red-600"
-            }`}
-          >
-            {avisoFila.mensaje}
-          </p>
-        )}
       </td>
     </tr>
   );
@@ -173,9 +78,6 @@ export default function ListadoPage({ onVolver, embebido = false, onVerDetalle, 
   const [errorCarga, setErrorCarga] = useState(null);
   const [tabActiva, setTabActiva] = useState("alumno");
   const [busqueda, setBusqueda] = useState("");
-  const [accionPendiente, setAccionPendiente] = useState(null); // { tipo: 'revocar'|'reactivar'|'eliminar', usuario }
-  const [procesando, setProcesando] = useState(false);
-  const [avisoFila, setAvisoFila] = useState(null); // { id, tipo: 'ok'|'error', mensaje }
 
   const cargarUsuarios = useCallback(() => {
     setCargando(true);
@@ -213,50 +115,13 @@ export default function ListadoPage({ onVolver, embebido = false, onVerDetalle, 
     );
   }, [usuarios, tabActiva, busqueda]);
 
-  function pedirConfirmacion(tipo, usuario) {
-    setAccionPendiente({ tipo, usuario });
-  }
-
-  function cancelarAccion() {
-    if (procesando) return;
-    setAccionPendiente(null);
-  }
-
-  function confirmarAccion() {
-    if (!accionPendiente) return;
-    const { tipo, usuario } = accionPendiente;
-    setProcesando(true);
-
-    const solicitud =
-      tipo === "eliminar"
-        ? api(`/api/usuarios/${usuario.id}`, { method: "DELETE" })
-        : tipo === "reactivar"
-          ? api(`/api/usuarios/${usuario.id}`, { method: "PUT", body: { activo: true } })
-          : api(`/api/usuarios/${usuario.id}/revocar`, { method: "PATCH" });
-
-    const mensajeOk =
-      tipo === "eliminar" ? "Usuario eliminado." : tipo === "reactivar" ? "Acceso reactivado." : "Acceso revocado.";
-
-    solicitud
-      .then((resultado) => {
-        setUsuarios((actuales) =>
-          tipo === "eliminar"
-            ? actuales.filter((u) => u.id !== usuario.id)
-            : actuales.map((u) => (u.id === usuario.id ? resultado : u)),
-        );
-        setAvisoFila({ id: usuario.id, tipo: "ok", mensaje: mensajeOk });
-      })
-      .catch((e) => {
-        setAvisoFila({ id: usuario.id, tipo: "error", mensaje: e.message });
-      })
-      .finally(() => {
-        setProcesando(false);
-        setAccionPendiente(null);
-      });
-  }
-
   const pestanaActiva = PESTANAS.find((p) => p.tipo === tabActiva);
   const tituloTabActiva = pestanaActiva?.titulo ?? "";
+
+  // La columna "identificador" muestra la boleta (alumnos) o el número de
+  // empleado (sinodales / personal), según la pestaña activa.
+  const esAlumno = tabActiva === "alumno";
+  const identificadorLabel = esAlumno ? "Boleta" : "Número de empleado";
 
   const panel = (
     <div className={`rounded-3xl p-6 sm:p-8 ${VIDRIO} bg-white/85`}>
@@ -275,7 +140,7 @@ export default function ListadoPage({ onVolver, embebido = false, onVerDetalle, 
                 </>
               )}
               <p className={`text-sm text-slate-600 ${embebido ? "" : "mt-1"}`}>
-                Listado de usuarios, revocar/reactivar acceso y eliminar cuentas.
+                Selecciona una fila para ver y editar el detalle del usuario.
               </p>
             </div>
             <div className="flex shrink-0 items-center gap-2">
@@ -357,10 +222,10 @@ export default function ListadoPage({ onVolver, embebido = false, onVerDetalle, 
                     <thead>
                       <tr className="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-400">
                         <th className="py-2 pl-4 pr-4 font-medium">Nombre</th>
+                        <th className="py-2 pr-4 font-medium">{identificadorLabel}</th>
+                        <th className="py-2 pr-4 font-medium">Teléfono</th>
                         <th className="py-2 pr-4 font-medium">Correo</th>
                         <th className="py-2 pr-4 font-medium">Estado</th>
-                        <th className="py-2 pr-4 font-medium">Alta</th>
-                        <th className="py-2 pr-4 text-right font-medium">Acciones</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -368,8 +233,7 @@ export default function ListadoPage({ onVolver, embebido = false, onVerDetalle, 
                         <FilaUsuario
                           key={usuario.id}
                           usuario={usuario}
-                          avisoFila={avisoFila}
-                          onPedirConfirmacion={pedirConfirmacion}
+                          identificador={esAlumno ? usuario.boleta : usuario.numero_empleado}
                           onVerDetalle={onVerDetalle}
                         />
                       ))}
@@ -382,23 +246,9 @@ export default function ListadoPage({ onVolver, embebido = false, onVerDetalle, 
     </div>
   );
 
-  const dialogo = (
-    <ConfirmDialog
-      accion={accionPendiente}
-      onCancelar={cancelarAccion}
-      onConfirmar={confirmarAccion}
-      procesando={procesando}
-    />
-  );
-
-  // Embebida en el panel: sólo la tarjeta + el diálogo, sin marco de pantalla.
+  // Embebida en el panel: sólo la tarjeta, sin marco de pantalla.
   if (embebido) {
-    return (
-      <>
-        {panel}
-        {dialogo}
-      </>
-    );
+    return panel;
   }
 
   // Suelta: marco de pantalla completa con fondo de marca y botón "Volver".
@@ -427,7 +277,6 @@ export default function ListadoPage({ onVolver, embebido = false, onVerDetalle, 
         )}
         {panel}
       </div>
-      {dialogo}
     </div>
   );
 }

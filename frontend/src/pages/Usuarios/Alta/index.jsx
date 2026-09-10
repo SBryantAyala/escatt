@@ -16,6 +16,7 @@ const CARRERAS = ["ISC", "IIA", "LCD"];
 const CAMPOS_INICIALES = {
   nombre: "",
   correo: "",
+  telefono: "",
   boleta: "",
   carrera: "",
   protocolo_tt: "",
@@ -51,6 +52,7 @@ export default function AltaPage({ tipoInicial = "alumno" }) {
     const payload = {
       nombre: formData.nombre.trim(),
       correo: formData.correo.trim(),
+      telefono: formData.telefono.trim(),
       tipo,
       ...(tipo === "alumno" && {
         boleta: formData.boleta,
@@ -115,6 +117,19 @@ export default function AltaPage({ tipoInicial = "alumno" }) {
             name="correo"
             required
             value={formData.correo}
+            onChange={handleChange}
+            className={claseInput}
+          />
+        </div>
+
+        {/* Teléfono: opcional y común a los 3 tipos, por eso va en datos
+            generales, antes del bloque condicional por tipo. */}
+        <div>
+          <label className={claseLabel}>Número de teléfono (opcional)</label>
+          <input
+            type="tel"
+            name="telefono"
+            value={formData.telefono}
             onChange={handleChange}
             className={claseInput}
           />
