@@ -1,17 +1,38 @@
+// Pantalla: Alta
+// Registra un nuevo usuario (alumno, sinodal o personal CATT) contra
+// POST /api/usuarios.
+//
+// Paleta y helpers duplicados aquí porque App.jsx no los exporta — mismo
+// patrón que ya usa pages/Listado/index.jsx en esta rama.
 import { useState } from "react";
+
+const API_BASE = import.meta.env.VITE_API_URL ?? "";
+const AZUL_MEDIO = "#1878B6";
+const AZUL_CLARO = "#4FB3E8";
+const GRAD_AZUL = `linear-gradient(135deg, ${AZUL_MEDIO} 0%, ${AZUL_CLARO} 100%)`;
+const VIDRIO = "border border-white/60 bg-white/70 backdrop-blur-xl shadow-lg shadow-[#1878B6]/10";
+
+// Las 3 carreras reales de ESCOM (espejo de CARRERAS_VALIDAS del backend).
+const CARRERAS = ["ISC", "IIA", "LCD"];
+
+const CAMPOS_INICIALES = {
+  nombre: "",
+  correo: "",
+  boleta: "",
+  carrera: "",
+  protocolo_tt: "",
+  numero_empleado: "",
+  especialidad: "",
+  cargo: "",
+};
+
+const claseInput =
+  "w-full rounded-xl border border-slate-200 bg-white/80 px-3 py-2.5 text-sm outline-none transition focus:border-[#1878B6] focus:ring-2 focus:ring-[#4FB3E8]/40";
+const claseLabel = "mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500";
 
 export default function AltaPage() {
   const [tipo, setTipo] = useState("alumno");
-  const [formData, setFormData] = useState({
-    nombre: "",
-    correo: "",
-    boleta: "",
-    carrera: "",
-    protocolo_tt: "",
-    numero_empleado: "",
-    especialidad: "",
-    cargo: "",
-  });
+  const [formData, setFormData] = useState(CAMPOS_INICIALES);
   const [loading, setLoading] = useState(false);
   const [mensaje, setMensaje] = useState(null);
 
@@ -45,31 +66,20 @@ export default function AltaPage() {
     };
 
     try {
-      const res = await fetch("http://localhost:3000/api/usuarios", {
+      const resp = await fetch(`${API_BASE}/api/usuarios`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
 
-      const data = await res.json();
+      const data = await resp.json();
 
-      if (!res.ok) {
+      if (!resp.ok) {
         throw new Error(data.error || "Error al registrar el usuario");
       }
 
       setMensaje({ tipo: "exito", texto: "¡Usuario registrado correctamente!" });
-
-      // Reiniciar formulario
-      setFormData({
-        nombre: "",
-        correo: "",
-        boleta: "",
-        carrera: "",
-        protocolo_tt: "",
-        numero_empleado: "",
-        especialidad: "",
-        cargo: "",
-      });
+      setFormData(CAMPOS_INICIALES);
     } catch (err) {
       setMensaje({ tipo: "error", texto: err.message });
     } finally {
@@ -78,93 +88,96 @@ export default function AltaPage() {
   };
 
   return (
-    <div className="max-w-2xl mx-auto my-8 p-6 bg-white rounded-xl shadow border border-slate-200">
-      <h2 className="text-2xl font-bold text-slate-800 mb-6">Alta de Usuario</h2>
+    <div className={`mx-auto max-w-2xl rounded-3xl p-6 sm:p-8 ${VIDRIO} bg-white/85`}>
+      <h2 className="text-2xl font-bold text-slate-800">Alta de usuario</h2>
 
       {mensaje && (
         <div
-          className={`p-4 mb-6 rounded-lg text-sm font-medium ${
+          role="alert"
+          className={`mt-5 rounded-2xl px-4 py-3 text-sm font-medium ${
             mensaje.tipo === "exito"
-              ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-              : "bg-rose-50 text-rose-700 border border-rose-200"
+              ? "bg-emerald-50 text-emerald-700"
+              : "bg-red-50 text-red-700"
           }`}
         >
           {mensaje.texto}
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={handleSubmit} className="mt-6 space-y-4">
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">Nombre completo</label>
+          <label className={claseLabel}>Nombre completo</label>
           <input
             type="text"
             name="nombre"
             required
             value={formData.nombre}
             onChange={handleChange}
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            className={claseInput}
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">Correo electrónico</label>
+          <label className={claseLabel}>Correo electrónico</label>
           <input
             type="email"
             name="correo"
             required
             value={formData.correo}
             onChange={handleChange}
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            className={claseInput}
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">Tipo de usuario</label>
-          <select
-            value={tipo}
-            onChange={(e) => setTipo(e.target.value)}
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          >
+          <label className={claseLabel}>Tipo de usuario</label>
+          <select value={tipo} onChange={(e) => setTipo(e.target.value)} className={claseInput}>
             <option value="alumno">Alumno</option>
             <option value="sinodal">Sinodal</option>
-            <option value="personal">Personal Administrativo</option>
+            <option value="personal">Personal CATT</option>
           </select>
         </div>
 
         {/* Campos condicionales según el rol */}
-        <div className="p-4 bg-slate-50 rounded-lg border border-slate-200 space-y-4">
+        <div className="space-y-4 rounded-2xl bg-white/60 p-4">
           {tipo === "alumno" && (
             <>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Boleta</label>
+                <label className={claseLabel}>Boleta</label>
                 <input
                   type="text"
                   name="boleta"
                   required
                   value={formData.boleta}
                   onChange={handleChange}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg"
+                  className={claseInput}
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Carrera</label>
-                <input
-                  type="text"
+                <label className={claseLabel}>Carrera</label>
+                <select
                   name="carrera"
                   required
                   value={formData.carrera}
                   onChange={handleChange}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg"
-                />
+                  className={claseInput}
+                >
+                  <option value="">Selecciona…</option>
+                  {CARRERAS.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Protocolo TT (Opcional)</label>
+                <label className={claseLabel}>Protocolo TT (Opcional)</label>
                 <input
                   type="text"
                   name="protocolo_tt"
                   value={formData.protocolo_tt}
                   onChange={handleChange}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg"
+                  className={claseInput}
                 />
               </div>
             </>
@@ -173,25 +186,25 @@ export default function AltaPage() {
           {tipo === "sinodal" && (
             <>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Número de Empleado</label>
+                <label className={claseLabel}>Número de empleado</label>
                 <input
                   type="text"
                   name="numero_empleado"
                   required
                   value={formData.numero_empleado}
                   onChange={handleChange}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg"
+                  className={claseInput}
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Especialidad</label>
+                <label className={claseLabel}>Especialidad</label>
                 <input
                   type="text"
                   name="especialidad"
                   required
                   value={formData.especialidad}
                   onChange={handleChange}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg"
+                  className={claseInput}
                 />
               </div>
             </>
@@ -200,25 +213,25 @@ export default function AltaPage() {
           {tipo === "personal" && (
             <>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Número de Empleado</label>
+                <label className={claseLabel}>Número de empleado</label>
                 <input
                   type="text"
                   name="numero_empleado"
                   required
                   value={formData.numero_empleado}
                   onChange={handleChange}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg"
+                  className={claseInput}
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Cargo</label>
+                <label className={claseLabel}>Cargo</label>
                 <input
                   type="text"
                   name="cargo"
                   required
                   value={formData.cargo}
                   onChange={handleChange}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg"
+                  className={claseInput}
                 />
               </div>
             </>
@@ -228,9 +241,10 @@ export default function AltaPage() {
         <button
           type="submit"
           disabled={loading}
-          className="w-full py-2.5 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition duration-200"
+          className="w-full rounded-full px-5 py-2.5 font-semibold text-white shadow-lg shadow-[#1878B6]/30 transition hover:-translate-y-0.5 hover:shadow-xl disabled:cursor-not-allowed disabled:opacity-60"
+          style={{ backgroundImage: GRAD_AZUL }}
         >
-          {loading ? "Registrando..." : "Registrar Usuario"}
+          {loading ? "Registrando…" : "Registrar usuario"}
         </button>
       </form>
     </div>
