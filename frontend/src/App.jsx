@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import NexusLogo from "./components/NexusLogo";
 import ListadoPage from "./pages/Listado";
+import AltaPage from "./pages/Alta";
 
 // Navegación mínima sin librerías externas: Sprint 1 solo necesita
 // Landing -> Listado (useState, sin react-router).
