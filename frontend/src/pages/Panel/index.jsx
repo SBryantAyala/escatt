@@ -357,6 +357,9 @@ export default function PanelPage({ usuario, onCerrarSesion, onVolver }) {
   // Usuario seleccionado desde una fila del Listado, para la sección "detalle"
   // (oculta del sidebar: solo se llega a ella dando clic en "Ver").
   const [detalleUserId, setDetalleUserId] = useState(null);
+  // Tipo con el que se abre el formulario de Alta cuando se llega desde el
+  // botón "Registrar alumno/sinodal/personal" de la pestaña activa en Listado.
+  const [altaTipoInicial, setAltaTipoInicial] = useState("alumno");
 
   const seccion = TODAS.find((s) => s.clave === seccionActiva) ?? TODAS[0];
   const permitida = seccion?.roles.includes(usuario.tipo);
@@ -370,6 +373,11 @@ export default function PanelPage({ usuario, onCerrarSesion, onVolver }) {
   const irADetalle = (usuarioSeleccionado) => {
     setDetalleUserId(usuarioSeleccionado.id);
     setSeccionActiva("detalle");
+  };
+
+  const irAAlta = (tipo) => {
+    setAltaTipoInicial(tipo);
+    setSeccionActiva("alta");
   };
 
   let contenido;
@@ -390,7 +398,11 @@ export default function PanelPage({ usuario, onCerrarSesion, onVolver }) {
   } else if (seccion.clave === "inicio") {
     contenido = <PanelInicio usuario={usuario} accesos={accesos} onIrA={setSeccionActiva} />;
   } else if (seccion.clave === "alumnos") {
-    contenido = <ListadoPage {...(seccion.props ?? {})} onVerDetalle={irADetalle} />;
+    contenido = (
+      <ListadoPage {...(seccion.props ?? {})} onVerDetalle={irADetalle} onDarDeAlta={irAAlta} />
+    );
+  } else if (seccion.clave === "alta") {
+    contenido = <AltaPage tipoInicial={altaTipoInicial} />;
   } else if (seccion.clave === "detalle") {
     contenido = (
       <DetallePage userId={detalleUserId} onVolver={() => setSeccionActiva("alumnos")} />
