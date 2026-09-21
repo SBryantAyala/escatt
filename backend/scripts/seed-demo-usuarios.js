@@ -13,7 +13,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { db } from "../src/db/index.js";
+import { pool, queryNamed } from "../src/db/index.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -75,28 +75,38 @@ const PERSONAL = [
   { nombre: "Oscar Iván", apellido_paterno: "Malpica", apellido_materno: "Serrano", correo: "oscar.malpica@ipn.mx", telefono: "5501200987", numero_empleado: "502951", cargo: "Personal Administrativo" },
 ];
 
-const insertUsuario = db.prepare(`
-  INSERT INTO usuarios
-    (nombre, apellido_paterno, apellido_materno, correo, telefono, tipo,
-     boleta, carrera, protocolo_tt, numero_empleado, especialidad, cargo)
-  VALUES
-    (@nombre, @apellido_paterno, @apellido_materno, @correo, @telefono, @tipo,
-     @boleta, @carrera, @protocolo_tt, @numero_empleado, @especialidad, @cargo)
-`);
+async function insertarUsuario(datos) {
+  const { rows } = await queryNamed(
+    `INSERT INTO usuarios
+       (nombre, apellido_paterno, apellido_materno, correo, telefono, tipo,
+        boleta, carrera, protocolo_tt, numero_empleado, especialidad, cargo)
+     VALUES
+       (@nombre, @apellido_paterno, @apellido_materno, @correo, @telefono, @tipo,
+        @boleta, @carrera, @protocolo_tt, @numero_empleado, @especialidad, @cargo)
+     RETURNING id`,
+    datos,
+  );
+  return rows[0].id;
+}
 
-const insertCredencial = db.prepare(`
-  INSERT INTO credenciales (usuario_id, password_hash, password_salt)
-  VALUES (?, ?, ?)
-`);
+async function insertarCredencial(usuarioId, hash, salt) {
+  await pool.query(
+    "INSERT INTO credenciales (usuario_id, password_hash, password_salt) VALUES ($1, $2, $3)",
+    [usuarioId, hash, salt],
+  );
+}
 
-const buscarPorCorreo = db.prepare("SELECT id FROM usuarios WHERE correo = ?");
+async function buscarPorCorreo(correo) {
+  const { rows } = await pool.query("SELECT id FROM usuarios WHERE correo = $1", [correo]);
+  return rows[0] ?? null;
+}
 
-function sembrar(tipo, lista) {
+async function sembrar(tipo, lista) {
   const password = PASSWORDS[tipo];
   const filasCredenciales = [];
 
   for (const persona of lista) {
-    const yaExiste = buscarPorCorreo.get(persona.correo);
+    const yaExiste = await buscarPorCorreo(persona.correo);
     if (yaExiste) {
       console.log(`- [omitido] ${persona.correo} ya existe (id ${yaExiste.id})`);
       continue;
@@ -117,11 +127,9 @@ function sembrar(tipo, lista) {
       cargo: persona.cargo ?? null,
     };
 
-    const info = insertUsuario.run(datos);
-    const usuarioId = Number(info.lastInsertRowid);
-
+    const usuarioId = await insertarUsuario(datos);
     const { salt, hash } = hashPassword(password);
-    insertCredencial.run(usuarioId, hash, salt);
+    await insertarCredencial(usuarioId, hash, salt);
 
     console.log(`+ [creado] ${tipo.padEnd(8)} ${persona.nombre} ${persona.apellido_paterno} <${persona.correo}>`);
 
@@ -140,9 +148,9 @@ function sembrar(tipo, lista) {
 console.log("Sembrando usuarios de prueba...\n");
 
 const todas = [
-  ...sembrar("alumno", ALUMNOS),
-  ...sembrar("sinodal", SINODALES),
-  ...sembrar("personal", PERSONAL),
+  ...(await sembrar("alumno", ALUMNOS)),
+  ...(await sembrar("sinodal", SINODALES)),
+  ...(await sembrar("personal", PERSONAL)),
 ];
 
 // Genera el archivo de credenciales, agrupado por tipo, con formato de tabla simple.
@@ -180,3 +188,5 @@ fs.writeFileSync(rutaSalida, contenido, "utf8");
 
 console.log(`\nListo. ${todas.length} usuarios nuevos creados (los ya existentes se omitieron).`);
 console.log(`Credenciales guardadas en: ${rutaSalida}`);
+
+await pool.end();

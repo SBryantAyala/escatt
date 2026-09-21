@@ -2,7 +2,7 @@ import "dotenv/config";
 import express from "express";
 import cors from "cors";
 
-import { db } from "./db/index.js";
+import { pool } from "./db/index.js";
 import healthRouter from "./routes/health.js";
 import usuariosRouter from "./routes/usuarios.js";
 import authRouter from "./routes/auth.js";
@@ -27,7 +27,10 @@ app.use("/api/auth", authRouter);
 //   app.use("/api/otro", otroRouter);
 
 const port = Number(process.env.PORT) || 3000;
-app.listen(port, () => {
+app.listen(port, async () => {
   console.log(`[api] ESCATT escuchando en http://localhost:${port}`);
-  console.log(`[api] tablas: ${db.prepare("SELECT count(*) AS n FROM sqlite_master WHERE type='table'").get().n}`);
+  const { rows } = await pool.query(
+    "SELECT count(*) AS n FROM information_schema.tables WHERE table_schema = 'public'",
+  );
+  console.log(`[api] tablas: ${rows[0].n}`);
 });

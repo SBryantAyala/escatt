@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db } from "../db/index.js";
+import { pool, queryNamed } from "../db/index.js";
 import { TIPOS_VALIDOS, CAMPOS_POR_TIPO } from "../lib/tipos-usuario.js";
 
 const router = Router();
@@ -29,14 +29,15 @@ const CAMPOS_EDITABLES = [
 // Campos de nombre obligatorios y no vacíos (comparten la misma validación).
 const CAMPOS_NOMBRE = ["nombre", "apellido_paterno", "apellido_materno"];
 
-// Convierte la fila de SQLite (activo llega como 1/0) al formato que consume el front.
-function serializar(fila) {
-  if (!fila) return fila;
-  return { ...fila, activo: fila.activo === 1 };
-}
+// Códigos de error de Postgres que reemplazan a los de SQLite:
+//   23505 = unique_violation  (antes err.code === "SQLITE_CONSTRAINT_UNIQUE")
+//   23514 = check_violation   (antes err.code === "SQLITE_CONSTRAINT_CHECK")
+const PG_UNIQUE_VIOLATION = "23505";
+const PG_CHECK_VIOLATION = "23514";
 
-function buscarPorId(id) {
-  return db.prepare("SELECT * FROM usuarios WHERE id = ?").get(id);
+async function buscarPorId(id) {
+  const { rows } = await pool.query("SELECT * FROM usuarios WHERE id = $1", [id]);
+  return rows[0] ?? null;
 }
 
 // Devuelve el id como entero positivo, o null si el parámetro no es válido.
@@ -46,28 +47,28 @@ function idDeParams(req) {
 }
 
 // GET /api/usuarios -> arreglo con todos los usuarios.
-router.get("/", (_req, res) => {
-  const filas = db.prepare("SELECT * FROM usuarios ORDER BY id").all();
-  res.json(filas.map(serializar));
+router.get("/", async (_req, res) => {
+  const { rows } = await pool.query("SELECT * FROM usuarios ORDER BY id");
+  res.json(rows);
 });
 
 // GET /api/usuarios/:id -> el usuario, o 404 si no existe.
-router.get("/:id", (req, res) => {
+router.get("/:id", async (req, res) => {
   const id = idDeParams(req);
   if (!id) {
     return res.status(400).json({ error: "El id debe ser un número entero positivo" });
   }
 
-  const usuario = buscarPorId(id);
+  const usuario = await buscarPorId(id);
   if (!usuario) {
     return res.status(404).json({ error: `No existe un usuario con id ${id}` });
   }
 
-  res.json(serializar(usuario));
+  res.json(usuario);
 });
 
 // POST /api/usuarios -> crea un usuario. 201 con el creado, o 400/409 según el error.
-router.post("/", (req, res) => {
+router.post("/", async (req, res) => {
   const cuerpo = req.body ?? {};
   const nombre = typeof cuerpo.nombre === "string" ? cuerpo.nombre.trim() : "";
   const apellidoPaterno =
@@ -113,25 +114,25 @@ router.post("/", (req, res) => {
   }
 
   try {
-    const info = db
-      .prepare(
-        `INSERT INTO usuarios
-           (nombre, apellido_paterno, apellido_materno, correo, telefono, tipo,
-            boleta, carrera, protocolo_tt, numero_empleado, especialidad, cargo)
-         VALUES
-           (@nombre, @apellidoPaterno, @apellidoMaterno, @correo, @telefono, @tipo,
-            @boleta, @carrera, @protocolo_tt, @numero_empleado, @especialidad, @cargo)`,
-      )
-      .run({ nombre, apellidoPaterno, apellidoMaterno, correo, telefono, tipo, ...especificos });
+    const { rows } = await queryNamed(
+      `INSERT INTO usuarios
+         (nombre, apellido_paterno, apellido_materno, correo, telefono, tipo,
+          boleta, carrera, protocolo_tt, numero_empleado, especialidad, cargo)
+       VALUES
+         (@nombre, @apellidoPaterno, @apellidoMaterno, @correo, @telefono, @tipo,
+          @boleta, @carrera, @protocolo_tt, @numero_empleado, @especialidad, @cargo)
+       RETURNING *`,
+      { nombre, apellidoPaterno, apellidoMaterno, correo, telefono, tipo, ...especificos },
+    );
 
-    res.status(201).json(serializar(buscarPorId(info.lastInsertRowid)));
+    res.status(201).json(rows[0]);
   } catch (err) {
-    if (err.code === "SQLITE_CONSTRAINT_UNIQUE") {
+    if (err.code === PG_UNIQUE_VIOLATION) {
       return res
         .status(409)
         .json({ error: `Ya existe un usuario con el correo ${correo}` });
     }
-    if (err.code === "SQLITE_CONSTRAINT_CHECK") {
+    if (err.code === PG_CHECK_VIOLATION) {
       return res.status(400).json({ error: `tipo inválido: "${tipo}"` });
     }
     throw err;
@@ -139,13 +140,13 @@ router.post("/", (req, res) => {
 });
 
 // PUT /api/usuarios/:id -> modifica los campos enviados. 200 con el actualizado, o 404.
-router.put("/:id", (req, res) => {
+router.put("/:id", async (req, res) => {
   const id = idDeParams(req);
   if (!id) {
     return res.status(400).json({ error: "El id debe ser un número entero positivo" });
   }
 
-  const usuario = buscarPorId(id);
+  const usuario = await buscarPorId(id);
   if (!usuario) {
     return res.status(404).json({ error: `No existe un usuario con id ${id}` });
   }
@@ -206,7 +207,7 @@ router.put("/:id", (req, res) => {
   }
 
   if ("activo" in cambios) {
-    cambios.activo = cambios.activo ? 1 : 0;
+    cambios.activo = Boolean(cambios.activo);
   }
 
   const asignaciones = Object.keys(cambios)
@@ -214,15 +215,15 @@ router.put("/:id", (req, res) => {
     .join(", ");
 
   try {
-    db.prepare(`UPDATE usuarios SET ${asignaciones} WHERE id = @id`).run({ ...cambios, id });
-    res.json(serializar(buscarPorId(id)));
+    await queryNamed(`UPDATE usuarios SET ${asignaciones} WHERE id = @id`, { ...cambios, id });
+    res.json(await buscarPorId(id));
   } catch (err) {
-    if (err.code === "SQLITE_CONSTRAINT_UNIQUE") {
+    if (err.code === PG_UNIQUE_VIOLATION) {
       return res
         .status(409)
         .json({ error: `Ya existe un usuario con el correo ${cambios.correo}` });
     }
-    if (err.code === "SQLITE_CONSTRAINT_CHECK") {
+    if (err.code === PG_CHECK_VIOLATION) {
       return res.status(400).json({ error: `tipo inválido: "${cambios.tipo}"` });
     }
     throw err;
@@ -230,34 +231,34 @@ router.put("/:id", (req, res) => {
 });
 
 // PATCH /api/usuarios/:id/revocar -> deja el usuario con activo:false. 200, o 404.
-router.patch("/:id/revocar", (req, res) => {
+router.patch("/:id/revocar", async (req, res) => {
   const id = idDeParams(req);
   if (!id) {
     return res.status(400).json({ error: "El id debe ser un número entero positivo" });
   }
 
-  const usuario = buscarPorId(id);
+  const usuario = await buscarPorId(id);
   if (!usuario) {
     return res.status(404).json({ error: `No existe un usuario con id ${id}` });
   }
 
-  db.prepare("UPDATE usuarios SET activo = 0 WHERE id = ?").run(id);
-  res.json(serializar(buscarPorId(id)));
+  await pool.query("UPDATE usuarios SET activo = FALSE WHERE id = $1", [id]);
+  res.json(await buscarPorId(id));
 });
 
 // DELETE /api/usuarios/:id -> borra el registro de verdad. 200 de confirmación, o 404.
-router.delete("/:id", (req, res) => {
+router.delete("/:id", async (req, res) => {
   const id = idDeParams(req);
   if (!id) {
     return res.status(400).json({ error: "El id debe ser un número entero positivo" });
   }
 
-  const usuario = buscarPorId(id);
+  const usuario = await buscarPorId(id);
   if (!usuario) {
     return res.status(404).json({ error: `No existe un usuario con id ${id}` });
   }
 
-  db.prepare("DELETE FROM usuarios WHERE id = ?").run(id);
+  await pool.query("DELETE FROM usuarios WHERE id = $1", [id]);
   res.json({ eliminado: true, id });
 });
 

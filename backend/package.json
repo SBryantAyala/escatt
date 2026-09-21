@@ -3,15 +3,15 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "API Express + SQLite para ESCATT",
+  "description": "API Express + PostgreSQL para ESCATT",
   "scripts": {
     "dev": "node --watch src/index.js",
     "start": "node src/index.js"
   },
   "dependencies": {
-    "better-sqlite3": "^12.2.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
-    "express": "^4.21.2"
+    "express": "^4.21.2",
+    "pg": "^8.13.1"
   }
 }

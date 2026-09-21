@@ -1,14 +1,14 @@
 import { Router } from "express";
-import { db } from "../db/index.js";
+import { pool } from "../db/index.js";
 
 const router = Router();
 
-// GET /api/health -> comprueba que la API responde y que SQLite está accesible.
-router.get("/health", (_req, res) => {
-  const row = db.prepare("SELECT 1 AS ok").get();
+// GET /api/health -> comprueba que la API responde y que PostgreSQL está accesible.
+router.get("/health", async (_req, res) => {
+  const { rows } = await pool.query("SELECT 1 AS ok");
   res.json({
     status: "ok",
-    db: row?.ok === 1 ? "conectada" : "error",
+    db: rows[0]?.ok === 1 ? "conectada" : "error",
     hora: new Date().toISOString(),
   });
 });

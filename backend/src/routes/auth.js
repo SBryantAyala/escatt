@@ -1,7 +1,7 @@
 import { Router } from "express";
 import crypto from "node:crypto";
 
-import { db } from "../db/index.js";
+import { pool } from "../db/index.js";
 
 const router = Router();
 
@@ -10,6 +10,9 @@ const CORREO_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 // Las 3 carreras reales de ESCOM.
 const CARRERAS_VALIDAS = ["ISC", "IIA", "LCD"];
+
+// 23505 = unique_violation en Postgres (antes SQLITE_CONSTRAINT_UNIQUE).
+const PG_UNIQUE_VIOLATION = "23505";
 
 // --- Helpers de contraseña (scrypt + comparación en tiempo constante) ---
 
@@ -33,17 +36,13 @@ function passwordValido(p) {
 
 // --- Helpers de sesión ---
 
-function ahoraSql() {
-  return new Date().toISOString().slice(0, 19).replace("T", " ");
-}
-
-function crearSesion(usuarioId) {
+async function crearSesion(usuarioId) {
   const token = crypto.randomBytes(32).toString("hex");
-  const expira = new Date(Date.now() + DIAS_SESION * 24 * 60 * 60 * 1000);
-  const expiraEn = expira.toISOString().slice(0, 19).replace("T", " ");
-  db.prepare(
-    "INSERT INTO sesiones (token, usuario_id, expira_en) VALUES (?, ?, ?)",
-  ).run(token, usuarioId, expiraEn);
+  const expiraEn = new Date(Date.now() + DIAS_SESION * 24 * 60 * 60 * 1000);
+  await pool.query(
+    "INSERT INTO sesiones (token, usuario_id, expira_en) VALUES ($1, $2, $3)",
+    [token, usuarioId, expiraEn],
+  );
   return token;
 }
 
@@ -53,34 +52,30 @@ function tokenDelHeader(req) {
   return m ? m[1].trim() : null;
 }
 
-function serializarUsuario(fila) {
-  if (!fila) return fila;
-  // La tabla `usuarios` no tiene columna de password, así que ya viene "sin password".
-  return { ...fila, activo: fila.activo === 1 };
-}
-
-function usuarioPorId(id) {
-  return db.prepare("SELECT * FROM usuarios WHERE id = ?").get(id);
+async function usuarioPorId(id) {
+  const { rows } = await pool.query("SELECT * FROM usuarios WHERE id = $1", [id]);
+  return rows[0] ?? null;
 }
 
 // Devuelve el usuario de un token válido; null si no hay token, no existe la
 // sesión o ya expiró (en ese último caso además borra la sesión vencida).
-function usuarioDeToken(token) {
+async function usuarioDeToken(token) {
   if (!token) return null;
-  const sesion = db.prepare("SELECT * FROM sesiones WHERE token = ?").get(token);
+  const { rows } = await pool.query("SELECT * FROM sesiones WHERE token = $1", [token]);
+  const sesion = rows[0];
   if (!sesion) return null;
-  if (sesion.expira_en <= ahoraSql()) {
-    db.prepare("DELETE FROM sesiones WHERE token = ?").run(token);
+  if (new Date(sesion.expira_en) <= new Date()) {
+    await pool.query("DELETE FROM sesiones WHERE token = $1", [token]);
     return null;
   }
-  return usuarioPorId(sesion.usuario_id) || null;
+  return usuarioPorId(sesion.usuario_id);
 }
 
 // POST /api/auth/registro
 // El registro público SOLO crea alumnos. El `tipo` NUNCA se lee del body: nadie
 // puede auto-asignarse una cuenta de sinodal/personal desde aquí (esas se dan de
 // alta por la vía administrativa + scripts/asignar-credenciales.js).
-router.post("/registro", (req, res) => {
+router.post("/registro", async (req, res) => {
   const cuerpo = req.body ?? {};
   const nombre = typeof cuerpo.nombre === "string" ? cuerpo.nombre.trim() : "";
   const apellidoPaterno =
@@ -126,41 +121,46 @@ router.post("/registro", (req, res) => {
   const salt = crypto.randomBytes(16).toString("hex");
   const passwordHash = derivar(password, salt).toString("hex");
 
+  // better-sqlite3 tenía db.transaction(fn) síncrono; con pg se pide un
+  // client propio del pool y se maneja BEGIN/COMMIT/ROLLBACK a mano.
+  const client = await pool.connect();
   try {
-    const registrar = db.transaction(() => {
-      // Nombre de pila y apellidos van en columnas separadas. Solo alumno:
-      // boleta y carrera; el resto de campos específicos van NULL.
-      const info = db
-        .prepare(
-          `INSERT INTO usuarios (nombre, apellido_paterno, apellido_materno, correo, tipo, boleta, carrera)
-           VALUES (@nombre, @apellidoPaterno, @apellidoMaterno, @correo, 'alumno', @boleta, @carrera)`,
-        )
-        .run({ nombre, apellidoPaterno, apellidoMaterno, correo, boleta, carrera });
+    await client.query("BEGIN");
 
-      const usuarioId = Number(info.lastInsertRowid);
-      db.prepare(
-        "INSERT INTO credenciales (usuario_id, password_hash, password_salt) VALUES (?, ?, ?)",
-      ).run(usuarioId, passwordHash, salt);
-      return usuarioId;
-    });
+    // Nombre de pila y apellidos van en columnas separadas. Solo alumno:
+    // boleta y carrera; el resto de campos específicos van NULL.
+    const { rows } = await client.query(
+      `INSERT INTO usuarios (nombre, apellido_paterno, apellido_materno, correo, tipo, boleta, carrera)
+       VALUES ($1, $2, $3, $4, 'alumno', $5, $6)
+       RETURNING *`,
+      [nombre, apellidoPaterno, apellidoMaterno, correo, boleta, carrera],
+    );
+    const usuario = rows[0];
 
-    const usuarioId = registrar();
-    const token = crearSesion(usuarioId);
-    return res
-      .status(201)
-      .json({ usuario: serializarUsuario(usuarioPorId(usuarioId)), token });
+    await client.query(
+      "INSERT INTO credenciales (usuario_id, password_hash, password_salt) VALUES ($1, $2, $3)",
+      [usuario.id, passwordHash, salt],
+    );
+
+    await client.query("COMMIT");
+
+    const token = await crearSesion(usuario.id);
+    return res.status(201).json({ usuario, token });
   } catch (err) {
-    if (err.code === "SQLITE_CONSTRAINT_UNIQUE") {
+    await client.query("ROLLBACK");
+    if (err.code === PG_UNIQUE_VIOLATION) {
       return res
         .status(409)
         .json({ error: `Ya existe un usuario con el correo ${correo}` });
     }
     throw err;
+  } finally {
+    client.release();
   }
 });
 
 // POST /api/auth/login
-router.post("/login", (req, res) => {
+router.post("/login", async (req, res) => {
   const cuerpo = req.body ?? {};
   const correo = typeof cuerpo.correo === "string" ? cuerpo.correo.trim() : "";
   const password = typeof cuerpo.password === "string" ? cuerpo.password : "";
@@ -170,10 +170,10 @@ router.post("/login", (req, res) => {
   const GENERICO = "Correo o contraseña incorrectos";
 
   const usuario = correo
-    ? db.prepare("SELECT * FROM usuarios WHERE correo = ?").get(correo)
+    ? (await pool.query("SELECT * FROM usuarios WHERE correo = $1", [correo])).rows[0]
     : null;
   const cred = usuario
-    ? db.prepare("SELECT * FROM credenciales WHERE usuario_id = ?").get(usuario.id)
+    ? (await pool.query("SELECT * FROM credenciales WHERE usuario_id = $1", [usuario.id])).rows[0]
     : null;
 
   if (!usuario || !cred || !password) {
@@ -186,30 +186,30 @@ router.post("/login", (req, res) => {
     return res.status(401).json({ error: GENERICO });
   }
 
-  const token = crearSesion(usuario.id);
-  return res.json({ usuario: serializarUsuario(usuario), token });
+  const token = await crearSesion(usuario.id);
+  return res.json({ usuario, token });
 });
 
 // GET /api/auth/yo
-router.get("/yo", (req, res) => {
+router.get("/yo", async (req, res) => {
   const token = tokenDelHeader(req);
   if (!token) {
     return res.status(401).json({ error: "Falta el token de sesión" });
   }
 
-  const usuario = usuarioDeToken(token);
+  const usuario = await usuarioDeToken(token);
   if (!usuario) {
     return res.status(401).json({ error: "Sesión inválida o expirada" });
   }
 
-  return res.json({ usuario: serializarUsuario(usuario) });
+  return res.json({ usuario });
 });
 
 // POST /api/auth/logout
-router.post("/logout", (req, res) => {
+router.post("/logout", async (req, res) => {
   const token = tokenDelHeader(req);
   if (token) {
-    db.prepare("DELETE FROM sesiones WHERE token = ?").run(token);
+    await pool.query("DELETE FROM sesiones WHERE token = $1", [token]);
   }
   // Aunque no hubiera token o sesión, el resultado neto ya es "sin sesión".
   return res.json({ ok: true });

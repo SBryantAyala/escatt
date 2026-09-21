@@ -19,7 +19,7 @@
 import crypto from "node:crypto";
 import "dotenv/config";
 
-import { db } from "../src/db/index.js";
+import { pool, queryNamed } from "../src/db/index.js";
 
 function salir(mensaje) {
   console.error(`Error: ${mensaje}`);
@@ -40,9 +40,11 @@ if (password.length < 9 || !/[a-zA-Z]/.test(password) || !/[0-9]/.test(password)
   );
 }
 
-const usuario = db
-  .prepare("SELECT id, nombre, tipo FROM usuarios WHERE correo = ?")
-  .get(correo);
+const { rows } = await pool.query(
+  "SELECT id, nombre, tipo FROM usuarios WHERE correo = $1",
+  [correo],
+);
+const usuario = rows[0];
 
 if (!usuario) {
   salir(
@@ -55,15 +57,19 @@ const salt = crypto.randomBytes(16).toString("hex");
 const passwordHash = crypto.scryptSync(password, salt, 64).toString("hex");
 
 // Inserta la fila de credenciales, o la reemplaza si el usuario ya tenía una.
-db.prepare(
+// `excluded` funciona igual en Postgres que en SQLite para ON CONFLICT DO UPDATE.
+await queryNamed(
   `INSERT INTO credenciales (usuario_id, password_hash, password_salt)
    VALUES (@id, @hash, @salt)
-   ON CONFLICT(usuario_id) DO UPDATE SET
+   ON CONFLICT (usuario_id) DO UPDATE SET
      password_hash = excluded.password_hash,
      password_salt = excluded.password_salt`,
-).run({ id: usuario.id, hash: passwordHash, salt });
+  { id: usuario.id, hash: passwordHash, salt },
+);
 
 console.log(
   `Credenciales asignadas a "${usuario.nombre}" (tipo: ${usuario.tipo}, correo: ${correo}).`,
 );
 console.log("Ya puede iniciar sesión con POST /api/auth/login.");
+
+await pool.end();
