@@ -14,11 +14,19 @@ import { AZUL_CLARO, AZUL_MEDIO, GRAD_AZUL, VIDRIO } from "../../../lib/theme";
 //     `embebido` — entonces sólo renderiza la tarjeta, sin marco ni fondo.
 // La paleta, la clase VIDRIO y el cliente `api()` se importan de src/lib.
 
-// Los 3 tipos de usuario, en el orden en que se muestran las pestañas.
+// El backend sigue teniendo solo 3 tipos de usuario (alumno/sinodal/personal
+// — ver backend/src/lib/tipos-usuario.js). Las 5 pestañas de aquí son una
+// agrupación visual sobre esos mismos datos: "personal" se reparte entre
+// Directores, Profesor de seguimiento y Personal CATT según el campo
+// `cargo` (texto libre), vía rolPersonal() más abajo. `tipo` es el tipo real
+// que se manda a la API al dar de alta; `rolPersonal`, cuando existe, es el
+// sub-grupo dentro de "personal" que le toca a esa pestaña.
 const PESTANAS = [
-  { tipo: "alumno", titulo: "Alumnos", etiquetaAlta: "Registrar alumno" },
-  { tipo: "sinodal", titulo: "Sinodales", etiquetaAlta: "Registrar sinodal" },
-  { tipo: "personal", titulo: "Personal CATT", etiquetaAlta: "Registrar personal CATT" },
+  { id: "alumno", tipo: "alumno", titulo: "Estudiantes", etiquetaAlta: "Registrar estudiante" },
+  { id: "sinodal", tipo: "sinodal", titulo: "Sinodales", etiquetaAlta: "Registrar sinodal" },
+  { id: "director", tipo: "personal", rolPersonal: "director", titulo: "Directores", etiquetaAlta: "Registrar personal CATT" },
+  { id: "seguimiento", tipo: "personal", rolPersonal: "seguimiento", titulo: "Profesor de seguimiento", etiquetaAlta: "Registrar personal CATT" },
+  { id: "personal-otro", tipo: "personal", rolPersonal: "otro", titulo: "Personal CATT", etiquetaAlta: "Registrar personal CATT" },
 ];
 
 // Sin acentos y en minúsculas, para que buscar "jose" también encuentre "José".
@@ -27,6 +35,24 @@ function normalizar(texto) {
     .normalize("NFD")
     .replace(/[̀-ͯ]/g, "")
     .toLowerCase();
+}
+
+// Clasifica a un usuario de tipo "personal" en director / seguimiento / otro
+// buscando palabras clave en su campo `cargo` (texto libre, sin catálogo
+// fijo). Sin un match claro, cae en "otro" (pestaña "Personal CATT").
+function rolPersonal(usuario) {
+  const cargo = normalizar(usuario.cargo ?? "");
+  if (cargo.includes("director")) return "director";
+  if (cargo.includes("seguimiento")) return "seguimiento";
+  return "otro";
+}
+
+// True si `usuario` pertenece a `pestana`: por tipo, y además por
+// rolPersonal cuando la pestaña es una subdivisión de "personal".
+function perteneceAPestana(usuario, pestana) {
+  if (!pestana || usuario.tipo !== pestana.tipo) return false;
+  if (pestana.rolPersonal) return rolPersonal(usuario) === pestana.rolPersonal;
+  return true;
 }
 
 function EstadoBadge({ activo }) {
@@ -93,22 +119,28 @@ export default function ListadoPage({ onVolver, embebido = false, onVerDetalle, 
     cargarUsuarios();
   }, [cargarUsuarios]);
 
-  function cambiarTab(tipo) {
-    setTabActiva(tipo);
+  function cambiarTab(id) {
+    setTabActiva(id);
     setBusqueda(""); // cada pestaña empieza sin filtro de búsqueda
   }
 
-  // Conteo por tipo (sobre el total, no sobre lo filtrado) para el número en la pestaña.
-  const conteosPorTipo = useMemo(() => {
-    const conteo = { alumno: 0, sinodal: 0, personal: 0 };
+  // Conteo por pestaña (sobre el total, no sobre lo filtrado) para el número
+  // junto al nombre de cada pestaña. "personal" se reparte entre 3 pestañas
+  // según rolPersonal, así que no basta con contar por `tipo`.
+  const conteosPorPestana = useMemo(() => {
+    const conteo = Object.fromEntries(PESTANAS.map((p) => [p.id, 0]));
     for (const u of usuarios ?? []) {
-      if (conteo[u.tipo] !== undefined) conteo[u.tipo] += 1;
+      const pestana = PESTANAS.find((p) => perteneceAPestana(u, p));
+      if (pestana) conteo[pestana.id] += 1;
     }
     return conteo;
   }, [usuarios]);
 
+  const pestanaActiva = PESTANAS.find((p) => p.id === tabActiva);
+  const tituloTabActiva = pestanaActiva?.titulo ?? "";
+
   const usuariosDeLaTab = useMemo(() => {
-    const deLaTab = (usuarios ?? []).filter((u) => u.tipo === tabActiva);
+    const deLaTab = (usuarios ?? []).filter((u) => perteneceAPestana(u, pestanaActiva));
     const consulta = normalizar(busqueda.trim());
     if (!consulta) return deLaTab;
     return deLaTab.filter(
@@ -117,9 +149,6 @@ export default function ListadoPage({ onVolver, embebido = false, onVerDetalle, 
         normalizar(u.correo).includes(consulta),
     );
   }, [usuarios, tabActiva, busqueda]);
-
-  const pestanaActiva = PESTANAS.find((p) => p.tipo === tabActiva);
-  const tituloTabActiva = pestanaActiva?.titulo ?? "";
 
   // La columna "identificador" muestra la boleta (alumnos) o el número de
   // empleado (sinodales / personal), según la pestaña activa.
@@ -158,7 +187,7 @@ export default function ListadoPage({ onVolver, embebido = false, onVerDetalle, 
               {onDarDeAlta && (
                 <button
                   type="button"
-                  onClick={() => onDarDeAlta(tabActiva)}
+                  onClick={() => onDarDeAlta(pestanaActiva?.tipo ?? tabActiva)}
                   className="rounded-full px-5 py-2 text-sm font-semibold text-white shadow-md shadow-[#1878B6]/30 transition hover:-translate-y-0.5"
                   style={{ background: GRAD_AZUL }}
                 >
@@ -182,13 +211,13 @@ export default function ListadoPage({ onVolver, embebido = false, onVerDetalle, 
             <>
               {/* Pestañas */}
               <div className="mt-6 flex flex-wrap gap-2 border-b border-slate-200 pb-3">
-                {PESTANAS.map(({ tipo, titulo }) => {
-                  const activa = tipo === tabActiva;
+                {PESTANAS.map(({ id, titulo }) => {
+                  const activa = id === tabActiva;
                   return (
                     <button
-                      key={tipo}
+                      key={id}
                       type="button"
-                      onClick={() => cambiarTab(tipo)}
+                      onClick={() => cambiarTab(id)}
                       className={`rounded-full px-4 py-1.5 text-sm font-semibold transition ${
                         activa
                           ? "text-white shadow-md shadow-[#1878B6]/30"
@@ -196,7 +225,7 @@ export default function ListadoPage({ onVolver, embebido = false, onVerDetalle, 
                       }`}
                       style={activa ? { background: GRAD_AZUL } : undefined}
                     >
-                      {titulo} <span className={activa ? "text-white/80" : "text-slate-400"}>({conteosPorTipo[tipo]})</span>
+                      {titulo} <span className={activa ? "text-white/80" : "text-slate-400"}>({conteosPorPestana[id]})</span>
                     </button>
                   );
                 })}
