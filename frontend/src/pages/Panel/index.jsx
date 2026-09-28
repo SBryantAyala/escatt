@@ -363,6 +363,9 @@ export default function PanelPage({ usuario, onCerrarSesion, onVolver }) {
   // Tipo con el que se abre el formulario de Alta cuando se llega desde el
   // botón "Registrar alumno/sinodal/personal" de la pestaña activa en Listado.
   const [altaTipoInicial, setAltaTipoInicial] = useState("alumno");
+  // Cargo sugerido para ese mismo formulario, cuando el Listado viene de una
+  // sub-pestaña de "personal" (Directores / Profesor de seguimiento).
+  const [altaCargoInicial, setAltaCargoInicial] = useState("");
 
   const seccion = TODAS.find((s) => s.clave === seccionActiva) ?? TODAS[0];
   const permitida = seccion?.roles.includes(usuario.tipo);
@@ -378,8 +381,9 @@ export default function PanelPage({ usuario, onCerrarSesion, onVolver }) {
     setSeccionActiva("detalle");
   };
 
-  const irAAlta = (tipo) => {
+  const irAAlta = (tipo, cargoSugerido) => {
     setAltaTipoInicial(tipo);
+    setAltaCargoInicial(cargoSugerido ?? "");
     setSeccionActiva("alta");
   };
 
@@ -405,7 +409,7 @@ export default function PanelPage({ usuario, onCerrarSesion, onVolver }) {
       <ListadoPage {...(seccion.props ?? {})} onVerDetalle={irADetalle} onDarDeAlta={irAAlta} />
     );
   } else if (seccion.clave === "alta") {
-    contenido = <AltaPage tipoInicial={altaTipoInicial} />;
+    contenido = <AltaPage tipoInicial={altaTipoInicial} cargoInicial={altaCargoInicial} />;
   } else if (seccion.clave === "detalle") {
     contenido = (
       <DetallePage userId={detalleUserId} onVolver={() => setSeccionActiva("alumnos")} />

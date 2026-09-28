@@ -24,8 +24,8 @@ import { AZUL_CLARO, AZUL_MEDIO, GRAD_AZUL, VIDRIO } from "../../../lib/theme";
 const PESTANAS = [
   { id: "alumno", tipo: "alumno", titulo: "Estudiantes", etiquetaAlta: "Registrar estudiante" },
   { id: "sinodal", tipo: "sinodal", titulo: "Sinodales", etiquetaAlta: "Registrar sinodal" },
-  { id: "director", tipo: "personal", rolPersonal: "director", titulo: "Directores", etiquetaAlta: "Registrar director" },
-  { id: "seguimiento", tipo: "personal", rolPersonal: "seguimiento", titulo: "Profesor de seguimiento", etiquetaAlta: "Registrar profesor de seguimiento" },
+  { id: "director", tipo: "personal", rolPersonal: "director", titulo: "Directores", etiquetaAlta: "Registrar director", cargoSugerido: "Director de Tesis" },
+  { id: "seguimiento", tipo: "personal", rolPersonal: "seguimiento", titulo: "Profesor de seguimiento", etiquetaAlta: "Registrar profesor de seguimiento", cargoSugerido: "Profesor de Seguimiento" },
   { id: "personal-otro", tipo: "personal", rolPersonal: "otro", titulo: "Personal CATT", etiquetaAlta: "Registrar personal CATT" },
 ];
 
@@ -187,7 +187,7 @@ export default function ListadoPage({ onVolver, embebido = false, onVerDetalle, 
               {onDarDeAlta && (
                 <button
                   type="button"
-                  onClick={() => onDarDeAlta(pestanaActiva?.tipo ?? tabActiva)}
+                  onClick={() => onDarDeAlta(pestanaActiva?.tipo ?? tabActiva, pestanaActiva?.cargoSugerido)}
                   className="rounded-full px-5 py-2 text-sm font-semibold text-white shadow-md shadow-[#1878B6]/30 transition hover:-translate-y-0.5"
                   style={{ background: GRAD_AZUL }}
                 >
