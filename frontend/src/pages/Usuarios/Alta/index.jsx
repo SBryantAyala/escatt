@@ -35,9 +35,14 @@ const claseLabel = "mb-1 block text-xs font-semibold uppercase tracking-wide tex
 // aquí con un tipo ya definido cuando Personal CATT le da clic a "Registrar
 // alumno/sinodal/personal" desde la pestaña correspondiente del Listado
 // (ver pages/Panel); el selector sigue editable por si se abrió por error.
-export default function AltaPage({ tipoInicial = "alumno" }) {
+//
+// cargoInicial: sugerencia para el campo Cargo (solo aplica cuando tipo es
+// "personal"). Se llena cuando el Listado agrupa "personal" en sub-pestañas
+// (Directores / Profesor de seguimiento) y quiere que el cargo ya venga
+// escrito en vez de que se tenga que capturar dos veces; sigue editable.
+export default function AltaPage({ tipoInicial = "alumno", cargoInicial = "" }) {
   const [tipo, setTipo] = useState(tipoInicial);
-  const [formData, setFormData] = useState(CAMPOS_INICIALES);
+  const [formData, setFormData] = useState({ ...CAMPOS_INICIALES, cargo: cargoInicial });
   const [loading, setLoading] = useState(false);
   const [mensaje, setMensaje] = useState(null);
 
