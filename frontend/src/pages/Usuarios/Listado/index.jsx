@@ -24,8 +24,8 @@ import { AZUL_CLARO, AZUL_MEDIO, GRAD_AZUL, VIDRIO } from "../../../lib/theme";
 const PESTANAS = [
   { id: "alumno", tipo: "alumno", titulo: "Estudiantes", etiquetaAlta: "Registrar estudiante" },
   { id: "sinodal", tipo: "sinodal", titulo: "Sinodales", etiquetaAlta: "Registrar sinodal" },
-  { id: "director", tipo: "personal", rolPersonal: "director", titulo: "Directores", etiquetaAlta: "Registrar personal CATT" },
-  { id: "seguimiento", tipo: "personal", rolPersonal: "seguimiento", titulo: "Profesor de seguimiento", etiquetaAlta: "Registrar personal CATT" },
+  { id: "director", tipo: "personal", rolPersonal: "director", titulo: "Directores", etiquetaAlta: "Registrar director" },
+  { id: "seguimiento", tipo: "personal", rolPersonal: "seguimiento", titulo: "Profesor de seguimiento", etiquetaAlta: "Registrar profesor de seguimiento" },
   { id: "personal-otro", tipo: "personal", rolPersonal: "otro", titulo: "Personal CATT", etiquetaAlta: "Registrar personal CATT" },
 ];
 
