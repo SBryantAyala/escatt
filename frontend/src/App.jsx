@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import NexusLogo from "./components/NexusLogo";
 import PanelPage from "./pages/Panel";
+import CambioObligatorioPage from "./pages/CambiarPassword";
+import { CARRERAS, DOMINIO_ALUMNO, PLANES } from "./lib/roles";
 import { api, TOKEN_KEY } from "./lib/api";
 import { AZUL_CLARO, AZUL_MEDIO, AZUL_OSCURO, GRAD_AZUL, VIDRIO } from "./lib/theme";
 
@@ -54,8 +56,8 @@ function InsigniaNexus({ logo = 20, texto = "text-xs" }) {
 // --- Autenticación (Sprint 2) ---------------------------------------------
 // El cliente HTTP `api()` y la clave TOKEN_KEY se importan de src/lib/api.js.
 
-// Las 3 carreras reales de ESCOM (espejo de CARRERAS_VALIDAS del backend).
-const CARRERAS = ["ISC", "IIA", "LCD"];
+// Carreras, planes y dominio de correo de alumno vienen de src/lib/roles.js
+// (espejo del backend).
 
 const CORREO_RE_FRONT = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -253,7 +255,8 @@ function ListaRequisitos({ req }) {
 
 // Páginas dedicadas (no modal) para iniciar sesión y registrarse. Comparten
 // layout; `modo` decide qué campos aparecen. Validación en vivo + alertas.
-// El registro es SOLO para alumnos (sinodal/personal los da de alta un admin).
+// El registro es SOLO para alumnos (docentes los da de alta la CATT y al
+// personal CATT, el administrador del sistema).
 function AuthPage({ modo, onAutenticado, onSalir, onCambiarModo }) {
   const esRegistro = modo === "registro";
 
@@ -266,6 +269,7 @@ function AuthPage({ modo, onAutenticado, onSalir, onCambiarModo }) {
     confirmarPassword: "",
     boleta: "",
     carrera: "",
+    planEstudios: "",
   });
   const [tocado, setTocado] = useState({});
   const [intentado, setIntentado] = useState(false);
@@ -305,6 +309,8 @@ function AuthPage({ modo, onAutenticado, onSalir, onCambiarModo }) {
   if (!correo) errores.correo = "Escribe tu correo.";
   else if (!CORREO_RE_FRONT.test(correo)) {
     errores.correo = "Ese correo no tiene un formato válido.";
+  } else if (esRegistro && !correo.toLowerCase().endsWith(DOMINIO_ALUMNO)) {
+    errores.correo = `Usa tu correo institucional (${DOMINIO_ALUMNO}).`;
   }
   if (!form.password) errores.password = "Escribe tu contraseña.";
   else if (esRegistro && !passwordValidoFront(form.password)) {
@@ -316,7 +322,9 @@ function AuthPage({ modo, onAutenticado, onSalir, onCambiarModo }) {
       errores.confirmarPassword = "Las contraseñas no coinciden.";
     }
     if (!boleta) errores.boleta = "Escribe tu boleta.";
+    else if (!/^\d{10}$/.test(boleta)) errores.boleta = "La boleta tiene 10 dígitos.";
     if (!form.carrera) errores.carrera = "Elige tu carrera.";
+    if (!form.planEstudios) errores.planEstudios = "Elige tu plan de estudios.";
   }
 
   const formOk = Object.keys(errores).length === 0;
@@ -344,6 +352,7 @@ function AuthPage({ modo, onAutenticado, onSalir, onCambiarModo }) {
           password: form.password,
           boleta,
           carrera: form.carrera,
+          planEstudios: form.planEstudios,
         }
       : { correo, password: form.password };
 
@@ -464,7 +473,7 @@ function AuthPage({ modo, onAutenticado, onSalir, onCambiarModo }) {
             )}
 
             <CampoLive
-              label="Correo"
+              label={esRegistro ? `Correo institucional (${DOMINIO_ALUMNO})` : "Correo"}
               type="email"
               value={form.correo}
               onChange={set("correo")}
@@ -520,6 +529,16 @@ function AuthPage({ modo, onAutenticado, onSalir, onCambiarModo }) {
                   error={mostrar("carrera")}
                   valido={valido("carrera")}
                 />
+                <SelectLive
+                  label="Plan de estudios"
+                  value={form.planEstudios}
+                  onChange={set("planEstudios")}
+                  onBlur={alSalirCampo("planEstudios")}
+                  opciones={PLANES.map((p) => ({ valor: p, etiqueta: `Plan ${p}` }))}
+                  placeholder="Selecciona…"
+                  error={mostrar("planEstudios")}
+                  valido={valido("planEstudios")}
+                />
               </>
             )}
 
@@ -537,7 +556,7 @@ function AuthPage({ modo, onAutenticado, onSalir, onCambiarModo }) {
 
           {esRegistro && (
             <p className="mt-4 text-center text-xs text-slate-400">
-              ¿Eres sinodal o personal de la CATT? Tu cuenta la asigna un administrador.
+              ¿Eres docente o personal de la CATT? Tu cuenta la da de alta la CATT; recibirás una contraseña temporal.
             </p>
           )}
 
@@ -1040,10 +1059,25 @@ export default function App() {
     );
   }
 
+  // HU-5: con contraseña temporal, lo único disponible es cambiarla.
+  if (usuario?.debe_cambiar_password && (page === "panel" || page === "login")) {
+    return (
+      <CambioObligatorioPage
+        usuario={usuario}
+        onCambiada={(u) => {
+          setUsuario(u);
+          setPage("panel");
+        }}
+        onCerrarSesion={cerrarSesion}
+      />
+    );
+  }
+
   if (page === "panel" && usuario) {
     return (
       <PanelPage
         usuario={usuario}
+        onUsuarioActualizado={setUsuario}
         onCerrarSesion={cerrarSesion}
         onVolver={() => setPage("landing")}
       />

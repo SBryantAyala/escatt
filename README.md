@@ -6,29 +6,44 @@ Este repositorio contiene **únicamente el código** del proyecto ESCATT.
 
 - **Backend:** Node.js + Express
 - **Frontend:** React + Vite + Tailwind CSS (v4, compilado localmente)
-- **Base de datos:** SQLite (`better-sqlite3`)
+- **Base de datos:** PostgreSQL (`pg`)
 
 ## Estructura
 
 ```
-01-Codigo/
-├── backend/            # API Express + acceso a SQLite
-│   └── src/
-│       ├── index.js    # arranque del servidor y registro de rutas
-│       ├── db/          # conexión SQLite y esquema
-│       └── routes/      # un archivo de rutas por recurso (health, usuarios, …)
-└── frontend/           # App React (Vite + Tailwind)
-    └── src/
-        ├── main.jsx
-        ├── App.jsx      # pantalla base: muestra el estado del backend
-        ├── index.css    # @import "tailwindcss";
-        ├── components/
-        │   └── NexusLogo.jsx  # logo de Nexus Solutions (identidad visual)
-        └── pages/        # una carpeta por pantalla, cada quien vive en la suya
-            ├── Listado/   # Edgar: listado + revocar acceso + eliminar
-            ├── Alta/      # Joshua: alta (registro) de usuario
-            └── Detalle/   # Eduardo: consultar + modificar
+backend/
+├── scripts/
+│   ├── crear-admin.js           # crea el primer Administrador del sistema
+│   ├── seed-demo-usuarios.js    # usuarios de prueba (uno o más por rol)
+│   └── asignar-credenciales.js  # asigna contraseña a un usuario desde la terminal
+└── src/
+    ├── index.js        # arranque, registro de rutas y manejador de errores
+    ├── db/index.js     # conexión, esquema (12 tablas) y migración del esquema anterior
+    ├── lib/            # roles y permisos, sesiones, acceso a usuarios
+    └── routes/         # auth, usuarios, academias, health
+frontend/src/
+├── App.jsx             # landing, login, registro de alumnos, cambio de contraseña obligatorio
+├── lib/                # api, roles (espejo del backend), tema
+├── components/         # layout del panel, chips de rol, íconos
+└── pages/
+    ├── Panel/          # navegación por roles
+    ├── Usuarios/       # Listado (Alumnos / Docentes / Personal CATT), Alta, Detalle
+    ├── MiCuenta/       # datos propios + cambio de contraseña
+    └── CambiarPassword/
 ```
+
+### Modelo de usuarios (Módulo 1)
+
+- `usuarios` guarda lo común; los datos propios viven en tablas de **perfil**:
+  `alumnos`, `empleados` → `docentes` / `personal_catt`.
+- Los **roles** (`roles` + `usuario_roles`) dicen qué puede hacer cada quien; una
+  persona puede tener varios (p. ej. docente + presidente de academia).
+- Roles: `admin_sistema`, `catt_ejecutivo`, `catt_auxiliar`, `catt_consulta`,
+  `docente`, `presidente_academia`, `alumno`.
+- Solo los alumnos se registran solos (`@alumno.ipn.mx`). La CATT da de alta a
+  alumnos y docentes; el Administrador del sistema da de alta al personal CATT.
+  Las cuentas nuevas nacen con contraseña temporal.
+- Las cuentas no se borran: se **revocan** y se pueden reactivar.
 
 ## Requisitos
 
@@ -41,6 +56,8 @@ Abrí **dos terminales**.
 
 ### 1. Backend
 
+Necesitas PostgreSQL con la base y el usuario de `.env` ya creados.
+
 ```bash
 cd backend
 cp .env.example .env
@@ -48,7 +65,19 @@ npm install
 npm run dev            # http://localhost:3000  (GET /api/health)
 ```
 
-La base `escatt.db` se crea sola la primera vez, dentro de `backend/`. No se sube a git.
+Al arrancar, el backend crea las tablas que falten. Si detecta el **esquema
+anterior** (columna `usuarios.tipo`), lo migra solo al modelo de perfiles + roles
+conservando ids y contraseñas: alumno → alumno, sinodal → docente (academia
+"Sin academia asignada"), personal → Auxiliar CATT.
+
+Después, una sola vez:
+
+```bash
+node scripts/crear-admin.js admin@ipn.mx "UnaClave123" "Nombre"   # primer administrador
+node scripts/seed-demo-usuarios.js                                # opcional: datos de demo
+```
+
+El seed deja las credenciales en `scripts/credenciales-demo.txt` (no se sube a git).
 
 ### 2. Frontend
 
