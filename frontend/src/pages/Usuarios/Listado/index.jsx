@@ -2,8 +2,10 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "../../../lib/api";
 import { nombreCompleto } from "../../../lib/nombre";
 import { AZUL_CLARO, AZUL_MEDIO, GRAD_AZUL, VIDRIO } from "../../../lib/theme";
+import ChipsRol from "../../../components/ChipsRol";
+import { esCuentaDePersonal, ROLES_CATT, ROLES_GESTION, tieneRol } from "../../../lib/roles";
 
-// Pantalla: Listado de usuarios (solo consulta + búsqueda por pestaña).
+// Pantalla: Listado de usuarios (HU-3): consulta + búsqueda por pestaña.
 // Consume GET /api/usuarios. Cada fila es clickeable y lleva al Detalle del
 // usuario; las acciones de revocar/reactivar/eliminar viven ahora en Detalle
 // (pages/Usuarios/Detalle), no aquí.
@@ -14,45 +16,58 @@ import { AZUL_CLARO, AZUL_MEDIO, GRAD_AZUL, VIDRIO } from "../../../lib/theme";
 //     `embebido` — entonces sólo renderiza la tarjeta, sin marco ni fondo.
 // La paleta, la clase VIDRIO y el cliente `api()` se importan de src/lib.
 
-// El backend sigue teniendo solo 3 tipos de usuario (alumno/sinodal/personal
-// — ver backend/src/lib/tipos-usuario.js). Las 5 pestañas de aquí son una
-// agrupación visual sobre esos mismos datos: "personal" se reparte entre
-// Directores, Profesor de seguimiento y Personal CATT según el campo
-// `cargo` (texto libre), vía rolPersonal() más abajo. `tipo` es el tipo real
-// que se manda a la API al dar de alta; `rolPersonal`, cuando existe, es el
-// sub-grupo dentro de "personal" que le toca a esa pestaña.
+// Tres pestañas, una por PERFIL (tabla de perfil en la base):
+//   Alumnos        -> perfil alumno
+//   Docentes       -> perfil docente (incluye presidentes de academia)
+//   Personal CATT  -> perfil personal_catt o rol admin/CATT
+// Una persona con dos perfiles (p. ej. docente comisionado a la CATT) aparece
+// en ambas pestañas. Los roles se muestran como chips en cada fila.
 const PESTANAS = [
-  { id: "alumno", tipo: "alumno", titulo: "Estudiantes", etiquetaAlta: "Registrar estudiante" },
-  { id: "sinodal", tipo: "sinodal", titulo: "Sinodales", etiquetaAlta: "Registrar sinodal" },
-  { id: "director", tipo: "personal", rolPersonal: "director", titulo: "Directores", etiquetaAlta: "Registrar director", cargoSugerido: "Director de Tesis" },
-  { id: "seguimiento", tipo: "personal", rolPersonal: "seguimiento", titulo: "Profesor de seguimiento", etiquetaAlta: "Registrar profesor de seguimiento", cargoSugerido: "Profesor de Seguimiento" },
-  { id: "personal-otro", tipo: "personal", rolPersonal: "otro", titulo: "Personal CATT", etiquetaAlta: "Registrar personal CATT" },
+  {
+    id: "alumnos",
+    perfil: "alumno",
+    titulo: "Alumnos",
+    etiquetaAlta: "Registrar alumno",
+    identificador: { label: "Boleta", campo: "boleta" },
+    extra: { label: "Carrera / plan", valor: (u) => `${u.carrera ?? "—"} · ${u.plan_estudios ?? "—"}` },
+    pertenece: (u) => u.perfiles?.includes("alumno"),
+    // Quién da de alta en esta pestaña (el backend valida igual).
+    altaPor: ROLES_GESTION,
+  },
+  {
+    id: "docentes",
+    perfil: "docente",
+    titulo: "Docentes",
+    etiquetaAlta: "Registrar docente",
+    identificador: { label: "Núm. empleado", campo: "numero_empleado" },
+    extra: { label: "Academia", valor: (u) => u.academia ?? "—" },
+    pertenece: (u) => u.perfiles?.includes("docente"),
+    altaPor: ROLES_GESTION,
+  },
+  {
+    id: "personal",
+    perfil: "personal_catt",
+    titulo: "Personal CATT",
+    etiquetaAlta: "Registrar personal CATT",
+    identificador: { label: "Núm. empleado", campo: "numero_empleado" },
+    extra: { label: "Cargo", valor: (u) => u.cargo ?? "—" },
+    pertenece: esCuentaDePersonal,
+    altaPor: ["admin_sistema"],
+  },
+];
+
+const FILTROS_ESTADO = [
+  { id: "todos", etiqueta: "Todos" },
+  { id: "activa", etiqueta: "Activos" },
+  { id: "revocada", etiqueta: "Revocados" },
 ];
 
 // Sin acentos y en minúsculas, para que buscar "jose" también encuentre "José".
 function normalizar(texto) {
-  return texto
+  return String(texto ?? "")
     .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
+    .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase();
-}
-
-// Clasifica a un usuario de tipo "personal" en director / seguimiento / otro
-// buscando palabras clave en su campo `cargo` (texto libre, sin catálogo
-// fijo). Sin un match claro, cae en "otro" (pestaña "Personal CATT").
-function rolPersonal(usuario) {
-  const cargo = normalizar(usuario.cargo ?? "");
-  if (cargo.includes("director")) return "director";
-  if (cargo.includes("seguimiento")) return "seguimiento";
-  return "otro";
-}
-
-// True si `usuario` pertenece a `pestana`: por tipo, y además por
-// rolPersonal cuando la pestaña es una subdivisión de "personal".
-function perteneceAPestana(usuario, pestana) {
-  if (!pestana || usuario.tipo !== pestana.tipo) return false;
-  if (pestana.rolPersonal) return rolPersonal(usuario) === pestana.rolPersonal;
-  return true;
 }
 
 function EstadoBadge({ activo }) {
@@ -70,7 +85,7 @@ function EstadoBadge({ activo }) {
 // Fila clickeable: toda la <tr> lleva al detalle del usuario (antes había un
 // botón "Ver"). Accesible por teclado (role="button" + Enter/Espacio). Las
 // acciones de revocar/reactivar/eliminar ya no viven aquí, sino en Detalle.
-function FilaUsuario({ usuario, identificador, onVerDetalle }) {
+function FilaUsuario({ usuario, pestana, onVerDetalle }) {
   const abrir = () => onVerDetalle?.(usuario);
   const alPresionar = (e) => {
     if (e.key === "Enter" || e.key === " ") {
@@ -86,25 +101,50 @@ function FilaUsuario({ usuario, identificador, onVerDetalle }) {
       onClick={abrir}
       onKeyDown={alPresionar}
       aria-label={`Ver detalle de ${nombreCompleto(usuario)}`}
-      className="cursor-pointer border-b border-slate-100 transition-colors last:border-0 hover:bg-[#4FB3E8]/10 focus:bg-[#4FB3E8]/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#4FB3E8]/50"
+      className="cursor-pointer border-b border-slate-100 align-top transition-colors last:border-0 hover:bg-[#4FB3E8]/10 focus:bg-[#4FB3E8]/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#4FB3E8]/50"
     >
-      <td className="py-3 pl-4 pr-4 font-medium text-slate-700">{nombreCompleto(usuario)}</td>
-      <td className="py-3 pr-4 text-slate-500">{identificador || "—"}</td>
-      <td className="py-3 pr-4 text-slate-500">{usuario.telefono || "—"}</td>
-      <td className="py-3 pr-4 text-slate-500">{usuario.correo}</td>
+      <td className="py-3 pl-4 pr-4">
+        <p className="font-medium text-slate-700">{nombreCompleto(usuario)}</p>
+        <p className="text-xs text-slate-400">{usuario.correo}</p>
+      </td>
+      <td className="py-3 pr-4 text-slate-500">{usuario[pestana.identificador.campo] || "—"}</td>
+      <td className="py-3 pr-4 text-slate-500">{pestana.extra.valor(usuario)}</td>
+      <td className="py-3 pr-4">
+        <ChipsRol roles={usuario.roles} />
+      </td>
       <td className="py-3 pr-4">
         <EstadoBadge activo={usuario.activo} />
+        {usuario.debe_cambiar_password && (
+          <p className="mt-1 text-[11px] text-amber-600">Contraseña temporal</p>
+        )}
       </td>
     </tr>
   );
 }
 
-export default function ListadoPage({ onVolver, embebido = false, onVerDetalle, onDarDeAlta }) {
+export default function ListadoPage({
+  actor,
+  onVolver,
+  embebido = false,
+  onVerDetalle,
+  onDarDeAlta,
+}) {
+  // El administrador del sistema no ve alumnos (el backend tampoco se los
+  // manda) y empieza en Personal CATT, que es lo que administra.
+  const soloAdmin = tieneRol(actor, "admin_sistema") && !tieneRol(actor, ...ROLES_CATT);
+  const pestanas = useMemo(
+    () =>
+      soloAdmin
+        ? ["personal", "docentes"].map((id) => PESTANAS.find((p) => p.id === id))
+        : PESTANAS,
+    [soloAdmin],
+  );
   const [usuarios, setUsuarios] = useState(null);
   const [cargando, setCargando] = useState(true);
   const [errorCarga, setErrorCarga] = useState(null);
-  const [tabActiva, setTabActiva] = useState("alumno");
+  const [tabActiva, setTabActiva] = useState(pestanas[0].id);
   const [busqueda, setBusqueda] = useState("");
+  const [filtroEstado, setFiltroEstado] = useState("todos");
 
   const cargarUsuarios = useCallback(() => {
     setCargando(true);
@@ -124,36 +164,31 @@ export default function ListadoPage({ onVolver, embebido = false, onVerDetalle, 
     setBusqueda(""); // cada pestaña empieza sin filtro de búsqueda
   }
 
-  // Conteo por pestaña (sobre el total, no sobre lo filtrado) para el número
-  // junto al nombre de cada pestaña. "personal" se reparte entre 3 pestañas
-  // según rolPersonal, así que no basta con contar por `tipo`.
-  const conteosPorPestana = useMemo(() => {
-    const conteo = Object.fromEntries(PESTANAS.map((p) => [p.id, 0]));
-    for (const u of usuarios ?? []) {
-      const pestana = PESTANAS.find((p) => perteneceAPestana(u, p));
-      if (pestana) conteo[pestana.id] += 1;
-    }
-    return conteo;
-  }, [usuarios]);
+  // Conteo por pestaña (sobre el total, no sobre lo filtrado).
+  const conteosPorPestana = useMemo(
+    () =>
+      Object.fromEntries(
+        pestanas.map((p) => [p.id, (usuarios ?? []).filter((u) => p.pertenece(u)).length]),
+      ),
+    [usuarios, pestanas],
+  );
 
-  const pestanaActiva = PESTANAS.find((p) => p.id === tabActiva);
-  const tituloTabActiva = pestanaActiva?.titulo ?? "";
+  const pestanaActiva = pestanas.find((p) => p.id === tabActiva) ?? pestanas[0];
+  const tituloTabActiva = pestanaActiva.titulo;
+  const puedeDarDeAlta = tieneRol(actor, ...pestanaActiva.altaPor);
 
   const usuariosDeLaTab = useMemo(() => {
-    const deLaTab = (usuarios ?? []).filter((u) => perteneceAPestana(u, pestanaActiva));
+    let lista = (usuarios ?? []).filter((u) => pestanaActiva.pertenece(u));
+    if (filtroEstado !== "todos") lista = lista.filter((u) => u.estado === filtroEstado);
     const consulta = normalizar(busqueda.trim());
-    if (!consulta) return deLaTab;
-    return deLaTab.filter(
+    if (!consulta) return lista;
+    return lista.filter(
       (u) =>
         normalizar(nombreCompleto(u)).includes(consulta) ||
-        normalizar(u.correo).includes(consulta),
+        normalizar(u.correo).includes(consulta) ||
+        normalizar(u[pestanaActiva.identificador.campo]).includes(consulta),
     );
-  }, [usuarios, tabActiva, busqueda]);
-
-  // La columna "identificador" muestra la boleta (alumnos) o el número de
-  // empleado (sinodales / personal), según la pestaña activa.
-  const esAlumno = tabActiva === "alumno";
-  const identificadorLabel = esAlumno ? "Boleta" : "Número de empleado";
+  }, [usuarios, pestanaActiva, busqueda, filtroEstado]);
 
   const panel = (
     <div className={`rounded-3xl p-6 sm:p-8 ${VIDRIO} bg-white/85`}>
@@ -184,10 +219,10 @@ export default function ListadoPage({ onVolver, embebido = false, onVerDetalle, 
               >
                 {cargando ? "Cargando…" : "Actualizar"}
               </button>
-              {onDarDeAlta && (
+              {onDarDeAlta && puedeDarDeAlta && (
                 <button
                   type="button"
-                  onClick={() => onDarDeAlta(pestanaActiva?.tipo ?? tabActiva, pestanaActiva?.cargoSugerido)}
+                  onClick={() => onDarDeAlta(pestanaActiva.perfil)}
                   className="rounded-full px-5 py-2 text-sm font-semibold text-white shadow-md shadow-[#1878B6]/30 transition hover:-translate-y-0.5"
                   style={{ background: GRAD_AZUL }}
                 >
@@ -211,7 +246,7 @@ export default function ListadoPage({ onVolver, embebido = false, onVerDetalle, 
             <>
               {/* Pestañas */}
               <div className="mt-6 flex flex-wrap gap-2 border-b border-slate-200 pb-3">
-                {PESTANAS.map(({ id, titulo }) => {
+                {pestanas.map(({ id, titulo }) => {
                   const activa = id === tabActiva;
                   return (
                     <button
@@ -231,15 +266,27 @@ export default function ListadoPage({ onVolver, embebido = false, onVerDetalle, 
                 })}
               </div>
 
-              {/* Búsqueda */}
-              <div className="mt-4">
+              {/* Búsqueda + filtro de estado */}
+              <div className="mt-4 flex flex-col gap-2 sm:flex-row">
                 <input
                   type="search"
                   value={busqueda}
                   onChange={(e) => setBusqueda(e.target.value)}
-                  placeholder={`Buscar en ${tituloTabActiva.toLowerCase()} por nombre o correo…`}
+                  placeholder={`Buscar en ${tituloTabActiva.toLowerCase()} por nombre, correo o ${pestanaActiva.identificador.label.toLowerCase()}…`}
                   className="w-full rounded-full border border-slate-200 bg-white px-4 py-2 text-sm text-slate-700 placeholder:text-slate-400 focus:border-[#4FB3E8] focus:outline-none focus:ring-2 focus:ring-[#4FB3E8]/30"
                 />
+                <select
+                  value={filtroEstado}
+                  onChange={(e) => setFiltroEstado(e.target.value)}
+                  aria-label="Filtrar por estado de la cuenta"
+                  className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm text-slate-700 focus:border-[#4FB3E8] focus:outline-none focus:ring-2 focus:ring-[#4FB3E8]/30"
+                >
+                  {FILTROS_ESTADO.map((f) => (
+                    <option key={f.id} value={f.id}>
+                      {f.etiqueta}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div className="mt-4 overflow-x-auto rounded-2xl bg-white/60">
@@ -254,9 +301,9 @@ export default function ListadoPage({ onVolver, embebido = false, onVerDetalle, 
                     <thead>
                       <tr className="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-400">
                         <th className="py-2 pl-4 pr-4 font-medium">Nombre</th>
-                        <th className="py-2 pr-4 font-medium">{identificadorLabel}</th>
-                        <th className="py-2 pr-4 font-medium">Teléfono</th>
-                        <th className="py-2 pr-4 font-medium">Correo</th>
+                        <th className="py-2 pr-4 font-medium">{pestanaActiva.identificador.label}</th>
+                        <th className="py-2 pr-4 font-medium">{pestanaActiva.extra.label}</th>
+                        <th className="py-2 pr-4 font-medium">Roles</th>
                         <th className="py-2 pr-4 font-medium">Estado</th>
                       </tr>
                     </thead>
@@ -265,7 +312,7 @@ export default function ListadoPage({ onVolver, embebido = false, onVerDetalle, 
                         <FilaUsuario
                           key={usuario.id}
                           usuario={usuario}
-                          identificador={esAlumno ? usuario.boleta : usuario.numero_empleado}
+                          pestana={pestanaActiva}
                           onVerDetalle={onVerDetalle}
                         />
                       ))}

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import DashboardLayout from "../../components/DashboardLayout";
 import {
   IconoAltaUsuario,
+  IconoCuenta,
   IconoDocumento,
   IconoFlujo,
   IconoInicio,
@@ -9,10 +10,12 @@ import {
   IconoUsuarios,
 } from "../../components/iconos";
 import { api } from "../../lib/api";
+import { etiquetaRolPrincipal, ROLES_CATT, ROLES_GESTION } from "../../lib/roles";
 import { AZUL_MEDIO, GRAD_AZUL, VIDRIO } from "../../lib/theme";
 import ListadoPage from "../Usuarios/Listado";
 import AltaPage from "../Usuarios/Alta";
 import DetallePage from "../Usuarios/Detalle";
+import MiCuentaPage from "../MiCuenta";
 
 // PanelPage: el centro de navegación del sistema. Deja de ser una tarjeta de
 // bienvenida suelta y pasa a ser un dashboard con sidebar + topbar + contenido.
@@ -22,16 +25,22 @@ import DetallePage from "../Usuarios/Detalle";
 // con empujar una entrada a ese array — el sidebar y el área de contenido se
 // generan a partir de él, sin tocar el layout.
 
-// Mapeo tipo -> etiqueta de rol (el mismo que usaba la vieja PanelPage).
-const ETIQUETA_ROL = {
-  alumno: "Alumno",
-  sinodal: "Sinodal",
-  personal: "Personal CATT",
-};
+// Grupos de roles para decidir qué secciones ve cada quien. Una persona puede
+// tener varios roles: ve la unión de lo que permite cada uno.
+const TODOS = [
+  "admin_sistema",
+  ...ROLES_CATT,
+  "docente",
+  "presidente_academia",
+  "alumno",
+];
+const ADMIN_Y_CATT = ["admin_sistema", ...ROLES_CATT];
+const ACADEMICOS = ["docente", "presidente_academia", ...ROLES_CATT];
 
 // Descripciones cortas para las tarjetas de accesos rápidos.
 const DESCRIPCION_SECCION = {
-  alumnos: "Ver y administrar el padrón de usuarios",
+  usuarios: "Ver y administrar el padrón de usuarios",
+  "mi-cuenta": "Tus datos y tu contraseña",
   alta: "Registrar un nuevo participante",
   detalle: "Consultar la ficha de un usuario",
   protocolo: "Registro y estado del Protocolo",
@@ -107,7 +116,8 @@ function Chip({ children }) {
 
 // Contenido de la sección "Inicio": hero de bienvenida + KPIs + accesos rápidos.
 function PanelInicio({ usuario, accesos, onIrA }) {
-  const esPersonal = usuario.tipo === "personal";
+  // Estadísticas del padrón: solo quien puede consultarlo (CATT y admin).
+  const esPersonal = usuario.roles?.some((r) => ADMIN_Y_CATT.includes(r));
   const [usuarios, setUsuarios] = useState(null);
   const [errorCarga, setErrorCarga] = useState(null);
 
@@ -131,14 +141,20 @@ function PanelInicio({ usuario, accesos, onIrA }) {
   const total = hayDatos ? usuarios.length : KPIS_EJEMPLO.total;
   const activos = hayDatos ? usuarios.filter((u) => u.activo).length : KPIS_EJEMPLO.activos;
   const revocados = hayDatos ? total - activos : KPIS_EJEMPLO.revocados;
-  // El backend todavía no expone "pendientes de alta": va como dato de ejemplo.
-  const pendientes = KPIS_EJEMPLO.pendientes;
+  const pendientes = hayDatos
+    ? usuarios.filter((u) => u.debe_cambiar_password).length
+    : KPIS_EJEMPLO.pendientes;
 
   const estadisticas = [
     { etiqueta: "Usuarios totales", valor: total, de: total },
     { etiqueta: "Con acceso activo", valor: activos, de: total },
     { etiqueta: "Acceso revocado", valor: revocados, de: total },
-    { etiqueta: "Pendientes de alta", valor: pendientes, de: total, ejemplo: true },
+    {
+      etiqueta: "Sin estrenar contraseña",
+      valor: pendientes,
+      de: total,
+      ejemplo: !hayDatos,
+    },
   ];
 
   return (
@@ -158,7 +174,7 @@ function PanelInicio({ usuario, accesos, onIrA }) {
             : "Aquí darás seguimiento a tu Trabajo Terminal. Algunas secciones estarán disponibles en próximos sprints."}
         </p>
         <div className="mt-4 flex flex-wrap gap-2">
-          <Chip>{ETIQUETA_ROL[usuario.tipo] ?? "Usuario"}</Chip>
+          <Chip>{etiquetaRolPrincipal(usuario)}</Chip>
           {esPersonal ? (
             <>
               <Chip>{hayDatos ? `${total} usuarios registrados` : "Datos de ejemplo"}</Chip>
@@ -258,7 +274,7 @@ function SeccionProximamente({ titulo, descripcion }) {
 //   clave        identificador único y estable (lo guarda seccionActiva)
 //   etiqueta     texto visible en sidebar / breadcrumb / accesos rápidos
 //   icono        componente de ícono (de components/iconos)
-//   roles        tipos de usuario que pueden ver la sección
+//   roles        roles que pueden ver la sección (basta con tener uno)
 //   Componente   se renderiza en el área de contenido
 //   props        props fijas para ese componente (opcional)
 //   proximamente si true, muestra SeccionProximamente en vez del componente
@@ -272,7 +288,7 @@ const SECCIONES = [
         clave: "inicio",
         etiqueta: "Inicio",
         icono: IconoInicio,
-        roles: ["alumno", "sinodal", "personal"],
+        roles: TODOS,
         Componente: PanelInicio,
       },
     ],
@@ -281,23 +297,22 @@ const SECCIONES = [
     categoria: "USUARIOS",
     items: [
       {
-        // La etiqueta es "Usuarios" (no "Alumnos") porque esta pantalla
-        // administra los tres tipos de usuario a través de pestañas
-        // (Alumnos/Sinodales/Personal CATT), no solo alumnos.
-        clave: "alumnos",
+        // Pestañas Alumnos / Docentes / Personal CATT. El administrador del
+        // sistema solo ve la de Personal CATT (y docentes, para asignarles
+        // un rol de la CATT); el backend filtra igual.
+        clave: "usuarios",
         etiqueta: "Usuarios",
         icono: IconoUsuarios,
-        roles: ["personal"],
+        roles: ADMIN_Y_CATT,
         Componente: ListadoPage,
         props: { embebido: true },
       },
       {
-        // Ya no es un ítem propio del sidebar: se llega aquí desde el botón
-        // "Registrar <tipo>" de la pestaña activa en Usuarios (Listado).
+        // Se llega desde el botón "Registrar …" de la pestaña activa.
         clave: "alta",
         etiqueta: "Alta",
         icono: IconoAltaUsuario,
-        roles: ["personal"],
+        roles: ["admin_sistema", ...ROLES_GESTION],
         Componente: AltaPage,
         oculto: true,
       },
@@ -305,7 +320,7 @@ const SECCIONES = [
         clave: "detalle",
         etiqueta: "Detalle",
         icono: IconoDocumento,
-        roles: ["personal"],
+        roles: ADMIN_Y_CATT,
         Componente: DetallePage,
         oculto: true,
       },
@@ -318,22 +333,34 @@ const SECCIONES = [
         clave: "protocolo",
         etiqueta: "Protocolo",
         icono: IconoDocumento,
-        roles: ["alumno", "sinodal", "personal"],
+        roles: ["alumno", ...ACADEMICOS],
         proximamente: true,
       },
       {
         clave: "trabajo-terminal",
         etiqueta: "Trabajo Terminal",
         icono: IconoFlujo,
-        roles: ["alumno", "sinodal", "personal"],
+        roles: ["alumno", ...ACADEMICOS],
         proximamente: true,
       },
       {
         clave: "presentaciones",
         etiqueta: "Presentaciones",
         icono: IconoPresentacion,
-        roles: ["sinodal", "personal"],
+        roles: ACADEMICOS,
         proximamente: true,
+      },
+    ],
+  },
+  {
+    categoria: "CUENTA",
+    items: [
+      {
+        clave: "mi-cuenta",
+        etiqueta: "Mi cuenta",
+        icono: IconoCuenta,
+        roles: TODOS,
+        Componente: MiCuentaPage,
       },
     ],
   },
@@ -341,18 +368,24 @@ const SECCIONES = [
 
 const TODAS = SECCIONES.flatMap((grupo) => grupo.items);
 
-// Navegación visible para un rol: grupos con al menos un item permitido y
-// no oculto. Es lo que se pinta en el sidebar y en los accesos rápidos.
-function navegacionPara(tipo) {
+const permiteA = (item, roles = []) => item.roles.some((r) => roles.includes(r));
+
+// Navegación visible para los roles del usuario: grupos con al menos un item
+// permitido y no oculto. Es lo que se pinta en el sidebar y en los accesos rápidos.
+function navegacionPara(roles) {
   return SECCIONES.map((grupo) => ({
     categoria: grupo.categoria,
-    items: grupo.items.filter((it) => it.roles.includes(tipo) && !it.oculto),
+    items: grupo.items.filter((it) => permiteA(it, roles) && !it.oculto),
   })).filter((grupo) => grupo.items.length > 0);
 }
 
-export default function PanelPage({ usuario, onCerrarSesion, onVolver }) {
-  const etiquetaRol = ETIQUETA_ROL[usuario.tipo] ?? "Usuario";
-  const navegacion = useMemo(() => navegacionPara(usuario.tipo), [usuario.tipo]);
+export default function PanelPage({ usuario, onUsuarioActualizado, onCerrarSesion, onVolver }) {
+  const etiquetaRol = etiquetaRolPrincipal(usuario);
+  const clavesRoles = (usuario.roles ?? []).join(",");
+  const navegacion = useMemo(
+    () => navegacionPara(clavesRoles.split(",")),
+    [clavesRoles],
+  );
 
   // Primera sección visible según el rol (para todos los roles hoy es "inicio").
   const seccionInicial = navegacion[0]?.items[0]?.clave ?? "inicio";
@@ -360,15 +393,12 @@ export default function PanelPage({ usuario, onCerrarSesion, onVolver }) {
   // Usuario seleccionado desde una fila del Listado, para la sección "detalle"
   // (oculta del sidebar: solo se llega a ella dando clic en "Ver").
   const [detalleUserId, setDetalleUserId] = useState(null);
-  // Tipo con el que se abre el formulario de Alta cuando se llega desde el
-  // botón "Registrar alumno/sinodal/personal" de la pestaña activa en Listado.
-  const [altaTipoInicial, setAltaTipoInicial] = useState("alumno");
-  // Cargo sugerido para ese mismo formulario, cuando el Listado viene de una
-  // sub-pestaña de "personal" (Directores / Profesor de seguimiento).
-  const [altaCargoInicial, setAltaCargoInicial] = useState("");
+  // Perfil con el que se abre el formulario de Alta cuando se llega desde el
+  // botón "Registrar …" de la pestaña activa en Listado.
+  const [altaPerfil, setAltaPerfil] = useState("alumno");
 
   const seccion = TODAS.find((s) => s.clave === seccionActiva) ?? TODAS[0];
-  const permitida = seccion?.roles.includes(usuario.tipo);
+  const permitida = seccion ? permiteA(seccion, usuario.roles) : false;
 
   // Accesos rápidos = todo lo visible para el rol menos el propio "Inicio".
   const accesos = useMemo(
@@ -381,9 +411,8 @@ export default function PanelPage({ usuario, onCerrarSesion, onVolver }) {
     setSeccionActiva("detalle");
   };
 
-  const irAAlta = (tipo, cargoSugerido) => {
-    setAltaTipoInicial(tipo);
-    setAltaCargoInicial(cargoSugerido ?? "");
+  const irAAlta = (perfil) => {
+    setAltaPerfil(perfil);
     setSeccionActiva("alta");
   };
 
@@ -391,8 +420,8 @@ export default function PanelPage({ usuario, onCerrarSesion, onVolver }) {
   if (!seccion || !permitida) {
     contenido = (
       <SeccionProximamente
-        titulo="Sección no disponible"
-        descripcion="Tu rol no tiene acceso a esta sección del panel."
+        titulo="Acceso denegado"
+        descripcion="Tu rol no tiene acceso a esta sección del panel. Si crees que es un error, comunícate con la CATT."
       />
     );
   } else if (seccion.proximamente || !seccion.Componente) {
@@ -404,16 +433,34 @@ export default function PanelPage({ usuario, onCerrarSesion, onVolver }) {
     );
   } else if (seccion.clave === "inicio") {
     contenido = <PanelInicio usuario={usuario} accesos={accesos} onIrA={setSeccionActiva} />;
-  } else if (seccion.clave === "alumnos") {
+  } else if (seccion.clave === "usuarios") {
     contenido = (
-      <ListadoPage {...(seccion.props ?? {})} onVerDetalle={irADetalle} onDarDeAlta={irAAlta} />
+      <ListadoPage
+        {...(seccion.props ?? {})}
+        actor={usuario}
+        onVerDetalle={irADetalle}
+        onDarDeAlta={irAAlta}
+      />
     );
   } else if (seccion.clave === "alta") {
-    contenido = <AltaPage tipoInicial={altaTipoInicial} cargoInicial={altaCargoInicial} />;
+    contenido = (
+      <AltaPage
+        key={altaPerfil}
+        actor={usuario}
+        perfilInicial={altaPerfil}
+        onVerDetalle={irADetalle}
+      />
+    );
   } else if (seccion.clave === "detalle") {
     contenido = (
-      <DetallePage userId={detalleUserId} onVolver={() => setSeccionActiva("alumnos")} />
+      <DetallePage
+        actor={usuario}
+        userId={detalleUserId}
+        onVolver={() => setSeccionActiva("usuarios")}
+      />
     );
+  } else if (seccion.clave === "mi-cuenta") {
+    contenido = <MiCuentaPage usuario={usuario} onUsuarioActualizado={onUsuarioActualizado} />;
   } else {
     const Componente = seccion.Componente;
     contenido = <Componente {...(seccion.props ?? {})} />;

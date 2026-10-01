@@ -1,75 +1,48 @@
-// Script TEMPORAL para asignar contraseña a un usuario de tipo sinodal o personal.
+// Asigna una contraseña a un usuario existente desde la terminal del servidor.
+// Útil en desarrollo; en la aplicación el camino normal es "Restablecer
+// contraseña" desde la ficha del usuario (genera una temporal).
 //
-// Contexto: el registro público (POST /api/auth/registro) solo crea alumnos —
-// nadie debe poder auto-asignarse una cuenta de staff desde un formulario
-// público. Mientras no exista el panel administrativo real que dé de alta y
-// asigne credenciales a sinodales/personal (pendiente anotado en
-// 00-Contexto-Proyecto/CONTEXTO-PROYECTO.md), este script es el mecanismo
-// provisional. NO es un endpoint HTTP: solo se corre desde la terminal del
-// servidor.
+// Uso (desde la carpeta backend/):
+//   node scripts/asignar-credenciales.js correo@ejemplo.com "unaContraseña9" [--temporal]
 //
-// Flujo:
-//   1. El usuario (sinodal/personal) ya se creó por la vía administrativa
-//      existente: POST /api/usuarios.
-//   2. Este script le asigna contraseña para que pueda hacer login normal.
-//
-// Uso:
-//   node scripts/asignar-credenciales.js correo@ejemplo.com "unaContraseña9"
+// Con --temporal, el usuario deberá cambiarla al iniciar sesión.
 
-import crypto from "node:crypto";
-import "dotenv/config";
-
-import { pool, queryNamed } from "../src/db/index.js";
+import { enTransaccion, pool } from "../src/db/index.js";
+import { guardarPassword, passwordValido } from "../src/lib/usuarios.js";
 
 function salir(mensaje) {
   console.error(`Error: ${mensaje}`);
   process.exit(1);
 }
 
-const [correo, password] = process.argv.slice(2);
+const args = process.argv.slice(2);
+const temporal = args.includes("--temporal");
+const [correo, password] = args.filter((a) => a !== "--temporal");
 
 if (!correo || !password) {
-  salir(
-    'faltan argumentos. Uso: node scripts/asignar-credenciales.js <correo> "<password>"',
-  );
+  salir('Uso: node scripts/asignar-credenciales.js <correo> "<password>" [--temporal]');
 }
-
-if (password.length < 9 || !/[a-zA-Z]/.test(password) || !/[0-9]/.test(password)) {
-  salir(
-    "la contraseña debe tener al menos 9 caracteres e incluir al menos una letra y un número",
-  );
+if (!passwordValido(password)) {
+  salir("la contraseña debe tener al menos 9 caracteres e incluir al menos una letra y un número");
 }
 
 const { rows } = await pool.query(
-  "SELECT id, nombre, tipo FROM usuarios WHERE correo = $1",
+  "SELECT id, nombre FROM usuarios WHERE lower(correo) = lower($1)",
   [correo],
 );
 const usuario = rows[0];
+if (!usuario) salir(`no existe un usuario con el correo ${correo}`);
 
-if (!usuario) {
-  salir(
-    `no existe ningún usuario con el correo "${correo}". ` +
-      "Créalo primero por la vía administrativa (POST /api/usuarios) y vuelve a correr este script.",
-  );
-}
-
-const salt = crypto.randomBytes(16).toString("hex");
-const passwordHash = crypto.scryptSync(password, salt, 64).toString("hex");
-
-// Inserta la fila de credenciales, o la reemplaza si el usuario ya tenía una.
-// `excluded` funciona igual en Postgres que en SQLite para ON CONFLICT DO UPDATE.
-await queryNamed(
-  `INSERT INTO credenciales (usuario_id, password_hash, password_salt)
-   VALUES (@id, @hash, @salt)
-   ON CONFLICT (usuario_id) DO UPDATE SET
-     password_hash = excluded.password_hash,
-     password_salt = excluded.password_salt`,
-  { id: usuario.id, hash: passwordHash, salt },
-);
+await enTransaccion(async (client) => {
+  await guardarPassword(client, usuario.id, password);
+  await client.query("UPDATE usuarios SET debe_cambiar_password = $1 WHERE id = $2", [
+    temporal,
+    usuario.id,
+  ]);
+  await client.query("DELETE FROM sesiones WHERE usuario_id = $1", [usuario.id]);
+});
 
 console.log(
-  `Credenciales asignadas a "${usuario.nombre}" (tipo: ${usuario.tipo}, correo: ${correo}).`,
+  `Contraseña asignada a ${usuario.nombre} <${correo}>${temporal ? " (temporal: deberá cambiarla)" : ""}.`,
 );
-console.log("Ya puede iniciar sesión con POST /api/auth/login.");
-
 await pool.end();

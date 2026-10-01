@@ -1,91 +1,47 @@
 import { Router } from "express";
-import crypto from "node:crypto";
 
-import { pool } from "../db/index.js";
+import { ruta } from "../lib/ruta.js";
+import { pool, enTransaccion } from "../db/index.js";
+import {
+  autenticar,
+  cerrarSesionesDe,
+  crearSesion,
+  tokenDelHeader,
+} from "../lib/auth.js";
+import { CARRERAS_VALIDAS, PLANES_VALIDOS } from "../lib/roles.js";
+import {
+  asignarRol,
+  derivar,
+  guardarPassword,
+  obtenerUsuario,
+  obtenerUsuarioPorCorreo,
+  passwordCoincide,
+  passwordValido,
+  registrarBitacora,
+} from "../lib/usuarios.js";
 
 const router = Router();
 
-const DIAS_SESION = 7;
 const CORREO_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-// Las 3 carreras reales de ESCOM.
-const CARRERAS_VALIDAS = ["ISC", "IIA", "LCD"];
-
-// 23505 = unique_violation en Postgres (antes SQLITE_CONSTRAINT_UNIQUE).
+const DOMINIO_ALUMNO = "@alumno.ipn.mx";
 const PG_UNIQUE_VIOLATION = "23505";
+const MENSAJE_PASSWORD =
+  "La contraseña debe tener al menos 9 caracteres e incluir al menos una letra y un número";
 
-// --- Helpers de contraseña (scrypt + comparación en tiempo constante) ---
+const texto = (v) => (typeof v === "string" ? v.trim() : "");
 
-function derivar(password, salt) {
-  return crypto.scryptSync(password, salt, 64);
-}
-
-function passwordCoincide(password, saltHex, hashHexGuardado) {
-  const calculado = derivar(password, saltHex);
-  const guardado = Buffer.from(hashHexGuardado, "hex");
-  // timingSafeEqual exige longitudes iguales; si no lo son ya no coincide.
-  if (calculado.length !== guardado.length) return false;
-  return crypto.timingSafeEqual(calculado, guardado);
-}
-
-function passwordValido(p) {
-  return (
-    typeof p === "string" && p.length >= 9 && /[a-zA-Z]/.test(p) && /[0-9]/.test(p)
-  );
-}
-
-// --- Helpers de sesión ---
-
-async function crearSesion(usuarioId) {
-  const token = crypto.randomBytes(32).toString("hex");
-  const expiraEn = new Date(Date.now() + DIAS_SESION * 24 * 60 * 60 * 1000);
-  await pool.query(
-    "INSERT INTO sesiones (token, usuario_id, expira_en) VALUES ($1, $2, $3)",
-    [token, usuarioId, expiraEn],
-  );
-  return token;
-}
-
-function tokenDelHeader(req) {
-  const cabecera = req.get("authorization") || "";
-  const m = cabecera.match(/^Bearer\s+(.+)$/i);
-  return m ? m[1].trim() : null;
-}
-
-async function usuarioPorId(id) {
-  const { rows } = await pool.query("SELECT * FROM usuarios WHERE id = $1", [id]);
-  return rows[0] ?? null;
-}
-
-// Devuelve el usuario de un token válido; null si no hay token, no existe la
-// sesión o ya expiró (en ese último caso además borra la sesión vencida).
-async function usuarioDeToken(token) {
-  if (!token) return null;
-  const { rows } = await pool.query("SELECT * FROM sesiones WHERE token = $1", [token]);
-  const sesion = rows[0];
-  if (!sesion) return null;
-  if (new Date(sesion.expira_en) <= new Date()) {
-    await pool.query("DELETE FROM sesiones WHERE token = $1", [token]);
-    return null;
-  }
-  return usuarioPorId(sesion.usuario_id);
-}
-
-// POST /api/auth/registro
-// El registro público SOLO crea alumnos. El `tipo` NUNCA se lee del body: nadie
-// puede auto-asignarse una cuenta de sinodal/personal desde aquí (esas se dan de
-// alta por la vía administrativa + scripts/asignar-credenciales.js).
-router.post("/registro", async (req, res) => {
+// POST /api/auth/registro (HU-2)
+// El registro público SOLO crea alumnos: el rol nunca se lee del body.
+router.post("/registro", ruta(async (req, res) => {
   const cuerpo = req.body ?? {};
-  const nombre = typeof cuerpo.nombre === "string" ? cuerpo.nombre.trim() : "";
-  const apellidoPaterno =
-    typeof cuerpo.apellidoPaterno === "string" ? cuerpo.apellidoPaterno.trim() : "";
-  const apellidoMaterno =
-    typeof cuerpo.apellidoMaterno === "string" ? cuerpo.apellidoMaterno.trim() : "";
-  const correo = typeof cuerpo.correo === "string" ? cuerpo.correo.trim() : "";
+  const nombre = texto(cuerpo.nombre);
+  const apellidoPaterno = texto(cuerpo.apellidoPaterno);
+  const apellidoMaterno = texto(cuerpo.apellidoMaterno);
+  const correo = texto(cuerpo.correo).toLowerCase();
   const password = typeof cuerpo.password === "string" ? cuerpo.password : "";
-  const boleta = typeof cuerpo.boleta === "string" ? cuerpo.boleta.trim() : "";
-  const carrera = typeof cuerpo.carrera === "string" ? cuerpo.carrera.trim() : "";
+  const boleta = texto(cuerpo.boleta);
+  const carrera = texto(cuerpo.carrera);
+  const planEstudios = texto(cuerpo.planEstudios);
 
   const faltantes = [];
   if (!nombre) faltantes.push("nombre");
@@ -95,124 +51,169 @@ router.post("/registro", async (req, res) => {
   if (!password) faltantes.push("password");
   if (!boleta) faltantes.push("boleta");
   if (!carrera) faltantes.push("carrera");
+  if (!planEstudios) faltantes.push("planEstudios");
   if (faltantes.length > 0) {
+    return res.status(400).json({ error: `Faltan campos obligatorios: ${faltantes.join(", ")}` });
+  }
+
+  if (!CORREO_RE.test(correo) || !correo.endsWith(DOMINIO_ALUMNO)) {
     return res
       .status(400)
-      .json({ error: `Faltan campos obligatorios: ${faltantes.join(", ")}` });
+      .json({ error: `Usa tu correo institucional de alumno (${DOMINIO_ALUMNO})` });
   }
-
-  if (!CORREO_RE.test(correo)) {
-    return res.status(400).json({ error: "El correo no tiene un formato válido" });
+  if (!passwordValido(password)) return res.status(400).json({ error: MENSAJE_PASSWORD });
+  if (!/^\d{10}$/.test(boleta)) {
+    return res.status(400).json({ error: "La boleta debe tener 10 dígitos" });
   }
-
-  if (!passwordValido(password)) {
-    return res.status(400).json({
-      error:
-        "La contraseña debe tener al menos 9 caracteres e incluir al menos una letra y un número",
-    });
-  }
-
   if (!CARRERAS_VALIDAS.includes(carrera)) {
-    return res.status(400).json({
-      error: `carrera inválida: debe ser una de ${CARRERAS_VALIDAS.join(", ")}`,
-    });
+    return res
+      .status(400)
+      .json({ error: `carrera inválida: debe ser una de ${CARRERAS_VALIDAS.join(", ")}` });
+  }
+  if (!PLANES_VALIDOS.includes(planEstudios)) {
+    return res
+      .status(400)
+      .json({ error: `plan de estudios inválido: debe ser ${PLANES_VALIDOS.join(" o ")}` });
   }
 
-  const salt = crypto.randomBytes(16).toString("hex");
-  const passwordHash = derivar(password, salt).toString("hex");
-
-  // better-sqlite3 tenía db.transaction(fn) síncrono; con pg se pide un
-  // client propio del pool y se maneja BEGIN/COMMIT/ROLLBACK a mano.
-  const client = await pool.connect();
   try {
-    await client.query("BEGIN");
+    const usuarioId = await enTransaccion(async (client) => {
+      const { rows } = await client.query(
+        `INSERT INTO usuarios (nombre, apellido_paterno, apellido_materno, correo)
+         VALUES ($1, $2, $3, $4) RETURNING id`,
+        [nombre, apellidoPaterno, apellidoMaterno, correo],
+      );
+      const id = rows[0].id;
+      await client.query(
+        "INSERT INTO alumnos (usuario_id, boleta, carrera, plan_estudios) VALUES ($1, $2, $3, $4)",
+        [id, boleta, carrera, planEstudios],
+      );
+      await asignarRol(client, id, "alumno");
+      await guardarPassword(client, id, password);
+      await registrarBitacora(client, id, "registro_alumno", "usuarios", id, null);
+      return id;
+    });
 
-    // Nombre de pila y apellidos van en columnas separadas. Solo alumno:
-    // boleta y carrera; el resto de campos específicos van NULL.
-    const { rows } = await client.query(
-      `INSERT INTO usuarios (nombre, apellido_paterno, apellido_materno, correo, tipo, boleta, carrera)
-       VALUES ($1, $2, $3, $4, 'alumno', $5, $6)
-       RETURNING *`,
-      [nombre, apellidoPaterno, apellidoMaterno, correo, boleta, carrera],
-    );
-    const usuario = rows[0];
-
-    await client.query(
-      "INSERT INTO credenciales (usuario_id, password_hash, password_salt) VALUES ($1, $2, $3)",
-      [usuario.id, passwordHash, salt],
-    );
-
-    await client.query("COMMIT");
-
-    const token = await crearSesion(usuario.id);
-    return res.status(201).json({ usuario, token });
+    const token = await crearSesion(usuarioId);
+    return res.status(201).json({ usuario: await obtenerUsuario(usuarioId), token });
   } catch (err) {
-    await client.query("ROLLBACK");
     if (err.code === PG_UNIQUE_VIOLATION) {
-      return res
-        .status(409)
-        .json({ error: `Ya existe un usuario con el correo ${correo}` });
+      const campo = String(err.constraint || "").includes("boleta") ? "boleta" : "correo";
+      return res.status(409).json({
+        error:
+          campo === "boleta"
+            ? `Ya existe una cuenta con la boleta ${boleta}`
+            : `Ya existe una cuenta con el correo ${correo}`,
+      });
     }
     throw err;
-  } finally {
-    client.release();
   }
-});
+}));
 
 // POST /api/auth/login
-router.post("/login", async (req, res) => {
+router.post("/login", ruta(async (req, res) => {
   const cuerpo = req.body ?? {};
-  const correo = typeof cuerpo.correo === "string" ? cuerpo.correo.trim() : "";
+  const correo = texto(cuerpo.correo);
   const password = typeof cuerpo.password === "string" ? cuerpo.password : "";
-
-  // Mismo mensaje para todos los casos de fallo: no revelamos si falló el correo
-  // o la contraseña.
   const GENERICO = "Correo o contraseña incorrectos";
 
-  const usuario = correo
-    ? (await pool.query("SELECT * FROM usuarios WHERE correo = $1", [correo])).rows[0]
-    : null;
+  const usuario = correo ? await obtenerUsuarioPorCorreo(correo) : null;
   const cred = usuario
     ? (await pool.query("SELECT * FROM credenciales WHERE usuario_id = $1", [usuario.id])).rows[0]
     : null;
 
   if (!usuario || !cred || !password) {
-    // Gastamos un scrypt igualmente para no dar una pista por tiempo de respuesta.
+    // Se gasta un scrypt igual para no dar pistas por tiempo de respuesta.
     if (password) derivar(password, "0".repeat(32));
     return res.status(401).json({ error: GENERICO });
   }
-
   if (!passwordCoincide(password, cred.password_salt, cred.password_hash)) {
     return res.status(401).json({ error: GENERICO });
+  }
+  // Solo después de validar la contraseña se revela que la cuenta está revocada.
+  if (usuario.estado === "revocada") {
+    return res
+      .status(403)
+      .json({ error: "Tu acceso fue revocado. Comunícate con la CATT para reactivarlo." });
   }
 
   const token = await crearSesion(usuario.id);
   return res.json({ usuario, token });
-});
+}));
 
 // GET /api/auth/yo
-router.get("/yo", async (req, res) => {
-  const token = tokenDelHeader(req);
-  if (!token) {
-    return res.status(401).json({ error: "Falta el token de sesión" });
-  }
-
-  const usuario = await usuarioDeToken(token);
-  if (!usuario) {
-    return res.status(401).json({ error: "Sesión inválida o expirada" });
-  }
-
-  return res.json({ usuario });
-});
+router.get("/yo", autenticar, (req, res) => res.json({ usuario: req.usuario }));
 
 // POST /api/auth/logout
-router.post("/logout", async (req, res) => {
+router.post("/logout", ruta(async (req, res) => {
   const token = tokenDelHeader(req);
-  if (token) {
-    await pool.query("DELETE FROM sesiones WHERE token = $1", [token]);
-  }
-  // Aunque no hubiera token o sesión, el resultado neto ya es "sin sesión".
+  if (token) await pool.query("DELETE FROM sesiones WHERE token = $1", [token]);
   return res.json({ ok: true });
-});
+}));
+
+// PUT /api/auth/password (HU-5) -> cambia la contraseña propia.
+// Es la única ruta disponible mientras la contraseña sea temporal.
+router.put("/password", autenticar, ruta(async (req, res) => {
+  const actual = typeof req.body?.actual === "string" ? req.body.actual : "";
+  const nueva = typeof req.body?.nueva === "string" ? req.body.nueva : "";
+
+  if (!actual || !nueva) {
+    return res.status(400).json({ error: "Escribe tu contraseña actual y la nueva" });
+  }
+  const { rows } = await pool.query("SELECT * FROM credenciales WHERE usuario_id = $1", [
+    req.usuario.id,
+  ]);
+  const cred = rows[0];
+  if (!cred || !passwordCoincide(actual, cred.password_salt, cred.password_hash)) {
+    return res.status(400).json({ error: "La contraseña actual no es correcta" });
+  }
+  if (!passwordValido(nueva)) return res.status(400).json({ error: MENSAJE_PASSWORD });
+  if (nueva === actual) {
+    return res.status(400).json({ error: "La nueva contraseña debe ser distinta de la actual" });
+  }
+
+  await enTransaccion(async (client) => {
+    await guardarPassword(client, req.usuario.id, nueva);
+    await client.query("UPDATE usuarios SET debe_cambiar_password = FALSE WHERE id = $1", [
+      req.usuario.id,
+    ]);
+    // Cierra las demás sesiones abiertas; la actual sigue viva.
+    await cerrarSesionesDe(req.usuario.id, client, req.token);
+    await registrarBitacora(client, req.usuario.id, "cambio_password", "usuarios", req.usuario.id);
+  });
+
+  return res.json({ usuario: await obtenerUsuario(req.usuario.id) });
+}));
+
+// PATCH /api/auth/perfil -> el usuario edita solo sus datos de contacto.
+router.patch("/perfil", autenticar, ruta(async (req, res) => {
+  const cuerpo = req.body ?? {};
+  const tieneTelefono = Object.prototype.hasOwnProperty.call(cuerpo, "telefono");
+  const tieneExtension = Object.prototype.hasOwnProperty.call(cuerpo, "extension");
+
+  if (!tieneTelefono && !tieneExtension) {
+    return res.status(400).json({ error: "Solo puedes editar teléfono y extensión" });
+  }
+  if (tieneExtension && !req.usuario.perfiles.includes("docente")) {
+    return res.status(400).json({ error: "La extensión solo aplica a docentes" });
+  }
+
+  await enTransaccion(async (client) => {
+    if (tieneTelefono) {
+      await client.query("UPDATE usuarios SET telefono = $1 WHERE id = $2", [
+        texto(cuerpo.telefono) || null,
+        req.usuario.id,
+      ]);
+    }
+    if (tieneExtension) {
+      await client.query("UPDATE docentes SET extension = $1 WHERE usuario_id = $2", [
+        texto(cuerpo.extension) || null,
+        req.usuario.id,
+      ]);
+    }
+  });
+
+  return res.json({ usuario: await obtenerUsuario(req.usuario.id) });
+}));
 
 export default router;
