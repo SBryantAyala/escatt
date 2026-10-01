@@ -43,7 +43,9 @@ frontend/src/
 - Solo los alumnos se registran solos (`@alumno.ipn.mx`). La CATT da de alta a
   alumnos y docentes; el Administrador del sistema da de alta al personal CATT.
   Las cuentas nuevas nacen con contraseña temporal.
-- Las cuentas no se borran: se **revocan** y se pueden reactivar.
+- Lo normal es **revocar** una cuenta (baja lógica: conserva el historial y se
+  puede reactivar). **Eliminar** borra la cuenta de forma permanente y solo se
+  permite si no tiene historial (altas duplicadas o hechas por error).
 
 ## Requisitos
 

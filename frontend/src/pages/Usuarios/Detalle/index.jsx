@@ -21,8 +21,9 @@ import { GRAD_AZUL, VIDRIO } from "../../../lib/theme";
 //   - Los roles se muestran como chips. Según quién consulta:
 //       Secretario Ejecutivo -> asigna/quita "Presidente de Academia" a docentes.
 //       Administrador        -> asigna/quita roles de la CATT y de administrador.
-//   - Zona de peligro: revocar / reactivar acceso (baja lógica, nunca se
-//     borra la cuenta) y restablecer contraseña (genera una temporal).
+//   - Zona de peligro: revocar / reactivar acceso (baja lógica), restablecer
+//     contraseña (genera una temporal) y eliminar la cuenta, esto último solo
+//     si no tiene historial (altas duplicadas o por error).
 // El backend valida todo otra vez; aquí solo se ocultan botones.
 export const userService = {
   async getUser(id) {
@@ -102,6 +103,7 @@ const TITULO_CONFIRMACION = {
   revocar: "Revocar acceso",
   reactivar: "Reactivar acceso",
   reset: "Restablecer contraseña",
+  eliminar: "Eliminar cuenta",
 };
 
 const TEXTO_CONFIRMACION = {
@@ -110,11 +112,18 @@ const TEXTO_CONFIRMACION = {
   reactivar: (nombre) => `"${nombre}" recupera su acceso al sistema de inmediato.`,
   reset: (nombre) =>
     `Se generará una contraseña temporal para "${nombre}" y se cerrarán sus sesiones. Deberá cambiarla al entrar.`,
+  eliminar: (nombre) =>
+    `Se borrará a "${nombre}" de forma permanente. Solo se permite porque la cuenta no tiene historial. No se puede deshacer.`,
+};
+
+const CLASE_BOTON_CONFIRMAR = {
+  revocar: "bg-amber-600 hover:bg-amber-700",
+  eliminar: "bg-red-600 hover:bg-red-700",
 };
 
 function ConfirmDialog({ accion, nombre, onCancelar, onConfirmar, procesando }) {
   if (!accion) return null;
-  const esRevocar = accion === "revocar";
+  const claseColor = CLASE_BOTON_CONFIRMAR[accion];
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4"
@@ -144,9 +153,9 @@ function ConfirmDialog({ accion, nombre, onCancelar, onConfirmar, procesando }) 
             type="button"
             onClick={onConfirmar}
             disabled={procesando}
-            style={esRevocar ? undefined : { background: GRAD_AZUL }}
+            style={claseColor ? undefined : { background: GRAD_AZUL }}
             className={`rounded-lg px-3 py-1.5 text-sm font-medium text-white transition disabled:opacity-50 ${
-              esRevocar ? "bg-amber-600 hover:bg-amber-700" : "shadow-md shadow-[#1878B6]/30"
+              claseColor ?? "shadow-md shadow-[#1878B6]/30"
             }`}
           >
             {procesando ? "Procesando…" : TITULO_CONFIRMACION[accion]}
@@ -336,14 +345,26 @@ function VolverLink({ onVolver }) {
   );
 }
 
-/* Zona de peligro: revocar / reactivar acceso y restablecer contraseña. */
-function ZonaPeligro({ activo, error, passwordTemporal, onRevocar, onReactivar, onReset }) {
+/* Zona de peligro: revocar / reactivar acceso, restablecer contraseña y
+   eliminar la cuenta. `historial` es la respuesta de /historial (null mientras
+   carga): sin ella el botón de eliminar queda deshabilitado. */
+function ZonaPeligro({
+  activo,
+  error,
+  passwordTemporal,
+  historial,
+  onRevocar,
+  onReactivar,
+  onReset,
+  onEliminar,
+}) {
+  const puedeEliminar = Boolean(historial?.puede_eliminar);
   return (
     <div className="mt-6 rounded-2xl border border-red-200 bg-red-50/70 p-5">
       <h2 className="text-sm font-bold uppercase tracking-wide text-red-700">Acceso a la cuenta</h2>
       <p className="mt-1 text-sm text-red-700/80">
-        Las cuentas no se eliminan: se revoca el acceso y se conserva el historial. Se pedirá
-        confirmación.
+        Revocar conserva el historial y se puede revertir. Eliminar borra la cuenta y solo está
+        disponible para cuentas sin historial (altas duplicadas o por error).
       </p>
       <div className="mt-4 flex flex-wrap gap-3">
         {activo ? (
@@ -372,7 +393,21 @@ function ZonaPeligro({ activo, error, passwordTemporal, onRevocar, onReactivar, 
             Restablecer contraseña
           </button>
         )}
+        <button
+          type="button"
+          onClick={onEliminar}
+          disabled={!puedeEliminar}
+          className="rounded-lg bg-red-600 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-red-600"
+        >
+          Eliminar cuenta
+        </button>
       </div>
+      {historial && !historial.puede_eliminar && (
+        <p className="mt-2 text-xs text-red-700/80">
+          No se puede eliminar porque tiene historial: {historial.motivos.join("; ")}. Usa Revocar
+          acceso.
+        </p>
+      )}
       {passwordTemporal && (
         <div className="mt-4 rounded-xl bg-white p-3 text-sm text-slate-700 ring-1 ring-emerald-200">
           Contraseña temporal (se muestra solo esta vez):{" "}
@@ -464,10 +499,11 @@ export default function UserProfileForm({ actor, userId, onVolver }) {
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState(null);
 
-  const [accionPeligro, setAccionPeligro] = useState(null); // 'revocar' | 'reactivar' | 'reset'
+  const [accionPeligro, setAccionPeligro] = useState(null); // 'revocar' | 'reactivar' | 'reset' | 'eliminar'
   const [procesandoPeligro, setProcesandoPeligro] = useState(false);
   const [errorPeligro, setErrorPeligro] = useState(null);
   const [passwordTemporal, setPasswordTemporal] = useState(null);
+  const [historial, setHistorial] = useState(null); // { puede_eliminar, motivos }
 
   // Normaliza academia_id a texto para que el <select> lo compare bien.
   const aFormulario = (u) => ({ ...u, academia_id: u.academia_id != null ? String(u.academia_id) : "" });
@@ -481,6 +517,10 @@ export default function UserProfileForm({ actor, userId, onVolver }) {
     let active = true;
     setIsLoading(true);
     setLoadError(null);
+    setHistorial(null);
+    api(`/api/usuarios/${userId}/historial`)
+      .then((h) => active && setHistorial(h))
+      .catch(() => {});
     userService
       .getUser(userId)
       .then((user) => {
@@ -556,6 +596,12 @@ export default function UserProfileForm({ actor, userId, onVolver }) {
     setProcesandoPeligro(true);
     setErrorPeligro(null);
     try {
+      if (accionPeligro === "eliminar") {
+        await api(`/api/usuarios/${userId}`, { method: "DELETE" });
+        setAccionPeligro(null);
+        onVolver?.();
+        return;
+      }
       if (accionPeligro === "reset") {
         const datos = await api(`/api/usuarios/${userId}/reset-password`, { method: "POST" });
         aplicar(datos.usuario);
@@ -743,6 +789,8 @@ export default function UserProfileForm({ actor, userId, onVolver }) {
           activo={originalData.activo}
           error={errorPeligro}
           passwordTemporal={passwordTemporal}
+          historial={historial}
+          onEliminar={() => pedirConfirmacion("eliminar")}
           onRevocar={() => pedirConfirmacion("revocar")}
           onReactivar={() => pedirConfirmacion("reactivar")}
           onReset={() => pedirConfirmacion("reset")}

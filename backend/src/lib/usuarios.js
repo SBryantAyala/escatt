@@ -98,6 +98,39 @@ export async function registrarBitacora(client, actorId, accion, entidad, entida
   );
 }
 
+// Motivos por los que una cuenta NO se puede eliminar (solo revocar).
+// Devuelve textos legibles; un arreglo vacío significa "sin historial"
+// (alta duplicada o hecha por error).
+//
+// Pendiente (Módulo 2): agregar aquí protocolos, participaciones en TT
+// (alumno, director, sinodal, seguimiento), evaluaciones y actas.
+export async function motivosHistorial(client, usuarioId) {
+  const { rows } = await client.query(
+    `SELECT
+       (SELECT count(*)::int FROM usuarios WHERE creado_por = $1) AS cuentas_creadas,
+       (SELECT count(*)::int FROM usuario_roles
+         WHERE asignado_por = $1 AND usuario_id <> $1) AS roles_asignados,
+       (SELECT count(*)::int FROM elegibilidad WHERE alumno_id = $1) AS elegibilidad_propia,
+       (SELECT count(*)::int FROM elegibilidad WHERE validado_por = $1) AS elegibilidad_validada,
+       (SELECT count(*)::int FROM bitacora
+         WHERE usuario_id = $1
+           AND NOT (entidad = 'usuarios' AND entidad_id IS NOT DISTINCT FROM $1)) AS acciones`,
+    [usuarioId],
+  );
+  const n = rows[0];
+  const motivos = [];
+  if (n.cuentas_creadas > 0) motivos.push(`dio de alta ${n.cuentas_creadas} cuenta(s)`);
+  if (n.roles_asignados > 0) motivos.push(`asignó ${n.roles_asignados} rol(es) a otras cuentas`);
+  if (n.elegibilidad_propia > 0) {
+    motivos.push(`tiene ${n.elegibilidad_propia} registro(s) de elegibilidad como alumno`);
+  }
+  if (n.elegibilidad_validada > 0) {
+    motivos.push(`validó ${n.elegibilidad_validada} registro(s) de elegibilidad`);
+  }
+  if (n.acciones > 0) motivos.push(`tiene ${n.acciones} acción(es) registradas en la bitácora`);
+  return motivos;
+}
+
 // --- Contraseñas (scrypt + comparación en tiempo constante) ----------------
 
 export function derivar(password, salt) {

@@ -19,6 +19,7 @@ import {
   generarPasswordTemporal,
   guardarPassword,
   listarUsuarios,
+  motivosHistorial,
   obtenerUsuario,
   quitarRol,
   registrarBitacora,
@@ -494,19 +495,76 @@ router.delete(
   }),
 );
 
-// DELETE /api/usuarios/:id -> las cuentas no se eliminan (baja lógica con
-// /revocar). Solo se permite en desarrollo para limpiar datos de prueba.
+// GET /api/usuarios/:id/historial -> ¿la cuenta se puede eliminar? Mismos
+// permisos que ver la ficha.
+router.get(
+  "/:id/historial",
+  ruta(async (req, res) => {
+    const objetivo = await cargarObjetivo(req, res);
+    if (!objetivo) return;
+    const motivos = await motivosHistorial(pool, objetivo.id);
+    res.json({ puede_eliminar: motivos.length === 0, motivos });
+  }),
+);
+
+// ¿Hay otra cuenta activa con ese rol además de `usuarioId`?
+async function quedaOtroActivoConRol(client, rol, usuarioId) {
+  const { rows } = await client.query(
+    `SELECT count(*)::int AS n FROM usuario_roles ur
+     JOIN roles r ON r.id = ur.rol_id
+     JOIN usuarios u ON u.id = ur.usuario_id
+     WHERE r.clave = $1 AND u.estado = 'activa' AND u.id <> $2`,
+    [rol, usuarioId],
+  );
+  return rows[0].n > 0;
+}
+
+// DELETE /api/usuarios/:id -> borrado real, solo para cuentas sin historial
+// (altas duplicadas o hechas por error). Lo normal es la baja lógica con
+// /revocar. Mismos permisos que editar.
 router.delete(
   "/:id",
   ruta(async (req, res) => {
-    if (process.env.NODE_ENV !== "development") {
-      return void res
-        .status(403)
-        .json({ error: "Las cuentas no se eliminan: usa Revocar acceso (baja lógica)" });
-    }
     const objetivo = await cargarObjetivo(req, res);
     if (!objetivo || !exigirGestion(req, res, objetivo)) return;
-    await pool.query("DELETE FROM usuarios WHERE id = $1", [objetivo.id]);
+
+    // Devuelve el cuerpo del 409, o null si se eliminó.
+    const conflicto = await enTransaccion(async (client) => {
+      const motivos = await motivosHistorial(client, objetivo.id);
+      if (motivos.length > 0) {
+        return { error: "Esta cuenta tiene historial; usa Revocar acceso.", motivos };
+      }
+      if (
+        objetivo.roles.includes("catt_ejecutivo") &&
+        !(await quedaOtroActivoConRol(client, "catt_ejecutivo", objetivo.id))
+      ) {
+        return { error: "Debe quedar al menos un Secretario Ejecutivo activo" };
+      }
+      if (
+        objetivo.roles.includes("admin_sistema") &&
+        !(await quedaOtroActivoConRol(client, "admin_sistema", objetivo.id))
+      ) {
+        return { error: "Debe quedar al menos un administrador del sistema activo" };
+      }
+
+      // La bitácora guarda una copia de los datos básicos: después del
+      // borrado ya no hay fila de usuarios a la cual consultar.
+      await registrarBitacora(client, req.usuario.id, "eliminar_usuario", "usuarios", objetivo.id, {
+        nombre_completo: [objetivo.nombre, objetivo.apellido_paterno, objetivo.apellido_materno]
+          .filter(Boolean)
+          .join(" "),
+        correo: objetivo.correo,
+        perfiles: objetivo.perfiles,
+        roles: objetivo.roles,
+        boleta: objetivo.boleta,
+        numero_empleado: objetivo.numero_empleado,
+      });
+      // Credenciales, sesiones, perfiles y roles caen en cascada.
+      await client.query("DELETE FROM usuarios WHERE id = $1", [objetivo.id]);
+      return null;
+    });
+
+    if (conflicto) return void res.status(409).json(conflicto);
     res.json({ eliminado: true, id: objetivo.id });
   }),
 );
