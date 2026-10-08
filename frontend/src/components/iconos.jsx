@@ -106,3 +106,13 @@ export function IconoCuenta({ className = "h-5 w-5" }) {
     </svg>
   );
 }
+
+export function IconoAcademia({ className = "h-5 w-5" }) {
+  return (
+    <svg {...COMUN} className={className}>
+      <path d="m2 9 10-5 10 5-10 5z" />
+      <path d="M6 11.5V16c0 1.2 2.7 3 6 3s6-1.8 6-3v-4.5" />
+      <path d="M22 9v6" />
+    </svg>
+  );
+}

@@ -28,6 +28,7 @@ frontend/src/
 └── pages/
     ├── Panel/          # navegación por roles
     ├── Usuarios/       # Listado (Alumnos / Docentes / Personal CATT), Alta, Detalle
+    ├── Academias/      # catálogo de academias (alta, edición, activar/desactivar)
     ├── MiCuenta/       # datos propios + cambio de contraseña
     └── CambiarPassword/
 ```

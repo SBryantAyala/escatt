@@ -97,9 +97,11 @@ async function academiaValida(id, client = pool) {
 // GET /api/usuarios -> padrón.
 //   Personal CATT (ejecutivo, auxiliar, consulta): todos.
 //   Administrador del sistema: personal CATT, administradores y docentes.
+//   Presidente de Academia (HU-11): solo los docentes de su academia.
+// El filtro real lo hace puedeVer(); requiereRol solo deja pasar a estos roles.
 router.get(
   "/",
-  requiereRol("admin_sistema", ...ROLES_STAFF),
+  requiereRol("admin_sistema", ...ROLES_STAFF, "presidente_academia"),
   ruta(async (req, res) => {
     const todos = await listarUsuarios();
     res.json(todos.filter((u) => puedeVer(req.usuario, u)));

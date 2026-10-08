@@ -48,11 +48,24 @@ export function esCuentaDePersonal(usuario) {
   );
 }
 
+// ¿`actor` es Presidente de la academia a la que pertenece el docente
+// `objetivo`? (HU-11) Solo aplica a docentes con academia asignada.
+export function esPresidenteDe(actor, objetivo) {
+  return (
+    tieneRol(actor, "presidente_academia") &&
+    Boolean(objetivo?.perfiles?.includes("docente")) &&
+    actor.academia_id != null &&
+    actor.academia_id === objetivo.academia_id
+  );
+}
+
 // ¿`actor` puede ver la ficha de `objetivo`?
 export function puedeVer(actor, objetivo) {
   if (!actor || !objetivo) return false;
   if (actor.id === objetivo.id) return true;
   if (tieneRol(actor, ...ROLES_STAFF)) return true;
+  // El Presidente de Academia ve (solo lectura) a los docentes de su academia.
+  if (esPresidenteDe(actor, objetivo)) return true;
   // El admin ve al personal y a los docentes (a un docente se le puede
   // asignar un rol de la CATT), pero no a los alumnos.
   if (tieneRol(actor, "admin_sistema")) {

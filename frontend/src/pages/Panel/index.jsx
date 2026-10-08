@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import DashboardLayout from "../../components/DashboardLayout";
 import {
+  IconoAcademia,
   IconoAltaUsuario,
   IconoCuenta,
   IconoDocumento,
@@ -16,6 +17,7 @@ import ListadoPage from "../Usuarios/Listado";
 import AltaPage from "../Usuarios/Alta";
 import DetallePage from "../Usuarios/Detalle";
 import MiCuentaPage from "../MiCuenta";
+import AcademiasPage from "../Academias";
 
 // PanelPage: el centro de navegación del sistema. Deja de ser una tarjeta de
 // bienvenida suelta y pasa a ser un dashboard con sidebar + topbar + contenido.
@@ -40,6 +42,8 @@ const ACADEMICOS = ["docente", "presidente_academia", ...ROLES_CATT];
 // Descripciones cortas para las tarjetas de accesos rápidos.
 const DESCRIPCION_SECCION = {
   usuarios: "Ver y administrar el padrón de usuarios",
+  "mi-academia": "Consultar a los docentes de tu academia",
+  academias: "Catálogo de academias de la ESCOM",
   "mi-cuenta": "Tus datos y tu contraseña",
   alta: "Registrar un nuevo participante",
   detalle: "Consultar la ficha de un usuario",
@@ -280,6 +284,9 @@ function SeccionProximamente({ titulo, descripcion }) {
 //   proximamente si true, muestra SeccionProximamente en vez del componente
 //   oculto       no aparece en el sidebar pero sigue siendo navegable
 //                (p. ej. Detalle, al que se llegará desde una fila del listado)
+//   excepto      roles que NO ven la sección aunque tengan alguno de `roles`
+//                (p. ej. "Mi academia" es la versión acotada de "Usuarios" y no
+//                tiene sentido para quien ya ve el padrón completo)
 const SECCIONES = [
   {
     categoria: "PRINCIPAL",
@@ -308,6 +315,18 @@ const SECCIONES = [
         props: { embebido: true },
       },
       {
+        // HU-11: el Presidente de Academia consulta (solo lectura) a los
+        // docentes de su academia. Es el mismo Listado, que se acota solo
+        // cuando el actor no es personal CATT ni administrador.
+        clave: "mi-academia",
+        etiqueta: "Mi academia",
+        icono: IconoUsuarios,
+        roles: ["presidente_academia"],
+        excepto: ADMIN_Y_CATT,
+        Componente: ListadoPage,
+        props: { embebido: true },
+      },
+      {
         // Se llega desde el botón "Registrar …" de la pestaña activa.
         clave: "alta",
         etiqueta: "Alta",
@@ -320,9 +339,23 @@ const SECCIONES = [
         clave: "detalle",
         etiqueta: "Detalle",
         icono: IconoDocumento,
-        roles: ADMIN_Y_CATT,
+        roles: [...ADMIN_Y_CATT, "presidente_academia"],
         Componente: DetallePage,
         oculto: true,
+      },
+    ],
+  },
+  {
+    categoria: "CATÁLOGOS",
+    items: [
+      {
+        // HU-10: todos los del personal consultan; solo el Secretario
+        // Ejecutivo modifica (la pantalla y el backend lo validan).
+        clave: "academias",
+        etiqueta: "Academias",
+        icono: IconoAcademia,
+        roles: ADMIN_Y_CATT,
+        Componente: AcademiasPage,
       },
     ],
   },
@@ -368,7 +401,8 @@ const SECCIONES = [
 
 const TODAS = SECCIONES.flatMap((grupo) => grupo.items);
 
-const permiteA = (item, roles = []) => item.roles.some((r) => roles.includes(r));
+const permiteA = (item, roles = []) =>
+  item.roles.some((r) => roles.includes(r)) && !(item.excepto ?? []).some((r) => roles.includes(r));
 
 // Navegación visible para los roles del usuario: grupos con al menos un item
 // permitido y no oculto. Es lo que se pinta en el sidebar y en los accesos rápidos.
@@ -396,6 +430,9 @@ export default function PanelPage({ usuario, onUsuarioActualizado, onCerrarSesio
   // Perfil con el que se abre el formulario de Alta cuando se llega desde el
   // botón "Registrar …" de la pestaña activa en Listado.
   const [altaPerfil, setAltaPerfil] = useState("alumno");
+  // Sección desde la que se abrió el Detalle, para que "Volver" regrese ahí
+  // ("usuarios" para el personal, "mi-academia" para el Presidente).
+  const [origenDetalle, setOrigenDetalle] = useState("usuarios");
 
   const seccion = TODAS.find((s) => s.clave === seccionActiva) ?? TODAS[0];
   const permitida = seccion ? permiteA(seccion, usuario.roles) : false;
@@ -408,6 +445,7 @@ export default function PanelPage({ usuario, onUsuarioActualizado, onCerrarSesio
 
   const irADetalle = (usuarioSeleccionado) => {
     setDetalleUserId(usuarioSeleccionado.id);
+    setOrigenDetalle(seccionActiva === "mi-academia" ? "mi-academia" : "usuarios");
     setSeccionActiva("detalle");
   };
 
@@ -433,7 +471,7 @@ export default function PanelPage({ usuario, onUsuarioActualizado, onCerrarSesio
     );
   } else if (seccion.clave === "inicio") {
     contenido = <PanelInicio usuario={usuario} accesos={accesos} onIrA={setSeccionActiva} />;
-  } else if (seccion.clave === "usuarios") {
+  } else if (seccion.clave === "usuarios" || seccion.clave === "mi-academia") {
     contenido = (
       <ListadoPage
         {...(seccion.props ?? {})}
@@ -456,9 +494,11 @@ export default function PanelPage({ usuario, onUsuarioActualizado, onCerrarSesio
       <DetallePage
         actor={usuario}
         userId={detalleUserId}
-        onVolver={() => setSeccionActiva("usuarios")}
+        onVolver={() => setSeccionActiva(origenDetalle)}
       />
     );
+  } else if (seccion.clave === "academias") {
+    contenido = <AcademiasPage actor={usuario} />;
   } else if (seccion.clave === "mi-cuenta") {
     contenido = <MiCuentaPage usuario={usuario} onUsuarioActualizado={onUsuarioActualizado} />;
   } else {

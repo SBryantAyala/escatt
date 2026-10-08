@@ -132,13 +132,16 @@ export default function ListadoPage({
   // El administrador del sistema no ve alumnos (el backend tampoco se los
   // manda) y empieza en Personal CATT, que es lo que administra.
   const soloAdmin = tieneRol(actor, "admin_sistema") && !tieneRol(actor, ...ROLES_CATT);
-  const pestanas = useMemo(
-    () =>
-      soloAdmin
-        ? ["personal", "docentes"].map((id) => PESTANAS.find((p) => p.id === id))
-        : PESTANAS,
-    [soloAdmin],
-  );
+  // HU-11: el Presidente de Academia (sin ser personal CATT ni admin) solo ve
+  // a los docentes de su academia, en solo lectura. El backend ya le manda
+  // únicamente esos; aquí se reduce la pantalla a la pestaña Docentes.
+  const soloPresidente =
+    tieneRol(actor, "presidente_academia") && !tieneRol(actor, "admin_sistema", ...ROLES_CATT);
+  const pestanas = useMemo(() => {
+    if (soloPresidente) return [PESTANAS.find((p) => p.id === "docentes")];
+    if (soloAdmin) return ["personal", "docentes"].map((id) => PESTANAS.find((p) => p.id === id));
+    return PESTANAS;
+  }, [soloAdmin, soloPresidente]);
   const [usuarios, setUsuarios] = useState(null);
   const [cargando, setCargando] = useState(true);
   const [errorCarga, setErrorCarga] = useState(null);
@@ -207,7 +210,9 @@ export default function ListadoPage({
                 </>
               )}
               <p className={`text-sm text-slate-600 ${embebido ? "" : "mt-1"}`}>
-                Selecciona una fila para ver y editar el detalle del usuario.
+                {soloPresidente
+                  ? `Docentes de ${actor.academia ?? "tu academia"}. Selecciona una fila para ver su ficha (solo consulta).`
+                  : "Selecciona una fila para ver y editar el detalle del usuario."}
               </p>
             </div>
             <div className="flex shrink-0 items-center gap-2">
