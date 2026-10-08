@@ -25,7 +25,12 @@ export async function api(ruta, { method = "GET", body } = {}) {
     datos = null;
   }
   if (!resp.ok) {
-    throw new Error(datos?.error || `Error ${resp.status}`);
+    const error = new Error(datos?.error || `Error ${resp.status}`);
+    error.status = resp.status;
+    // Cuerpo completo de la respuesta: algunos errores traen más que un texto
+    // (p. ej. el 409 de revocar trae la lista de `asignaciones`).
+    error.datos = datos;
+    throw error;
   }
   return datos;
 }

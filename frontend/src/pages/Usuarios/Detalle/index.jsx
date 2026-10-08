@@ -612,7 +612,15 @@ export default function UserProfileForm({ actor, userId, onVolver }) {
       }
       setAccionPeligro(null);
     } catch (err) {
-      setErrorPeligro(err.message || "No se pudo completar la acción.");
+      // HU-7: al revocar a un docente con asignaciones vigentes el backend
+      // responde 409 con la lista; se muestra completa para que se sepa qué
+      // reasignar antes de volver a intentarlo.
+      const asignaciones = err.datos?.asignaciones;
+      const detalle =
+        Array.isArray(asignaciones) && asignaciones.length > 0
+          ? `: ${asignaciones.map((a) => a.descripcion ?? a.rol).join("; ")}`
+          : "";
+      setErrorPeligro(`${err.message || "No se pudo completar la acción."}${detalle}`);
       setAccionPeligro(null);
     } finally {
       setProcesandoPeligro(false);

@@ -98,6 +98,19 @@ export async function registrarBitacora(client, actorId, accion, entidad, entida
   );
 }
 
+// Asignaciones vigentes de un docente: protocolos en curso donde es director,
+// sinodal, profesor de seguimiento o titular. Mientras existan, su cuenta no
+// se puede revocar (HU-7): la ruta responde 409 con esta lista.
+//
+// Pendiente (Módulo 2): todavía no hay tablas de protocolos ni de asignaciones,
+// así que por ahora no hay nada que bloquear y devuelve []. Cuando existan,
+// esta es la ÚNICA función que falta completar: debe devolver objetos con la
+// forma { rol: "director" | "sinodal" | ..., descripcion: "texto legible" }
+// y tanto la ruta como la pantalla de Detalle ya los muestran.
+export async function asignacionesVigentes(_client, _usuarioId) {
+  return [];
+}
+
 // Motivos por los que una cuenta NO se puede eliminar (solo revocar).
 // Devuelve textos legibles; un arreglo vacío significa "sin historial"
 // (alta duplicada o hecha por error).

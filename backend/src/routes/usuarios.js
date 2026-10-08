@@ -15,6 +15,7 @@ import {
 } from "../lib/roles.js";
 import { ruta } from "../lib/ruta.js";
 import {
+  asignacionesVigentes,
   asignarRol,
   generarPasswordTemporal,
   guardarPassword,
@@ -373,8 +374,19 @@ async function cambiarEstado(req, res, estado, accion) {
       return;
     }
   }
-  // Pendiente (Módulo 2): impedir revocar a un docente con asignaciones
-  // vigentes (director, sinodal, seguimiento o titular) -> 409 con la lista.
+  // HU-7: un docente con asignaciones vigentes (director, sinodal, seguimiento
+  // o titular) no se puede revocar: 409 con la lista. Hoy la lista siempre
+  // sale vacía porque el Módulo 2 aún no existe (ver asignacionesVigentes).
+  if (estado === "revocada" && objetivo.perfiles.includes("docente")) {
+    const asignaciones = await asignacionesVigentes(pool, objetivo.id);
+    if (asignaciones.length > 0) {
+      res.status(409).json({
+        error: "No se puede revocar: el docente tiene asignaciones vigentes",
+        asignaciones,
+      });
+      return;
+    }
+  }
 
   await enTransaccion(async (client) => {
     await client.query("UPDATE usuarios SET estado = $1 WHERE id = $2", [estado, objetivo.id]);
