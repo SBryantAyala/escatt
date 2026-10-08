@@ -20,7 +20,7 @@ router.get(
     const todas = req.query.todas === "1" && tieneRol(req.usuario, "catt_ejecutivo");
     const { rows } = await pool.query(
       `SELECT id, nombre, departamento, activa FROM academias
-       ${todas ? "" : "WHERE activa"} ORDER BY nombre`,
+       ${todas ? "" : "WHERE activa"} ORDER BY activa DESC, nombre`,
     );
     res.json(rows);
   }),

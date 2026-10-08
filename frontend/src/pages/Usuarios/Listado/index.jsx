@@ -183,6 +183,12 @@ export default function ListadoPage({
   const usuariosDeLaTab = useMemo(() => {
     let lista = (usuarios ?? []).filter((u) => pestanaActiva.pertenece(u));
     if (filtroEstado !== "todos") lista = lista.filter((u) => u.estado === filtroEstado);
+    // Alfabético por nombre; las cuentas revocadas van al final del listado.
+    lista = [...lista].sort(
+      (a, b) =>
+        (a.estado === "revocada") - (b.estado === "revocada") ||
+        nombreCompleto(a).localeCompare(nombreCompleto(b), "es", { sensitivity: "base" }),
+    );
     const consulta = normalizar(busqueda.trim());
     if (!consulta) return lista;
     return lista.filter(

@@ -27,6 +27,13 @@ function EstadoBadge({ activa }) {
   );
 }
 
+// Activas primero y, dentro de cada grupo, por nombre (sin distinguir acentos
+// ni mayúsculas). Las desactivadas quedan al final de la lista.
+function porActivaYNombre(a, b) {
+  if (a.activa !== b.activa) return a.activa ? -1 : 1;
+  return a.nombre.localeCompare(b.nombre, "es", { sensitivity: "base" });
+}
+
 export default function AcademiasPage({ actor }) {
   const puedeAdministrar = tieneRol(actor, "catt_ejecutivo");
 
@@ -46,7 +53,7 @@ export default function AcademiasPage({ actor }) {
     setErrorCarga(null);
     try {
       const datos = await api(puedeAdministrar ? "/api/academias?todas=1" : "/api/academias");
-      setAcademias(Array.isArray(datos) ? datos : []);
+      setAcademias(Array.isArray(datos) ? [...datos].sort(porActivaYNombre) : []);
     } catch (e) {
       setErrorCarga(e.message);
     } finally {
@@ -119,7 +126,7 @@ export default function AcademiasPage({ actor }) {
         <p className="text-sm text-slate-600">
           {puedeAdministrar
             ? "Administra las academias que se asignan a los docentes. Desactivar una la quita de las opciones del alta, sin afectar a los docentes que ya pertenecen a ella."
-            : "Catálogo de academias. Solo el Secretario Ejecutivo puede modificarlo."}
+            : "Catálogo de academias."}
         </p>
         <button
           type="button"
@@ -130,6 +137,15 @@ export default function AcademiasPage({ actor }) {
           {cargando ? "Cargando…" : "Actualizar"}
         </button>
       </div>
+
+      {!puedeAdministrar && (
+        <p
+          role="note"
+          className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-base font-semibold text-red-700"
+        >
+          Solo el Secretario Ejecutivo puede modificar este catálogo.
+        </p>
+      )}
 
       {error && (
         <p
