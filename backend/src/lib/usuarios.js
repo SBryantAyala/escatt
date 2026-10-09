@@ -10,7 +10,7 @@
 //     perfiles: ["docente", "personal_catt", ...],
 //     boleta, carrera, plan_estudios,                    // perfil alumno
 //     numero_empleado,                                   // empleados
-//     academia_id, academia, cedula_profesional, extension, // perfil docente
+//     academia_id, academia, academia_color, cedula_profesional, extension, // perfil docente
 //     cargo                                              // perfil personal_catt
 //   }
 
@@ -22,7 +22,8 @@ const SELECT_USUARIO = `
          u.estado, u.debe_cambiar_password, u.creado_por, u.creado_en,
          a.boleta, a.carrera, a.plan_estudios,
          e.numero_empleado,
-         d.academia_id, ac.nombre AS academia, d.cedula_profesional, d.extension,
+         d.academia_id, ac.nombre AS academia, ac.color AS academia_color,
+         d.cedula_profesional, d.extension,
          p.cargo,
          (a.usuario_id IS NOT NULL) AS es_alumno,
          (d.usuario_id IS NOT NULL) AS es_docente,

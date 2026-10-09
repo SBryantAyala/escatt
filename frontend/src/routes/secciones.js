@@ -93,12 +93,21 @@ export const SECCIONES = [
     items: [
       {
         // HU-10: todos los del personal consultan; solo el Secretario
-        // Ejecutivo modifica (la pantalla y el backend lo validan).
+        // Ejecutivo modifica (la ficha y el backend lo validan).
         clave: "academias",
         ruta: "/panel/academias",
         etiqueta: "Academias",
         icono: IconoAcademia,
         roles: ADMIN_Y_CATT,
+      },
+      {
+        // Se llega desde una tarjeta de la galería.
+        clave: "academia-ficha",
+        ruta: "/panel/academias/:id",
+        etiqueta: "Academia",
+        icono: IconoAcademia,
+        roles: ADMIN_Y_CATT,
+        oculto: true,
       },
     ],
   },
@@ -158,6 +167,7 @@ export function seccionPorClave(clave) {
 export function seccionPorRuta(pathname) {
   if (pathname === "/panel/usuarios/nuevo") return seccionPorClave("alta");
   if (/^\/panel\/usuarios\/[^/]+$/.test(pathname)) return seccionPorClave("detalle");
+  if (/^\/panel\/academias\/[^/]+$/.test(pathname)) return seccionPorClave("academia-ficha");
   return TODAS_SECCIONES.find((s) => s.ruta === pathname);
 }
 

@@ -108,14 +108,22 @@ function PasswordTemporal({ datos, onOtra, onVerDetalle }) {
   );
 }
 
-export default function AltaPage({ actor, perfilInicial = "alumno", onVerDetalle }) {
+export default function AltaPage({ actor, perfilInicial = "alumno", academiaPreseleccionada, onVerDetalle }) {
   const perfilesPermitidos = PERFILES.filter((p) => tieneRol(actor, ...p.altaPor));
   const inicial = perfilesPermitidos.some((p) => p.valor === perfilInicial)
     ? perfilInicial
     : perfilesPermitidos[0]?.valor;
 
   const [perfil, setPerfil] = useState(inicial);
-  const [form, setForm] = useState(CAMPOS_INICIALES);
+  const [form, setForm] = useState(() =>
+    academiaPreseleccionada
+      ? { ...CAMPOS_INICIALES, academia_id: String(academiaPreseleccionada) }
+      : CAMPOS_INICIALES,
+  );
+  // Si se llegó desde "Registrar docente nuevo" en la ficha de una academia,
+  // el select de Academia llega bloqueado con esa academia; "Cambiar" lo
+  // desbloquea por si la persona se equivocó de ficha.
+  const [academiaBloqueada, setAcademiaBloqueada] = useState(Boolean(academiaPreseleccionada));
   const [academias, setAcademias] = useState([]);
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState(null);
@@ -320,19 +328,33 @@ export default function AltaPage({ actor, perfilInicial = "alumno", onVerDetalle
             {perfil === "docente" && (
               <>
                 <Campo label="Academia">
-                  <select
-                    required
-                    value={form.academia_id}
-                    onChange={set("academia_id")}
-                    className={claseInput}
-                  >
-                    <option value="">Selecciona…</option>
-                    {academias.map((a) => (
-                      <option key={a.id} value={a.id}>
-                        {a.nombre}
-                      </option>
-                    ))}
-                  </select>
+                  <div className="flex items-center gap-2">
+                    <select
+                      required
+                      value={form.academia_id}
+                      onChange={set("academia_id")}
+                      disabled={academiaBloqueada}
+                      className={`${claseInput} ${
+                        academiaBloqueada ? "cursor-not-allowed bg-slate-100 text-slate-500" : ""
+                      }`}
+                    >
+                      <option value="">Selecciona…</option>
+                      {academias.map((a) => (
+                        <option key={a.id} value={a.id}>
+                          {a.nombre}
+                        </option>
+                      ))}
+                    </select>
+                    {academiaBloqueada && (
+                      <button
+                        type="button"
+                        onClick={() => setAcademiaBloqueada(false)}
+                        className="shrink-0 whitespace-nowrap text-xs font-medium text-[#1878B6] underline-offset-2 hover:underline"
+                      >
+                        Cambiar
+                      </button>
+                    )}
+                  </div>
                 </Campo>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <Campo label="Cédula profesional" opcional>

@@ -82,6 +82,14 @@ const ROLES_EXTRA_DOCENTE = {
   "miguel.casarrubias@ipn.mx": ["catt_ejecutivo"],
 };
 
+// A qué academia preside cada presidente de la demo (debe ser la misma
+// academia en la que quedó el docente arriba). Mantiene el invariante
+// academias.presidente_id <-> rol presidente_academia.
+const PRESIDENCIAS_DEMO = {
+  "roberto.mendoza@ipn.mx": "Academia de Ingeniería de Software",
+  "patricia.guzman@ipn.mx": "Academia de Ciencias de la Computación",
+};
+
 // Rol CATT de cada integrante del personal.
 const ROL_PERSONAL = {
   "rosamaria.beltran@ipn.mx": "catt_consulta",
@@ -173,8 +181,10 @@ await enTransaccion(async (client) => {
     anotar("alumno", a, ["alumno"], `Boleta: ${a.boleta}`);
   }
 
+  const idDocentePorCorreo = {};
   for (const d of DOCENTES) {
     const id = await upsertUsuario(client, d);
+    idDocentePorCorreo[d.correo] = id;
     await empleado(client, id, d.numero_empleado);
     await client.query(
       `INSERT INTO docentes (usuario_id, academia_id) VALUES ($1, $2)
@@ -189,6 +199,18 @@ await enTransaccion(async (client) => {
     await dejarRoles(client, id, roles);
     await guardarPassword(client, id, PASSWORDS.docente);
     anotar("docente", d, roles, `Núm. empleado: ${d.numero_empleado} · ${d.academia}`);
+  }
+
+  // Presidentes de academia: hay un solo presidente por academia
+  // (academias.presidente_id). Se limpia primero para que una corrida
+  // posterior no deje apuntando a alguien que ya perdió el rol arriba (p. ej.
+  // si se quita a alguien de ROLES_EXTRA_DOCENTE en el futuro).
+  await client.query("UPDATE academias SET presidente_id = NULL");
+  for (const [correo, academia] of Object.entries(PRESIDENCIAS_DEMO)) {
+    await client.query("UPDATE academias SET presidente_id = $1 WHERE nombre = $2", [
+      idDocentePorCorreo[correo],
+      academia,
+    ]);
   }
 
   for (const p of PERSONAL) {

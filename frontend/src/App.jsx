@@ -10,9 +10,12 @@ import {
 } from "react-router-dom";
 import CargandoPantalla from "./components/CargandoPantalla";
 import NexusLogo from "./components/NexusLogo";
+import SeccionNoticias from "./components/SeccionNoticias";
+import TablonAvisos from "./components/TablonAvisos";
 import { AvisoProvider } from "./components/ui/Avisos";
 import { SesionProvider, useSesion } from "./context/SesionContext";
 import AcademiasPage from "./pages/Academias";
+import AcademiaFicha from "./pages/Academias/Ficha";
 import CambioObligatorioPage from "./pages/CambiarPassword";
 import PanelInicio from "./pages/Panel/Inicio";
 import PanelLayout from "./pages/Panel";
@@ -65,6 +68,28 @@ const ETAPAS = [
   },
 ];
 
+const GUIA_ETAPAS = [
+  "Revisa los avisos de registro y conversa con tus directores sobre la propuesta que presentarás.",
+  "Organiza con tus directores el desarrollo del proyecto y consulta los avisos relacionados con esta etapa.",
+  "Revisa con tus directores el reporte técnico y consulta los avisos de entrega antes de preparar tus documentos.",
+  "Prepara la exposición de tu proyecto y revisa los avisos de presentación publicados por la CATT.",
+];
+
+const PILARES_CATT = [
+  {
+    titulo: "Registro claro",
+    texto: "Cada propuesta entra con datos completos, archivos y responsables desde el primer paso.",
+  },
+  {
+    titulo: "Seguimiento vivo",
+    texto: "Alumnos, sinodales y coordinación comparten una sola vista del avance del Trabajo Terminal.",
+  },
+  {
+    titulo: "Cierre ordenado",
+    texto: "Las entregas, revisiones y presentaciones quedan listas para cerrar el proceso sin perder contexto.",
+  },
+];
+
 // Insignia de co-marca: aquí es donde vive el amarillo de Nexus, sobre fondo
 // oscuro para que el #FDD40A sea legible.
 function InsigniaNexus({ logo = 20, texto = "text-xs" }) {
@@ -73,6 +98,67 @@ function InsigniaNexus({ logo = 20, texto = "text-xs" }) {
       <NexusLogo size={logo} />
       <span className={`${texto} font-semibold text-[#FDD40A]`}>Nexus Solutions</span>
     </span>
+  );
+}
+
+function LogosInstitucionales({ compacto = false }) {
+  return (
+    <div className={`flex items-center gap-4 ${compacto ? "" : "sm:gap-6"}`}>
+      <a href="https://www.ipn.mx/" target="_blank" rel="noopener noreferrer" className="rounded-sm opacity-90 transition-opacity hover:opacity-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white">
+        <img src="/images/logo-ipn.png" alt="Instituto Politécnico Nacional" width="544" height="196" loading="lazy" className={`object-contain brightness-0 invert ${compacto ? "h-auto w-36 sm:w-[180px]" : "h-auto w-[152px] sm:w-[220px]"}`} />
+      </a>
+      <span aria-hidden="true" className="h-9 w-px shrink-0 bg-white/25" />
+      <a href="https://www.escom.ipn.mx/" target="_blank" rel="noopener noreferrer" className="rounded-sm opacity-90 transition-opacity hover:opacity-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white">
+        <img src="/images/logo-escom.png" alt="Escuela Superior de Cómputo" width="480" height="366" loading="lazy" className={`object-contain brightness-0 invert ${compacto ? "h-auto w-16 sm:w-20" : "h-auto w-16 sm:w-24"}`} />
+      </a>
+    </div>
+  );
+}
+
+function FlechaIcono() {
+  return (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path
+        d="M5 12h14m-6-6 6 6-6 6"
+        stroke="currentColor"
+        strokeWidth="2.2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function PanelIcono() {
+  return (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path
+        d="M4 5.5A1.5 1.5 0 0 1 5.5 4h13A1.5 1.5 0 0 1 20 5.5v13a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 18.5v-13Z"
+        stroke="currentColor"
+        strokeWidth="1.8"
+      />
+      <path d="M8 9h8M8 13h5M8 17h7" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function SalirIcono() {
+  return (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path
+        d="M14 7V5.5A1.5 1.5 0 0 0 12.5 4h-6A1.5 1.5 0 0 0 5 5.5v13A1.5 1.5 0 0 0 6.5 20h6a1.5 1.5 0 0 0 1.5-1.5V17"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+      />
+      <path
+        d="M10 12h9m-3-3 3 3-3 3"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
   );
 }
 
@@ -604,293 +690,7 @@ function AuthPage({ modo }) {
   );
 }
 
-// Fondo por diapositiva: el mismo trío de azules de marca, variando ángulo y
-// orden para que cada etapa se sienta distinta sin salirse de la identidad.
-// El extremo oscuro siempre queda del lado izquierdo, donde va el texto.
-const FONDOS_BANNER = [
-  `linear-gradient(135deg, ${AZUL_OSCURO} 0%, ${AZUL_MEDIO} 55%, ${AZUL_CLARO} 100%)`,
-  `linear-gradient(200deg, ${AZUL_MEDIO} 0%, ${AZUL_OSCURO} 60%, ${AZUL_MEDIO} 100%)`,
-  `linear-gradient(115deg, ${AZUL_OSCURO} 0%, ${AZUL_OSCURO} 30%, ${AZUL_CLARO} 100%)`,
-  `linear-gradient(160deg, ${AZUL_MEDIO} 0%, ${AZUL_OSCURO} 50%, ${AZUL_MEDIO} 100%)`,
-];
 
-// Mismo azul que domina cada diapositiva pero semitransparente, para teñir la
-// foto de la etapa y que combine con el degradado en vez de verse como una
-// imagen "de stock" ajena a la marca.
-const FONDOS_BANNER_TINTE = [`${AZUL_OSCURO}66`, `${AZUL_MEDIO}66`, `${AZUL_OSCURO}66`, `${AZUL_MEDIO}66`];
-
-// El costado derecho de cada diapositiva ya no usa formas SVG genéricas:
-// muestra la foto real de esa etapa (las mismas fotos libres de derechos que
-// se usan en la sección Noticias), atenuada con una máscara y un tinte azul
-// de marca para que se funda con el degradado en vez de verse "pegada".
-
-const ChevronBanner = ({ dir }) => (
-  <svg
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2.5"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className="h-5 w-5"
-    aria-hidden="true"
-  >
-    <path d={dir === "prev" ? "M15 6l-6 6 6 6" : "M9 6l6 6-6 6"} />
-  </svg>
-);
-
-function CarruselEtapas() {
-  const [activo, setActivo] = useState(0);
-  const [pausado, setPausado] = useState(false);
-  const [ciclo, setCiclo] = useState(0);
-
-  useEffect(() => {
-    if (pausado) return undefined;
-    const id = setInterval(() => {
-      setActivo((i) => (i + 1) % ETAPAS.length);
-    }, 5500);
-    return () => clearInterval(id);
-  }, [pausado, ciclo]);
-
-  // Navegación manual: cambia de etapa y reinicia el temporizador de auto-avance
-  // (bump de `ciclo` -> el efecto se vuelve a montar con un setInterval nuevo).
-  const irA = (i) => {
-    setActivo(i);
-    setCiclo((c) => c + 1);
-  };
-  const mover = (delta) => {
-    setActivo((i) => (i + delta + ETAPAS.length) % ETAPAS.length);
-    setCiclo((c) => c + 1);
-  };
-
-  return (
-    <div className="mt-10">
-      <div
-        className="relative h-[320px] w-full overflow-hidden rounded-3xl shadow-2xl shadow-[#1878B6]/30 sm:h-[440px]"
-        onMouseEnter={() => setPausado(true)}
-        onMouseLeave={() => setPausado(false)}
-        aria-roledescription="carrusel"
-      >
-        <div
-          className="flex h-full transition-transform duration-700 ease-in-out"
-          style={{ transform: `translateX(-${activo * 100}%)` }}
-        >
-          {ETAPAS.map((etapa, i) => (
-            <div
-              key={etapa.titulo}
-              className="relative h-full w-full shrink-0"
-              style={{ backgroundImage: FONDOS_BANNER[i] }}
-            >
-              {/* Foto real de la etapa (una de las noticias principales), fundida
-                  con el degradado mediante una máscara para que no se vea como
-                  un recorte pegado encima del color de marca. */}
-              <div
-                className="pointer-events-none absolute inset-y-0 right-0 w-[78%] overflow-hidden sm:w-[55%]"
-                style={{
-                  WebkitMaskImage:
-                    "linear-gradient(to right, transparent 0%, rgba(0,0,0,0.55) 22%, #000 50%)",
-                  maskImage:
-                    "linear-gradient(to right, transparent 0%, rgba(0,0,0,0.55) 22%, #000 50%)",
-                }}
-              >
-                <img
-                  src={etapa.imagen}
-                  alt={etapa.alt}
-                  loading={i === 0 ? "eager" : "lazy"}
-                  decoding="async"
-                  width="920"
-                  height="880"
-                  className="h-full w-full object-cover"
-                />
-                {/* Tinte de marca sobre la foto para no romper la paleta azul */}
-                <div
-                  className="absolute inset-0"
-                  style={{
-                    backgroundImage: `linear-gradient(115deg, ${FONDOS_BANNER_TINTE[i]} 0%, transparent 60%)`,
-                  }}
-                />
-              </div>
-
-              {/* Refuerzo de contraste del lado del texto */}
-              <div className="absolute inset-0 bg-gradient-to-r from-black/45 via-black/15 to-transparent" />
-
-              <div className="relative z-10 flex h-full flex-col items-center justify-center px-6 text-center sm:items-start sm:px-14 sm:text-left">
-                {/* Panel oscuro suave solo en mobile (texto centrado sobre la zona clara del degradado) */}
-                <div className="max-w-md rounded-2xl bg-black/15 p-5 sm:max-w-lg sm:bg-transparent sm:p-0">
-                  <span className="inline-flex items-center rounded-full bg-white/15 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-white backdrop-blur-sm">
-                    Etapa {i + 1} de {ETAPAS.length}
-                  </span>
-                  <h4 className="mt-4 text-3xl font-bold uppercase leading-tight text-white sm:text-5xl">
-                    {etapa.titulo}
-                  </h4>
-                  <p className="mt-3 text-sm text-white/90 sm:text-lg">{etapa.texto}</p>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        <button
-          type="button"
-          onClick={() => mover(-1)}
-          aria-label="Etapa anterior"
-          className="absolute left-3 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full
-                     bg-white/15 text-white backdrop-blur-md transition hover:bg-white/25 sm:left-5 sm:h-11 sm:w-11"
-        >
-          <ChevronBanner dir="prev" />
-        </button>
-        <button
-          type="button"
-          onClick={() => mover(1)}
-          aria-label="Etapa siguiente"
-          className="absolute right-3 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full
-                     bg-white/15 text-white backdrop-blur-md transition hover:bg-white/25 sm:right-5 sm:h-11 sm:w-11"
-        >
-          <ChevronBanner dir="next" />
-        </button>
-      </div>
-
-      <div className="mt-5 flex justify-center gap-2">
-        {ETAPAS.map((etapa, i) => (
-          <button
-            key={etapa.titulo}
-            type="button"
-            aria-label={`Ver etapa ${i + 1}: ${etapa.titulo}`}
-            aria-current={i === activo}
-            onClick={() => irA(i)}
-            className={`h-2 rounded-full transition-all duration-300 ${
-              i === activo ? "w-8" : "w-2 bg-slate-300 hover:bg-slate-400"
-            }`}
-            style={i === activo ? { backgroundImage: GRAD_AZUL } : undefined}
-          />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// --- Noticias -----------------------------------------------------------------
-// Contenido de EJEMPLO para el proyecto escolar: todavía no hay backend de
-// noticias, así que los textos son ficticios pero verosímiles y coherentes con
-// lo que describe la sección "¿Qué es la CATT?". Las fotos son libres de
-// derechos (Unsplash) y viven en public/images/noticias/. Formato inspirado en
-// cómo ESCOM publica sus avisos: imagen destacada + categoría + título + fecha
-// + resumen breve.
-const NOTICIAS = [
-  {
-    categoria: "Convocatoria",
-    titulo: "Abre el registro de Protocolo para el semestre 2027/1",
-    fecha: "25 de agosto de 2026",
-    iso: "2026-08-25",
-    resumen:
-      "Los alumnos que cubran los créditos requeridos ya pueden subir su propuesta de Trabajo Terminal para revisión de la CATT.",
-    imagen: "/images/noticias/registro-protocolo.webp",
-    alt: "Tres estudiantes de ESCOM revisan una propuesta frente a sus laptops.",
-  },
-  {
-    categoria: "Trámites",
-    titulo: "Se actualizan los lineamientos de entrega del reporte técnico de TT II",
-    fecha: "12 de agosto de 2026",
-    iso: "2026-08-12",
-    resumen:
-      "El nuevo formato unifica portada, carta de liberación y bitácora en un solo expediente digital.",
-    imagen: "/images/noticias/entrega-documentos.webp",
-    alt: "Persona firmando documentos impresos sobre un escritorio.",
-  },
-  {
-    categoria: "Laboratorios",
-    titulo: "Nuevos horarios de laboratorios de cómputo para alumnos de TT I",
-    fecha: "5 de agosto de 2026",
-    iso: "2026-08-05",
-    resumen:
-      "Se amplía el acceso por las tardes para avanzar en el desarrollo de proyectos con equipo especializado.",
-    imagen: "/images/noticias/laboratorio-computo.webp",
-    alt: "Dos estudiantes programan frente a un monitor en un laboratorio de cómputo.",
-  },
-  {
-    categoria: "Trabajo Terminal",
-    titulo: "Se publican las nuevas fechas de presentación de Trabajo Terminal II",
-    fecha: "30 de julio de 2026",
-    iso: "2026-07-30",
-    resumen:
-      "El calendario de exposiciones ante el jurado de sinodales abarca de la semana 14 a la 17 del periodo.",
-    imagen: "/images/noticias/presentacion-tt.webp",
-    alt: "Un alumno expone su proyecto ante un grupo en un aula con proyector.",
-  },
-  {
-    categoria: "Difusión",
-    titulo: "Reunión informativa de la CATT para quienes se integran al proceso",
-    fecha: "22 de julio de 2026",
-    iso: "2026-07-22",
-    resumen:
-      "La coordinación explicará las etapas, el papel de los sinodales y el uso de ESCATT para dar seguimiento.",
-    imagen: "/images/noticias/campus-escom.webp",
-    alt: "Edificio principal del campus de ESCOM rodeado de áreas verdes.",
-  },
-  {
-    categoria: "Asesorías",
-    titulo: "Jornada de asesorías con sinodales para revisión de avances",
-    fecha: "15 de julio de 2026",
-    iso: "2026-07-15",
-    resumen:
-      "Espacios de 20 minutos por alumno para resolver dudas de metodología y redacción del reporte.",
-    imagen: "/images/noticias/alumnos-biblioteca.webp",
-    alt: "Un grupo de estudiantes trabaja junto a un librero en una biblioteca.",
-  },
-];
-
-// Tarjeta VIDRIO con foto destacada arriba. Hover: elevación sutil + zoom leve
-// de la imagen, en línea con el resto del sitio (rounded-3xl, sombra azul).
-function TarjetaNoticia({ noticia }) {
-  return (
-    <article
-      className={`group flex flex-col overflow-hidden rounded-3xl transition duration-300
-                  hover:-translate-y-1 hover:shadow-xl hover:shadow-[#1878B6]/20 ${VIDRIO}`}
-    >
-      <div className="aspect-[16/10] overflow-hidden">
-        <img
-          src={noticia.imagen}
-          alt={noticia.alt}
-          loading="lazy"
-          decoding="async"
-          width="800"
-          height="500"
-          className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
-        />
-      </div>
-      <div className="flex flex-1 flex-col p-5">
-        <span className="inline-flex w-fit items-center rounded-full bg-[#4FB3E8]/15 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-[#0F5C8C]">
-          {noticia.categoria}
-        </span>
-        <h3 className="mt-3 text-lg font-bold leading-snug text-slate-800">{noticia.titulo}</h3>
-        <time
-          dateTime={noticia.iso}
-          className="mt-1 block text-xs font-medium uppercase tracking-wide text-slate-400"
-        >
-          {noticia.fecha}
-        </time>
-        <p className="mt-2 text-sm leading-relaxed text-slate-600">{noticia.resumen}</p>
-      </div>
-    </article>
-  );
-}
-
-function SeccionNoticias() {
-  return (
-    <section id="noticias" className="mx-auto max-w-6xl scroll-mt-24 px-4 py-20">
-      <h2 className="text-3xl font-bold text-slate-800 sm:text-4xl">Noticias</h2>
-      <p className="mt-4 max-w-2xl text-lg leading-relaxed text-slate-600">
-        Avisos y fechas clave del proceso de titulación: convocatorias de Protocolo, entregas de
-        Trabajo Terminal, laboratorios y asesorías con sinodales.
-      </p>
-      <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-        {NOTICIAS.map((noticia) => (
-          <TarjetaNoticia key={noticia.titulo} noticia={noticia} />
-        ))}
-      </div>
-    </section>
-  );
-}
 
 // --- Proceso de la CATT: diagrama de flujo animado ---------------------------
 // Conector entre nodos: una línea que se "dibuja" (stroke-dasharray/offset con
@@ -958,55 +758,60 @@ function DiagramaProceso() {
   }, []);
 
   return (
-    <section id="proceso" className="mx-auto max-w-5xl scroll-mt-24 px-4 py-20">
-      <h2 className="text-3xl font-bold text-slate-800 sm:text-4xl">Proceso de la CATT</h2>
-      <p className="mt-4 max-w-2xl text-lg leading-relaxed text-slate-600">
-        De principio a fin, la titulación curricular avanza por cuatro etapas encadenadas: cada una
-        habilita la siguiente.
-      </p>
+    <section id="proceso" className="scroll-mt-36 bg-[#EAF7FC] px-4 py-20 md:scroll-mt-28">
+      <div className="mx-auto max-w-5xl">
+        <span className="text-xs font-semibold uppercase tracking-[0.22em] text-[#1878B6]">
+          Ruta de titulación
+        </span>
+        <h2 className="mt-3 text-3xl font-bold text-slate-900 sm:text-4xl">Proceso de la CATT</h2>
+        <p className="mt-4 max-w-2xl text-lg leading-relaxed text-slate-600">
+          De principio a fin, la titulación curricular avanza por cuatro etapas encadenadas: cada
+          una habilita la siguiente.
+        </p>
 
-      <ol
-        ref={ref}
-        aria-label="Proceso de la CATT en cuatro etapas, en orden"
-        className={`mt-12 flex flex-col gap-12 md:flex-row md:items-stretch md:gap-6 ${
-          visible ? "is-visible" : ""
-        }`}
-      >
-        {ETAPAS.map((etapa, i) => (
-          <li
-            key={etapa.titulo}
-            aria-label={`Etapa ${i + 1} de ${ETAPAS.length}: ${etapa.titulo}. ${etapa.texto}`}
-            className="proceso-nodo relative md:flex-1"
-            style={{ transitionDelay: `${i * 130}ms` }}
-          >
-            <div className={`flex h-full flex-col rounded-2xl p-5 ${VIDRIO}`}>
-              <span
-                aria-hidden="true"
-                className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white"
-                style={{ backgroundImage: GRAD_AZUL }}
-              >
-                {i + 1}
-              </span>
-              <h3 className="mt-3 text-base font-bold" style={{ color: AZUL_OSCURO }}>
-                {etapa.titulo}
-              </h3>
-              <p className="mt-1.5 text-sm leading-relaxed text-slate-600">{etapa.texto}</p>
-            </div>
+        <ol
+          ref={ref}
+          aria-label="Proceso de la CATT en cuatro etapas, en orden"
+          className={`mt-12 flex flex-col gap-12 md:flex-row md:items-stretch md:gap-6 ${
+            visible ? "is-visible" : ""
+          }`}
+        >
+          {ETAPAS.map((etapa, i) => (
+            <li
+              key={etapa.titulo}
+              aria-label={`Etapa ${i + 1} de ${ETAPAS.length}: ${etapa.titulo}. ${etapa.texto}`}
+              className="proceso-nodo relative md:flex-1"
+              style={{ transitionDelay: `${i * 130}ms` }}
+            >
+              <div className="group flex h-full flex-col rounded-[1.5rem] border border-white bg-white/80 p-5 shadow-lg shadow-[#1878B6]/10 transition duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-[#1878B6]/20">
+                <span
+                  aria-hidden="true"
+                  className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white shadow-lg shadow-[#1878B6]/25 transition group-hover:scale-110"
+                  style={{ backgroundImage: GRAD_AZUL }}
+                >
+                  {i + 1}
+                </span>
+                <h3 className="mt-4 text-base font-bold" style={{ color: AZUL_OSCURO }}>
+                  {etapa.titulo}
+                </h3>
+                <p className="mt-2 text-sm leading-relaxed text-slate-600">{etapa.texto}</p>
+              </div>
 
-            {i < ETAPAS.length - 1 && (
-              <>
-                {/* Conector horizontal (desktop) / vertical (móvil), decorativo. */}
-                <span className="pointer-events-none absolute right-0 top-1/2 z-10 hidden -translate-y-1/2 translate-x-1/2 md:block">
-                  <ConectorProceso orientacion="horizontal" delay={`${i * 130 + 260}ms`} />
-                </span>
-                <span className="pointer-events-none absolute bottom-0 left-1/2 z-10 -translate-x-1/2 translate-y-1/2 md:hidden">
-                  <ConectorProceso orientacion="vertical" delay={`${i * 130 + 260}ms`} />
-                </span>
-              </>
-            )}
-          </li>
-        ))}
-      </ol>
+              {i < ETAPAS.length - 1 && (
+                <>
+                  {/* Conector horizontal (desktop) / vertical (móvil), decorativo. */}
+                  <span className="pointer-events-none absolute right-0 top-1/2 z-10 hidden -translate-y-1/2 translate-x-1/2 md:block">
+                    <ConectorProceso orientacion="horizontal" delay={`${i * 130 + 260}ms`} />
+                  </span>
+                  <span className="pointer-events-none absolute bottom-0 left-1/2 z-10 -translate-x-1/2 translate-y-1/2 md:hidden">
+                    <ConectorProceso orientacion="vertical" delay={`${i * 130 + 260}ms`} />
+                  </span>
+                </>
+              )}
+            </li>
+          ))}
+        </ol>
+      </div>
     </section>
   );
 }
@@ -1017,9 +822,43 @@ function LandingPage() {
   const { usuario, cargando, cerrarSesion } = useSesion();
   const navigate = useNavigate();
   const [scrolled, setScrolled] = useState(false);
+  const nombrePerfil = [usuario?.nombre, usuario?.apellido_paterno]
+    .map((parte) => (parte || "").trim())
+    .filter(Boolean)
+    .join(" ") || "Mi cuenta";
+  const [perfilAbierto, setPerfilAbierto] = useState(false);
+  const [seccionActiva, setSeccionActiva] = useState("inicio");
+  const [etapaGuia, setEtapaGuia] = useState(0);
+  const perfilRef = useRef(null);
+  const perfilBotonRef = useRef(null);
 
   useEffect(() => {
-    const alHacerScroll = () => setScrolled(window.scrollY > 8);
+    if (!perfilAbierto) return;
+    const cerrarFuera = (evento) => {
+      if (!perfilRef.current?.contains(evento.target)) setPerfilAbierto(false);
+    };
+    const cerrarConEscape = (evento) => {
+      if (evento.key === "Escape") {
+        setPerfilAbierto(false);
+        perfilBotonRef.current?.focus();
+      }
+    };
+    document.addEventListener("pointerdown", cerrarFuera);
+    document.addEventListener("keydown", cerrarConEscape);
+    return () => {
+      document.removeEventListener("pointerdown", cerrarFuera);
+      document.removeEventListener("keydown", cerrarConEscape);
+    };
+  }, [perfilAbierto]);
+
+  useEffect(() => {
+    const alHacerScroll = () => {
+      setScrolled(window.scrollY > 8);
+      const actual = ["inicio", "catt", "noticias", "proceso"].filter(
+        (id) => document.getElementById(id)?.getBoundingClientRect().top <= 170,
+      ).pop();
+      setSeccionActiva(actual || "inicio");
+    };
     alHacerScroll();
     window.addEventListener("scroll", alHacerScroll, { passive: true });
     return () => window.removeEventListener("scroll", alHacerScroll);
@@ -1033,7 +872,7 @@ function LandingPage() {
   };
 
   return (
-    <div className="min-h-screen bg-white text-slate-800">
+    <div className="min-h-screen overflow-hidden bg-[#F3FAFD] text-slate-800">
       {/* Fondo: blobs azules grandes, desenfocados y en movimiento lento */}
       <div aria-hidden="true" className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
         <div
@@ -1048,73 +887,77 @@ function LandingPage() {
           className="escatt-blob-3 absolute bottom-[-12rem] left-1/4 h-[28rem] w-[28rem] rounded-full blur-3xl"
           style={{ background: `radial-gradient(circle at 50% 50%, ${AZUL_CLARO}3d, transparent 70%)` }}
         />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(79,179,232,0.18),transparent_34%),linear-gradient(180deg,rgba(255,255,255,0.2),rgba(243,250,253,0.92))]" />
       </div>
 
       {/* TOPBAR */}
       <header
-        className={`fixed inset-x-0 top-0 z-40 transition-colors duration-300 ${
-          scrolled
-            ? "border-b border-white/50 bg-white/70 shadow-sm backdrop-blur-md"
-            : "border-b border-transparent bg-transparent"
-        }`}
+        className="fixed inset-x-0 top-0 z-40 px-3 pt-3 sm:px-6"
       >
-        <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-3 sm:gap-4 sm:px-6">
-          <a href="#inicio" className="text-lg font-bold" style={{ color: AZUL_MEDIO }}>
+        <div className={`landing-topbar relative mx-auto flex min-h-16 max-w-6xl flex-wrap items-center gap-x-4 rounded-3xl border border-sky-100 bg-white/95 px-4 backdrop-blur-xl transition-shadow duration-300 sm:px-6 ${scrolled ? "shadow-xl shadow-sky-900/10" : "shadow-lg shadow-sky-900/5"}`}>
+          <a href="#inicio" onClick={() => setSeccionActiva("inicio")} className="inline-flex h-16 shrink-0 items-center text-xl font-extrabold text-[#1878B6] outline-offset-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-500">
             ESCATT
           </a>
 
-          <nav className="ml-3 hidden items-center gap-6 text-sm text-slate-600 md:flex">
-            <a href="#inicio" className="transition hover:text-slate-900">
-              Inicio
-            </a>
-            <a href="#catt" className="transition hover:text-slate-900">
-              ¿Qué es la CATT?
-            </a>
-            <a href="#noticias" className="transition hover:text-slate-900">
-              Noticias
-            </a>
-            <a href="#proceso" className="transition hover:text-slate-900">
-              Proceso
-            </a>
+          <nav aria-label="Navegación principal" className="order-last flex w-full items-center justify-between gap-1 border-t border-sky-100 py-2 text-xs font-medium md:order-none md:ml-4 md:w-auto md:justify-start md:border-t-0 md:text-sm">
+            {[["inicio", "Inicio"], ["catt", "¿Qué es la CATT?"], ["noticias", "Noticias"], ["proceso", "Proceso"]].map(([id, titulo]) => (
+              <a key={id} href={`#${id}`} onClick={() => setSeccionActiva(id)} aria-current={seccionActiva === id ? "location" : undefined} className={`landing-nav-link relative flex min-h-10 items-center rounded-full px-2 transition-all duration-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-500 md:px-4 ${seccionActiva === id ? "bg-sky-50 text-[#1878B6]" : "text-slate-600 hover:bg-sky-50 hover:text-[#1878B6]"}`}>
+                {titulo}
+              </a>
+            ))}
           </nav>
 
           <div className="ml-auto flex items-center gap-2 sm:gap-3">
             {usuario ? (
-              <>
+              <div ref={perfilRef} className="relative" onBlur={(evento) => {
+                if (!evento.currentTarget.contains(evento.relatedTarget)) setPerfilAbierto(false);
+              }}>
                 <button
+                  ref={perfilBotonRef}
                   type="button"
-                  onClick={() => navigate("/panel")}
-                  className="max-w-[9rem] truncate rounded-full px-2.5 py-1.5 text-xs font-medium
-                             text-slate-600 transition hover:text-slate-900 sm:max-w-[12rem] sm:text-sm"
+                  onClick={() => setPerfilAbierto((abierto) => !abierto)}
+                  aria-label={`Abrir opciones de ${nombrePerfil}`}
+                  aria-expanded={perfilAbierto}
+                  aria-controls="opciones-perfil"
+                  title="Mi perfil"
+                  className={`group inline-flex min-h-12 items-center gap-2 rounded-full border py-1.5 pl-1.5 pr-3 text-left shadow-sm transition-all duration-300 hover:border-sky-300 hover:bg-sky-50 hover:shadow-md hover:shadow-sky-500/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-sky-500 sm:gap-3 sm:pr-4 ${perfilAbierto ? "border-sky-300 bg-sky-50 shadow-sky-500/10" : "border-sky-100 bg-[#F5FAFE]"}`}
                 >
-                  Hola, {usuario.nombre}
+                  <span aria-hidden="true" className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2 border-white bg-gradient-to-br from-[#1878B6] to-[#4FB3E8] text-xs font-bold text-white shadow-md shadow-sky-600/20 transition-transform duration-300 group-hover:scale-105 sm:h-10 sm:w-10 sm:text-sm">
+                    {[usuario.nombre?.trim()[0], usuario.apellido_paterno?.trim()[0]].filter(Boolean).join("").toUpperCase() || "U"}
+                  </span>
+                  <span className="flex max-w-[80px] flex-col gap-0.5 sm:max-w-[160px]">
+                    <span className="break-words text-xs font-semibold leading-snug text-slate-800 transition-colors group-hover:text-[#1878B6] sm:text-sm">{nombrePerfil}</span>
+                    <span className="text-[10px] font-medium leading-tight text-[#1878B6]/80 sm:text-xs">Mi cuenta</span>
+                  </span>
+                  <span aria-hidden="true" className="flex h-3 w-3 shrink-0 items-center justify-center">
+                    <span className={`h-1.5 w-1.5 border-b-[1.5px] border-r-[1.5px] border-[#1878B6] transition-transform duration-300 ${perfilAbierto ? "rotate-[225deg]" : "rotate-45"}`} />
+                  </span>
                 </button>
-                <button
-                  type="button"
-                  onClick={alCerrarSesion}
-                  className="rounded-full px-3 py-1.5 text-xs font-semibold text-white shadow-md
-                             shadow-[#1878B6]/30 transition hover:-translate-y-0.5 hover:shadow-lg sm:px-4 sm:text-sm"
-                  style={{ backgroundImage: GRAD_AZUL }}
-                >
-                  Cerrar sesión
-                </button>
-              </>
+                {perfilAbierto && (
+                  <div id="opciones-perfil" className="landing-profile-menu absolute right-0 top-full mt-3 w-64 max-w-[calc(100vw-3rem)] rounded-2xl border border-sky-100 bg-white p-2 shadow-xl shadow-sky-900/15">
+                    <div className="border-b border-slate-100 px-3 py-3">
+                      <p className="break-words text-sm font-semibold text-slate-900">{nombrePerfil}</p>
+                      <p className="mt-1 break-words text-xs text-slate-500">{usuario.correo}</p>
+                    </div>
+                    <a href="/panel/mi-cuenta" className="mt-1 flex min-h-11 items-center rounded-lg px-3 text-sm text-slate-700 transition hover:bg-sky-50 hover:text-[#1878B6]">Mi perfil</a>
+                    <a href="/panel" className="flex min-h-11 items-center gap-2 rounded-lg px-3 text-sm text-slate-700 transition hover:bg-sky-50 hover:text-[#1878B6]"><PanelIcono />Mi panel</a>
+                    <button type="button" onClick={alCerrarSesion} className="mt-1 flex min-h-11 w-full items-center gap-2 rounded-lg border-t border-slate-100 px-3 text-sm text-slate-600 transition hover:bg-red-50 hover:text-red-600"><SalirIcono />Cerrar sesión</button>
+                  </div>
+                )}
+              </div>
             ) : (
               <>
                 <button
                   type="button"
                   onClick={() => navigate("/login")}
-                  className="rounded-full px-2.5 py-1.5 text-xs font-medium text-slate-600 transition
-                             hover:text-slate-900 sm:text-sm"
+                  className="inline-flex min-h-10 items-center rounded-full px-3 text-xs font-semibold text-[#1878B6] transition-colors hover:bg-sky-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-500 sm:text-sm"
                 >
                   Iniciar sesión
                 </button>
                 <button
                   type="button"
                   onClick={() => navigate("/registro")}
-                  className="rounded-full px-3 py-1.5 text-xs font-semibold text-white shadow-md
-                             shadow-[#1878B6]/30 transition hover:-translate-y-0.5 hover:shadow-lg sm:px-4 sm:text-sm"
-                  style={{ backgroundImage: GRAD_AZUL }}
+                  className="inline-flex min-h-10 items-center rounded-full bg-[#1878B6] px-3 text-xs font-semibold text-white shadow-md shadow-sky-500/20 transition-all hover:bg-[#1264A3] hover:shadow-lg hover:shadow-sky-500/25 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 sm:px-4 sm:text-sm"
                 >
                   Registrarse
                 </button>
@@ -1125,39 +968,119 @@ function LandingPage() {
       </header>
 
       <main>
-        {/* INICIO: encabezado breve + banner de etapas */}
-        <section id="inicio" className="mx-auto max-w-5xl scroll-mt-24 px-4 pb-10 pt-28">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#1878B6]">
-            ESCOM · Comisión Académica de Trabajos Terminales
-          </p>
-          <h1
-            className="mt-2 text-4xl font-bold tracking-tight sm:text-5xl"
-            style={{
-              backgroundImage: `linear-gradient(135deg, ${AZUL_OSCURO} 0%, ${AZUL_MEDIO} 60%, ${AZUL_CLARO} 100%)`,
-              WebkitBackgroundClip: "text",
-              backgroundClip: "text",
-              color: "transparent",
-            }}
-          >
-            ESCATT
-          </h1>
-          <p className="mt-2 max-w-xl text-base text-slate-600 sm:text-lg">
-            Consulta el estado y las etapas de tu proceso de Trabajo Terminal.
-          </p>
-          <CarruselEtapas />
+        <section id="inicio" aria-label="Anuncios destacados" className="relative scroll-mt-36 px-4 pb-8 pt-40 md:scroll-mt-28 md:pt-28">
+          <div className="mx-auto max-w-6xl">
+            <TablonAvisos key={usuario?.id ?? "publico"} usuarioId={usuario?.id ?? "publico"} />
+          </div>
+        </section>
+
+        {/* Guía pública: las etapas no representan el estado de un expediente. */}
+        <section aria-labelledby="titulo-guia" className="relative px-4 pb-16 pt-8">
+          <div className="mx-auto grid max-w-6xl items-center gap-10 lg:grid-cols-[1fr_0.92fr]">
+            <div className="landing-reveal">
+              <p className="inline-flex rounded-full border border-[#1878B6]/15 bg-white/70 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-[#1878B6] shadow-sm backdrop-blur">
+                Guía de titulación · ESCOM
+              </p>
+              <h2 id="titulo-guia" className="mt-5 max-w-3xl text-4xl font-black leading-tight text-slate-950 sm:text-5xl">
+                Tu siguiente paso, más claro.
+              </h2>
+              <p className="mt-5 max-w-2xl text-lg leading-relaxed text-slate-600 sm:text-xl">
+                Conoce cada etapa de tu Trabajo Terminal y consulta los avisos de la CATT
+                para preparar lo que sigue.
+              </p>
+              <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+                <a
+                  href="#noticias"
+                  onClick={() => setSeccionActiva("noticias")}
+                  className="inline-flex items-center justify-center gap-2 rounded-full px-6 py-3 text-sm font-bold text-white shadow-xl shadow-[#1878B6]/30 transition hover:-translate-y-1 hover:shadow-2xl"
+                  style={{ backgroundImage: GRAD_AZUL }}
+                >
+                  Consultar avisos
+                  <FlechaIcono />
+                </a>
+                <a
+                  href="#proceso"
+                  className="inline-flex items-center justify-center rounded-full border border-[#1878B6]/15 bg-white/75 px-6 py-3 text-sm font-bold text-[#0F5C8C] shadow-sm backdrop-blur transition hover:-translate-y-1 hover:bg-white"
+                >
+                  Ver proceso completo
+                </a>
+              </div>
+              <div className="mt-10 border-l-2 border-[#4FB3E8] pl-5">
+                <p className="text-sm font-semibold text-[#0F5C8C]">{usuario ? "Tu espacio personal" : "¿Aún no tienes cuenta?"}</p>
+                <p className="mt-2 text-sm leading-relaxed text-slate-600">{usuario ? "Consulta tus datos y las secciones disponibles para tu perfil." : "Regístrate para acceder a tu espacio en ESCATT."}</p>
+                <button type="button" onClick={() => navigate(usuario ? "/panel" : "/registro")} className="mt-3 inline-flex min-h-10 items-center gap-2 text-sm font-bold text-[#1878B6] transition hover:text-[#0F5C8C]">
+                  {usuario ? "Ir a mi panel" : "Crear cuenta"}<FlechaIcono />
+                </button>
+              </div>
+            </div>
+
+            <div className="relative isolate flex min-h-[480px] flex-col justify-between gap-8 p-5 sm:min-h-[500px] sm:p-8">
+              <div className="absolute inset-0 rounded-[2rem] bg-[#071826] shadow-2xl shadow-[#0F5C8C]/25" />
+              <img
+                src="/images/noticias/campus-escom.webp"
+                alt=""
+                width="900"
+                height="900"
+                className="absolute inset-0 h-full w-full rounded-[2rem] object-cover opacity-75 mix-blend-screen"
+              />
+              <div className="absolute inset-0 rounded-[2rem] bg-gradient-to-br from-[#0F5C8C]/95 via-[#1878B6]/70 to-[#4FB3E8]/35" />
+              <div className="relative text-white">
+                <div className="mb-6 border-b border-white/20 pb-5">
+                  <LogosInstitucionales compacto />
+                </div>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/75">Ruta del Trabajo Terminal</p>
+                <div role="group" aria-label="Etapa de la guía" className="mt-5 grid grid-cols-2 gap-3">
+                  {ETAPAS.map((etapa, i) => (
+                    <button key={etapa.titulo} type="button" aria-pressed={etapaGuia === i} aria-controls="detalle-etapa-guia" onClick={() => setEtapaGuia(i)} className={`flex min-h-16 items-center gap-2 rounded-xl border px-3 py-3 text-left text-xs font-semibold transition-all duration-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white sm:text-sm ${etapaGuia === i ? "border-white bg-white text-[#0F5C8C] shadow-lg shadow-black/10" : "border-white/25 bg-white/10 text-white backdrop-blur-md hover:border-white/60 hover:bg-white/20"}`}>
+                      <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] ${etapaGuia === i ? "bg-sky-100 text-[#1878B6]" : "bg-white/15 text-white"}`}>{i + 1}</span>
+                      <span>{etapa.titulo}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div id="detalle-etapa-guia" aria-live="polite" aria-atomic="true" className="relative rounded-2xl border border-white/25 bg-[#061827]/55 p-5 text-white shadow-lg backdrop-blur-md sm:p-6">
+                <div key={etapaGuia} className="landing-reveal">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-200">Etapa {etapaGuia + 1} de {ETAPAS.length}</p>
+                  <h3 className="mt-3 text-2xl font-bold">{ETAPAS[etapaGuia].titulo}</h3>
+                  <p className="mt-3 text-sm leading-relaxed text-white/90">{ETAPAS[etapaGuia].texto}</p>
+                  <p className="mt-4 border-t border-white/20 pt-4 text-sm leading-relaxed text-sky-100">{GUIA_ETAPAS[etapaGuia]}</p>
+                </div>
+              </div>
+            </div>
+          </div>
         </section>
 
         {/* ¿QUÉ ES LA CATT? */}
-        <section id="catt" className="mx-auto max-w-4xl scroll-mt-24 px-4 py-20">
-          <h2 className="text-3xl font-bold text-slate-800 sm:text-4xl">¿Qué es la CATT?</h2>
-          <p className="mt-4 text-lg leading-relaxed text-slate-600">
-            La Comisión Académica de Trabajos Terminales (CATT) administra el proceso de
-            titulación curricular de ESCOM: desde el registro del Protocolo, pasando por Trabajo
-            Terminal I y II, hasta la presentación final ante sinodales. En este proceso participan
-            los alumnos con protocolo de Trabajo Terminal registrado, los sinodales designados y el
-            personal de coordinación de la CATT. ESCATT digitaliza el registro y seguimiento de
-            quienes participan en él.
-          </p>
+        <section id="catt" className="scroll-mt-36 bg-white px-4 py-20 md:scroll-mt-28">
+          <div className="mx-auto grid max-w-6xl gap-10 lg:grid-cols-[0.8fr_1fr] lg:items-start">
+            <div>
+              <span className="text-xs font-semibold uppercase tracking-[0.22em] text-[#1878B6]">
+                ¿Qué es la CATT?
+              </span>
+              <h2 className="mt-3 text-3xl font-black text-slate-950 sm:text-5xl">
+                La ruta completa de titulación, ahora más visible.
+              </h2>
+            </div>
+            <div>
+              <p className="text-lg leading-relaxed text-slate-600">
+                La Comisión Académica de Trabajos Terminales administra el proceso de titulación
+                curricular de ESCOM: desde el registro del Protocolo, pasando por Trabajo Terminal
+                I y II, hasta la presentación final ante sinodales. ESCATT digitaliza el registro y
+                seguimiento de quienes participan en él.
+              </p>
+              <div className="mt-8 grid gap-4 sm:grid-cols-3">
+                {PILARES_CATT.map((pilar) => (
+                  <article
+                    key={pilar.titulo}
+                    className="rounded-[1.5rem] border border-[#D8EEF8] bg-[#F3FAFD] p-5 transition duration-300 hover:-translate-y-1 hover:border-[#4FB3E8]/60 hover:bg-white hover:shadow-xl hover:shadow-[#1878B6]/12"
+                  >
+                    <h3 className="font-bold text-slate-950">{pilar.titulo}</h3>
+                    <p className="mt-2 text-sm leading-relaxed text-slate-600">{pilar.texto}</p>
+                  </article>
+                ))}
+              </div>
+            </div>
+          </div>
         </section>
 
         {/* NOTICIAS: avisos del proceso, formato tarjeta con foto real */}
@@ -1168,10 +1091,19 @@ function LandingPage() {
       </main>
 
       {/* FOOTER */}
-      <footer className="border-t border-white/50 bg-white/50 px-4 py-8 backdrop-blur-sm">
-        <div className="mx-auto flex max-w-6xl flex-col items-center gap-4 text-center text-sm text-slate-500 sm:flex-row sm:justify-between sm:text-left">
+      <footer className="border-t border-sky-900 bg-[#092B43] px-4 py-10 text-white">
+        <div className="mx-auto flex max-w-6xl flex-col gap-6">
+          <div className="flex flex-col items-center justify-between gap-6 text-center sm:flex-row sm:text-left">
+            <LogosInstitucionales />
+            <div>
+              <p className="text-lg font-bold">ESCATT</p>
+              <p className="mt-1 text-sm text-sky-100/75">Comisión Académica de Trabajos Terminales</p>
+            </div>
+          </div>
+          <div className="flex flex-col items-center gap-4 border-t border-white/15 pt-6 text-center text-xs text-sky-100/70 sm:flex-row sm:justify-between sm:text-left">
           <p>© 2026 ESCATT — Sistema desarrollado por Nexus Solutions para ESCOM-IPN.</p>
           <InsigniaNexus />
+          </div>
         </div>
       </footer>
     </div>
@@ -1192,11 +1124,13 @@ function AltaRoute() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const perfil = params.get("perfil") ?? "alumno";
+  const academia = params.get("academia");
   return (
     <AltaPage
       key={perfil}
       actor={usuario}
       perfilInicial={perfil}
+      academiaPreseleccionada={academia}
       onVerDetalle={(u) => navigate(`/panel/usuarios/${u.id}`)}
     />
   );
@@ -1221,6 +1155,30 @@ function DetalleRoute() {
 function AcademiasRoute() {
   const { usuario } = useSesion();
   return <AcademiasPage actor={usuario} />;
+}
+
+function AcademiaFichaRoute() {
+  const { usuario } = useSesion();
+  const { id } = useParams();
+  return <AcademiaFicha actor={usuario} academiaId={id} />;
+}
+
+// El Presidente ve la ficha de SU academia (su propio academia_id como
+// docente), siempre en solo lectura: no tiene catt_ejecutivo, así que la
+// ficha misma oculta todos los botones de acción.
+function MiAcademiaRoute() {
+  const { usuario } = useSesion();
+  if (usuario.academia_id == null) {
+    return (
+      <div className={`rounded-3xl p-8 text-center ${VIDRIO} bg-white/85`}>
+        <p className="text-base font-medium text-slate-900">Todavía no tienes una academia asignada.</p>
+        <p className="mt-2 text-sm text-slate-600">
+          Cuando la CATT te asigne una, aparecerá aquí.
+        </p>
+      </div>
+    );
+  }
+  return <AcademiaFicha actor={usuario} academiaId={usuario.academia_id} />;
 }
 
 function MiCuentaRoute() {
@@ -1323,7 +1281,7 @@ function AppRoutes() {
           path="mi-academia"
           element={
             <RequiereRol clave="mi-academia">
-              <ListadoRoute />
+              <MiAcademiaRoute />
             </RequiereRol>
           }
         />
@@ -1332,6 +1290,14 @@ function AppRoutes() {
           element={
             <RequiereRol clave="academias">
               <AcademiasRoute />
+            </RequiereRol>
+          }
+        />
+        <Route
+          path="academias/:id"
+          element={
+            <RequiereRol clave="academia-ficha">
+              <AcademiaFichaRoute />
             </RequiereRol>
           }
         />

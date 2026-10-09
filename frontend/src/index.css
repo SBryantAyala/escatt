@@ -42,6 +42,27 @@ html {
   }
 }
 
+@keyframes landing-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(1rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes landing-float {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-0.5deg);
+  }
+  50% {
+    transform: translateY(-0.8rem) rotate(0.5deg);
+  }
+}
+
 .escatt-blob-1 {
   animation: escatt-blob-1 18s ease-in-out infinite;
 }
@@ -50,6 +71,63 @@ html {
 }
 .escatt-blob-3 {
   animation: escatt-blob-3 16s ease-in-out infinite;
+}
+
+.landing-reveal {
+  animation: landing-reveal 700ms ease-out both;
+}
+
+.landing-float {
+  animation: landing-float 7s ease-in-out infinite;
+}
+
+.landing-topbar::after {
+  content: "";
+  position: absolute;
+  bottom: -1px;
+  left: 20%;
+  width: 60%;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #4fb3e8, transparent);
+  background-size: 200% 100%;
+  animation: landing-blue-accent 6s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes landing-blue-accent {
+  0%, 100% { background-position: 0% 50%; opacity: 0.35; }
+  50% { background-position: 100% 50%; opacity: 0.85; }
+}
+
+.landing-nav-link::after {
+  content: "";
+  position: absolute;
+  bottom: 3px;
+  left: 30%;
+  width: 40%;
+  height: 2px;
+  border-radius: 999px;
+  background: #4fb3e8;
+  transform: scaleX(0);
+  transition: transform 250ms ease;
+}
+
+.landing-nav-link:hover::after,
+.landing-nav-link[aria-current]::after {
+  transform: scaleX(1);
+}
+
+.landing-profile-menu {
+  animation: landing-reveal 180ms ease-out both;
+}
+
+@keyframes aviso-autoplay {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+
+.aviso-autoplay {
+  animation: aviso-autoplay 8s linear both;
 }
 
 /* Diagrama "Proceso de la CATT": los nodos y los conectores se revelan al
@@ -85,14 +163,41 @@ html {
   opacity: 1;
 }
 
+/* Galería de academias: entrada escalonada (fade + deslizamiento), el retardo
+   por tarjeta se pone inline (indice * 80ms). El hover/focus (subir, sombra,
+   giro del ícono) vive en Tailwind con el prefijo motion-safe:. */
+@keyframes tarjeta-academia-entrada {
+  from {
+    opacity: 0;
+    transform: translateY(1rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.tarjeta-academia {
+  opacity: 0;
+  animation: tarjeta-academia-entrada 420ms ease-out both;
+}
+
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
   }
   .escatt-blob-1,
   .escatt-blob-2,
-  .escatt-blob-3 {
+  .escatt-blob-3,
+  .landing-float,
+  .landing-reveal,
+  .landing-profile-menu,
+  .aviso-autoplay,
+  .landing-topbar::after {
     animation: none;
+  }
+  .landing-nav-link,
+  .landing-nav-link::after {
+    transition: none;
   }
   /* Sin animación de entrada: el contenido se muestra ya en su estado final. */
   .proceso-nodo {
@@ -106,6 +211,10 @@ html {
   }
   .proceso-conector-flecha {
     transition: none;
+    opacity: 1;
+  }
+  .tarjeta-academia {
+    animation: none;
     opacity: 1;
   }
 }
