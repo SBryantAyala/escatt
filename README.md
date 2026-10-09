@@ -22,16 +22,33 @@ backend/
     ├── lib/            # roles y permisos, sesiones, acceso a usuarios
     └── routes/         # auth, usuarios, academias, health
 frontend/src/
-├── App.jsx             # landing, login, registro de alumnos, cambio de contraseña obligatorio
+├── App.jsx             # árbol de rutas (react-router), landing, login/registro
+├── context/            # SesionContext: usuario en sesión, sin pasarlo por props
+├── routes/             # secciones.js (fuente única de nav/roles) + guardas (RequiereSesion, RequiereRol…)
 ├── lib/                # api, roles (espejo del backend), tema
-├── components/         # layout del panel, chips de rol, íconos
+├── components/
+│   ├── ui/              # TablaDatos, EncabezadoFicha, Pestanas, DialogoConfirmacion, Avisos…
+│   └── DashboardLayout.jsx, ChipsRol.jsx, íconos
 └── pages/
-    ├── Panel/          # navegación por roles
+    ├── Panel/          # layout + navegación por roles
     ├── Usuarios/       # Listado (Alumnos / Docentes / Personal CATT), Alta, Detalle
     ├── Academias/      # catálogo de academias (alta, edición, activar/desactivar)
     ├── MiCuenta/       # datos propios + cambio de contraseña
     └── CambiarPassword/
 ```
+
+### Rutas (frontend)
+
+El frontend usa `react-router-dom` (modo librería, `BrowserRouter`) con rutas
+reales: `/`, `/login`, `/registro`, `/cambiar-password`, `/panel/...`. En
+desarrollo (`vite dev`), Vite ya resuelve cualquier ruta desconocida contra
+`index.html`, así que recargar en `/panel/usuarios/123` funciona sin
+configuración extra.
+
+**En producción**, el servidor que sirva los archivos estáticos de
+`frontend/dist/` debe redirigir cualquier ruta no encontrada a `index.html`
+(fallback de SPA) para que recargar o entrar directo a una URL del panel no
+dé 404 a nivel servidor — react-router toma el control desde ahí.
 
 ### Modelo de usuarios (Módulo 1)
 

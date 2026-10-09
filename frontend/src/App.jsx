@@ -1,15 +1,38 @@
 import { useEffect, useRef, useState } from "react";
+import {
+  Navigate,
+  Route,
+  Routes,
+  useLocation,
+  useNavigate,
+  useParams,
+  useSearchParams,
+} from "react-router-dom";
+import CargandoPantalla from "./components/CargandoPantalla";
 import NexusLogo from "./components/NexusLogo";
-import PanelPage from "./pages/Panel";
+import { AvisoProvider } from "./components/ui/Avisos";
+import { SesionProvider, useSesion } from "./context/SesionContext";
+import AcademiasPage from "./pages/Academias";
 import CambioObligatorioPage from "./pages/CambiarPassword";
-import { CARRERAS, DOMINIO_ALUMNO, PLANES } from "./lib/roles";
+import PanelInicio from "./pages/Panel/Inicio";
+import PanelLayout from "./pages/Panel";
+import SeccionProximamente from "./pages/Panel/SeccionProximamente";
+import AltaPage from "./pages/Usuarios/Alta";
+import DetallePage from "./pages/Usuarios/Detalle";
+import ListadoPage from "./pages/Usuarios/Listado";
+import MiCuentaPage from "./pages/MiCuenta";
 import { api, TOKEN_KEY } from "./lib/api";
+import { CARRERAS, DOMINIO_ALUMNO, PLANES } from "./lib/roles";
 import { AZUL_CLARO, AZUL_MEDIO, AZUL_OSCURO, GRAD_AZUL, VIDRIO } from "./lib/theme";
+import NoEncontrada from "./routes/NoEncontrada";
+import RequiereInvitado from "./routes/RequiereInvitado";
+import RequiereRol from "./routes/RequiereRol";
+import RequiereSesion from "./routes/RequiereSesion";
 
-// Navegación sin librerías externas (sin react-router): un useState("page")
-// conmuta entre landing / login / registro / panel. El panel administrativo
-// (PanelPage) trae su propia navegación interna por secciones — ver
-// src/pages/Panel/.
+// Rutas reales con react-router (BrowserRouter en main.jsx). App.jsx define
+// el árbol completo: landing / login / registro / cambiar-password / panel
+// (con sus sub-rutas) / 404. El usuario en sesión vive en SesionContext, no
+// se pasa por props.
 //
 // La identidad visual compartida (paleta azul + clase VIDRIO) vive en
 // src/lib/theme.js y el cliente HTTP en src/lib/api.js, para no duplicarlos
@@ -253,12 +276,15 @@ function ListaRequisitos({ req }) {
   );
 }
 
-// Páginas dedicadas (no modal) para iniciar sesión y registrarse. Comparten
-// layout; `modo` decide qué campos aparecen. Validación en vivo + alertas.
-// El registro es SOLO para alumnos (docentes los da de alta la CATT y al
-// personal CATT, el administrador del sistema).
-function AuthPage({ modo, onAutenticado, onSalir, onCambiarModo }) {
+// Página dedicada (no modal) para iniciar sesión y registrarse. `modo` decide
+// qué campos aparecen. Validación en vivo + alertas. El registro es SOLO
+// para alumnos (docentes los da de alta la CATT y al personal CATT, el
+// administrador del sistema).
+function AuthPage({ modo }) {
   const esRegistro = modo === "registro";
+  const navigate = useNavigate();
+  const [params] = useSearchParams();
+  const { setUsuario } = useSesion();
 
   const [form, setForm] = useState({
     nombre: "",
@@ -278,11 +304,11 @@ function AuthPage({ modo, onAutenticado, onSalir, onCambiarModo }) {
 
   useEffect(() => {
     const alPresionar = (e) => {
-      if (e.key === "Escape") onSalir();
+      if (e.key === "Escape") navigate("/");
     };
     document.addEventListener("keydown", alPresionar);
     return () => document.removeEventListener("keydown", alPresionar);
-  }, [onSalir]);
+  }, [navigate]);
 
   const set = (campo) => (e) => {
     const { value } = e.target;
@@ -364,7 +390,9 @@ function AuthPage({ modo, onAutenticado, onSalir, onCambiarModo }) {
       });
       localStorage.setItem(TOKEN_KEY, datos.token);
       setAlerta({ tipo: "ok", texto: "Listo, entrando…" });
-      onAutenticado(datos.usuario);
+      setUsuario(datos.usuario);
+      const siguiente = params.get("next");
+      navigate(siguiente || "/panel/inicio", { replace: true });
     } catch (err) {
       setAlerta({ tipo: "error", texto: err.message });
       setEnviando(false);
@@ -393,7 +421,7 @@ function AuthPage({ modo, onAutenticado, onSalir, onCambiarModo }) {
       <div className="mx-auto flex min-h-screen w-full max-w-lg flex-col justify-center px-4 py-12">
         <button
           type="button"
-          onClick={onSalir}
+          onClick={() => navigate("/")}
           className="mb-6 self-start text-sm text-slate-500 transition hover:text-slate-800"
         >
           ← Volver al inicio
@@ -564,7 +592,7 @@ function AuthPage({ modo, onAutenticado, onSalir, onCambiarModo }) {
             {esRegistro ? "¿Ya tienes cuenta? " : "¿No tienes cuenta? "}
             <button
               type="button"
-              onClick={() => onCambiarModo(esRegistro ? "login" : "registro")}
+              onClick={() => navigate(esRegistro ? "/login" : "/registro")}
               className="font-semibold text-[#1878B6] transition hover:underline"
             >
               {esRegistro ? "Inicia sesión" : "Regístrate"}
@@ -575,10 +603,6 @@ function AuthPage({ modo, onAutenticado, onSalir, onCambiarModo }) {
     </div>
   );
 }
-
-// PanelPage se movió a src/pages/Panel/: ahora es un dashboard con sidebar +
-// topbar + navegación interna por secciones (Listado, Alta, Detalle y las
-// secciones de "Proceso" que vendrán). App.jsx solo lo monta cuando page === "panel".
 
 // Fondo por diapositiva: el mismo trío de azules de marca, variando ángulo y
 // orden para que cada etapa se sienta distinta sin salirse de la identidad.
@@ -987,11 +1011,12 @@ function DiagramaProceso() {
   );
 }
 
-export default function App() {
-  const [page, setPage] = useState("landing"); // landing | panel | login | registro
+// Página de inicio pública. Antes era el único "page" sin sesión en App();
+// ahora lee el usuario de SesionContext y navega con <Link>/useNavigate.
+function LandingPage() {
+  const { usuario, cargando, cerrarSesion } = useSesion();
+  const navigate = useNavigate();
   const [scrolled, setScrolled] = useState(false);
-  const [usuario, setUsuario] = useState(null);
-  const [cargandoSesion, setCargandoSesion] = useState(true);
 
   useEffect(() => {
     const alHacerScroll = () => setScrolled(window.scrollY > 8);
@@ -1000,89 +1025,12 @@ export default function App() {
     return () => window.removeEventListener("scroll", alHacerScroll);
   }, []);
 
-  // Al cargar: si hay token guardado, validarlo contra el backend y restaurar
-  // el usuario. Si ya no sirve, se borra en silencio.
-  useEffect(() => {
-    const token = localStorage.getItem(TOKEN_KEY);
-    if (!token) {
-      setCargandoSesion(false);
-      return undefined;
-    }
-    let vivo = true;
-    api("/api/auth/yo")
-      .then((datos) => {
-        if (vivo) setUsuario(datos.usuario);
-      })
-      .catch(() => {
-        localStorage.removeItem(TOKEN_KEY);
-      })
-      .finally(() => {
-        if (vivo) setCargandoSesion(false);
-      });
-    return () => {
-      vivo = false;
-    };
-  }, []);
+  if (cargando) return <CargandoPantalla />;
 
-  const cerrarSesion = async () => {
-    try {
-      await api("/api/auth/logout", { method: "POST" });
-    } catch {
-      // El resultado neto que nos importa (no hay sesión local) se logra igual.
-    }
-    localStorage.removeItem(TOKEN_KEY);
-    setUsuario(null);
-    setPage("landing");
+  const alCerrarSesion = async () => {
+    await cerrarSesion();
+    navigate("/");
   };
-
-  const alAutenticar = (u) => {
-    setUsuario(u);
-    setPage("panel");
-  };
-
-  if (cargandoSesion) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-white text-slate-500">
-        <span className="animate-pulse text-sm">Cargando…</span>
-      </div>
-    );
-  }
-
-  if ((page === "login" || page === "registro") && !usuario) {
-    return (
-      <AuthPage
-        modo={page}
-        onAutenticado={alAutenticar}
-        onSalir={() => setPage("landing")}
-        onCambiarModo={(m) => setPage(m)}
-      />
-    );
-  }
-
-  // HU-5: con contraseña temporal, lo único disponible es cambiarla.
-  if (usuario?.debe_cambiar_password && (page === "panel" || page === "login")) {
-    return (
-      <CambioObligatorioPage
-        usuario={usuario}
-        onCambiada={(u) => {
-          setUsuario(u);
-          setPage("panel");
-        }}
-        onCerrarSesion={cerrarSesion}
-      />
-    );
-  }
-
-  if (page === "panel" && usuario) {
-    return (
-      <PanelPage
-        usuario={usuario}
-        onUsuarioActualizado={setUsuario}
-        onCerrarSesion={cerrarSesion}
-        onVolver={() => setPage("landing")}
-      />
-    );
-  }
 
   return (
     <div className="min-h-screen bg-white text-slate-800">
@@ -1135,7 +1083,7 @@ export default function App() {
               <>
                 <button
                   type="button"
-                  onClick={() => setPage("panel")}
+                  onClick={() => navigate("/panel")}
                   className="max-w-[9rem] truncate rounded-full px-2.5 py-1.5 text-xs font-medium
                              text-slate-600 transition hover:text-slate-900 sm:max-w-[12rem] sm:text-sm"
                 >
@@ -1143,7 +1091,7 @@ export default function App() {
                 </button>
                 <button
                   type="button"
-                  onClick={cerrarSesion}
+                  onClick={alCerrarSesion}
                   className="rounded-full px-3 py-1.5 text-xs font-semibold text-white shadow-md
                              shadow-[#1878B6]/30 transition hover:-translate-y-0.5 hover:shadow-lg sm:px-4 sm:text-sm"
                   style={{ backgroundImage: GRAD_AZUL }}
@@ -1155,7 +1103,7 @@ export default function App() {
               <>
                 <button
                   type="button"
-                  onClick={() => setPage("login")}
+                  onClick={() => navigate("/login")}
                   className="rounded-full px-2.5 py-1.5 text-xs font-medium text-slate-600 transition
                              hover:text-slate-900 sm:text-sm"
                 >
@@ -1163,7 +1111,7 @@ export default function App() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setPage("registro")}
+                  onClick={() => navigate("/registro")}
                   className="rounded-full px-3 py-1.5 text-xs font-semibold text-white shadow-md
                              shadow-[#1878B6]/30 transition hover:-translate-y-0.5 hover:shadow-lg sm:px-4 sm:text-sm"
                   style={{ backgroundImage: GRAD_AZUL }}
@@ -1227,5 +1175,211 @@ export default function App() {
         </div>
       </footer>
     </div>
+  );
+}
+
+// --- Puentes entre rutas y páginas (props -> hooks) --------------------------
+// Las páginas de pages/ siguen recibiendo props simples (actor, userId,
+// onVolver…); estos componentes son el único lugar que conoce react-router.
+
+function ListadoRoute() {
+  const { usuario } = useSesion();
+  return <ListadoPage actor={usuario} />;
+}
+
+function AltaRoute() {
+  const { usuario } = useSesion();
+  const navigate = useNavigate();
+  const [params] = useSearchParams();
+  const perfil = params.get("perfil") ?? "alumno";
+  return (
+    <AltaPage
+      key={perfil}
+      actor={usuario}
+      perfilInicial={perfil}
+      onVerDetalle={(u) => navigate(`/panel/usuarios/${u.id}`)}
+    />
+  );
+}
+
+function DetalleRoute() {
+  const { usuario } = useSesion();
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  // "Volver" regresa a la ruta anterior; si no hay historial dentro de la app
+  // (p. ej. se entró recargando esta misma URL), cae a /panel/usuarios.
+  function volver() {
+    if (location.key !== "default") navigate(-1);
+    else navigate("/panel/usuarios");
+  }
+
+  return <DetallePage actor={usuario} userId={id} onVolver={volver} />;
+}
+
+function AcademiasRoute() {
+  const { usuario } = useSesion();
+  return <AcademiasPage actor={usuario} />;
+}
+
+function MiCuentaRoute() {
+  const { usuario, setUsuario } = useSesion();
+  return <MiCuentaPage usuario={usuario} onUsuarioActualizado={setUsuario} />;
+}
+
+function CambiarPasswordRoute() {
+  const { usuario, setUsuario, cerrarSesion } = useSesion();
+  const navigate = useNavigate();
+  return (
+    <CambioObligatorioPage
+      usuario={usuario}
+      onCambiada={(u) => {
+        setUsuario(u);
+        navigate("/panel/inicio");
+      }}
+      onCerrarSesion={async () => {
+        await cerrarSesion();
+        navigate("/");
+      }}
+    />
+  );
+}
+
+const DESCRIPCION_PROXIMAMENTE =
+  "Esta sección estará disponible en un próximo sprint. Ya está conectada al panel: cuando se implemente aparecerá aquí sin tocar el layout.";
+
+function AppRoutes() {
+  return (
+    <Routes>
+      <Route path="/" element={<LandingPage />} />
+      <Route
+        path="/login"
+        element={
+          <RequiereInvitado>
+            <AuthPage modo="login" />
+          </RequiereInvitado>
+        }
+      />
+      <Route
+        path="/registro"
+        element={
+          <RequiereInvitado>
+            <AuthPage modo="registro" />
+          </RequiereInvitado>
+        }
+      />
+      <Route
+        path="/cambiar-password"
+        element={
+          <RequiereSesion>
+            <CambiarPasswordRoute />
+          </RequiereSesion>
+        }
+      />
+
+      <Route
+        path="/panel"
+        element={
+          <RequiereSesion>
+            <PanelLayout />
+          </RequiereSesion>
+        }
+      >
+        <Route index element={<Navigate to="inicio" replace />} />
+        <Route
+          path="inicio"
+          element={
+            <RequiereRol clave="inicio">
+              <PanelInicio />
+            </RequiereRol>
+          }
+        />
+        <Route
+          path="usuarios"
+          element={
+            <RequiereRol clave="usuarios">
+              <ListadoRoute />
+            </RequiereRol>
+          }
+        />
+        <Route
+          path="usuarios/nuevo"
+          element={
+            <RequiereRol clave="alta">
+              <AltaRoute />
+            </RequiereRol>
+          }
+        />
+        <Route
+          path="usuarios/:id"
+          element={
+            <RequiereRol clave="detalle">
+              <DetalleRoute />
+            </RequiereRol>
+          }
+        />
+        <Route
+          path="mi-academia"
+          element={
+            <RequiereRol clave="mi-academia">
+              <ListadoRoute />
+            </RequiereRol>
+          }
+        />
+        <Route
+          path="academias"
+          element={
+            <RequiereRol clave="academias">
+              <AcademiasRoute />
+            </RequiereRol>
+          }
+        />
+        <Route
+          path="mi-cuenta"
+          element={
+            <RequiereRol clave="mi-cuenta">
+              <MiCuentaRoute />
+            </RequiereRol>
+          }
+        />
+        <Route
+          path="protocolo"
+          element={
+            <RequiereRol clave="protocolo">
+              <SeccionProximamente titulo="Protocolo" descripcion={DESCRIPCION_PROXIMAMENTE} />
+            </RequiereRol>
+          }
+        />
+        <Route
+          path="trabajo-terminal"
+          element={
+            <RequiereRol clave="trabajo-terminal">
+              <SeccionProximamente titulo="Trabajo Terminal" descripcion={DESCRIPCION_PROXIMAMENTE} />
+            </RequiereRol>
+          }
+        />
+        <Route
+          path="presentaciones"
+          element={
+            <RequiereRol clave="presentaciones">
+              <SeccionProximamente titulo="Presentaciones" descripcion={DESCRIPCION_PROXIMAMENTE} />
+            </RequiereRol>
+          }
+        />
+      </Route>
+
+      <Route path="*" element={<NoEncontrada />} />
+    </Routes>
+  );
+}
+
+export default function App() {
+  return (
+    <SesionProvider>
+      <AvisoProvider>
+        <AppRoutes />
+      </AvisoProvider>
+    </SesionProvider>
   );
 }

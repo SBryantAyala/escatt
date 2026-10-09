@@ -4,6 +4,7 @@ import { CARRERAS, ETIQUETA_ROL, PLANES, ROLES_CATT, ROLES_GESTION, tieneRol } f
 import { GRAD_AZUL, VIDRIO } from "../../../lib/theme";
 
 // Pantalla: Alta de usuario (HU-4 docentes/alumnos, HU-6 personal CATT).
+// Vive en /panel/usuarios/nuevo?perfil=alumno|docente|personal_catt.
 // POST /api/usuarios con `perfil`:
 //   alumno | docente  -> Secretario Ejecutivo o Auxiliar CATT
 //   personal_catt     -> solo el Administrador del sistema (con rol_catt)

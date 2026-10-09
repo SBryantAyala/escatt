@@ -1,5 +1,6 @@
 import { useState } from "react";
 import ChipsRol from "../../components/ChipsRol";
+import { useAviso } from "../../components/ui/Avisos";
 import { api } from "../../lib/api";
 import { nombreCompleto } from "../../lib/nombre";
 import { GRAD_AZUL, VIDRIO } from "../../lib/theme";
@@ -24,24 +25,23 @@ function Dato({ label, valor }) {
 }
 
 export default function MiCuentaPage({ usuario, onUsuarioActualizado }) {
+  const aviso = useAviso();
   const esDocente = usuario.perfiles?.includes("docente");
   const [telefono, setTelefono] = useState(usuario.telefono ?? "");
   const [extension, setExtension] = useState(usuario.extension ?? "");
   const [guardando, setGuardando] = useState(false);
-  const [mensaje, setMensaje] = useState(null);
 
   const guardar = async (e) => {
     e.preventDefault();
     setGuardando(true);
-    setMensaje(null);
     try {
       const body = { telefono };
       if (esDocente) body.extension = extension;
       const datos = await api("/api/auth/perfil", { method: "PATCH", body });
       onUsuarioActualizado?.(datos.usuario);
-      setMensaje({ tipo: "ok", texto: "Datos de contacto actualizados." });
+      aviso.exito("Datos de contacto actualizados.");
     } catch (err) {
-      setMensaje({ tipo: "error", texto: err.message });
+      aviso.error(err.message);
     } finally {
       setGuardando(false);
     }
@@ -76,16 +76,6 @@ export default function MiCuentaPage({ usuario, onUsuarioActualizado }) {
 
         <form onSubmit={guardar} className="mt-6 space-y-4 border-t border-slate-100 pt-5">
           <h3 className="text-sm font-semibold text-slate-700">Datos de contacto</h3>
-          {mensaje && (
-            <div
-              role="alert"
-              className={`rounded-2xl px-4 py-3 text-sm ${
-                mensaje.tipo === "error" ? "bg-red-50 text-red-700" : "bg-emerald-50 text-emerald-700"
-              }`}
-            >
-              {mensaje.texto}
-            </div>
-          )}
           <label className="block">
             <span className={`${claseLabel} mb-1 block`}>Teléfono</span>
             <input
