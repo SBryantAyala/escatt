@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useAviso } from "../../components/ui/Avisos";
 import { api } from "../../lib/api";
 import { AZUL_CLARO, AZUL_MEDIO, GRAD_AZUL, VIDRIO } from "../../lib/theme";
 
@@ -22,6 +23,7 @@ function requisitos(p) {
 }
 
 export function FormCambioPassword({ onCambiada, textoBoton = "Cambiar contraseña" }) {
+  const aviso = useAviso();
   const [actual, setActual] = useState("");
   const [nueva, setNueva] = useState("");
   const [confirmar, setConfirmar] = useState("");
@@ -47,17 +49,17 @@ export function FormCambioPassword({ onCambiada, textoBoton = "Cambiar contrase�
       });
       return;
     }
-    setEnviando(true);
     setMensaje(null);
+    setEnviando(true);
     try {
       const datos = await api("/api/auth/password", { method: "PUT", body: { actual, nueva } });
       setActual("");
       setNueva("");
       setConfirmar("");
-      setMensaje({ tipo: "ok", texto: "Contraseña actualizada. Se cerraron tus otras sesiones." });
+      aviso.exito("Contraseña actualizada. Se cerraron tus otras sesiones.");
       onCambiada?.(datos.usuario);
     } catch (err) {
-      setMensaje({ tipo: "error", texto: err.message });
+      aviso.error(err.message);
     } finally {
       setEnviando(false);
     }

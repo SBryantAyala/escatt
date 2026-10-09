@@ -1,5 +1,11 @@
 import { useEffect, useState } from "react";
 import ChipsRol from "../../../components/ChipsRol";
+import DialogoConfirmacion from "../../../components/ui/DialogoConfirmacion";
+import EncabezadoFicha from "../../../components/ui/EncabezadoFicha";
+import Esqueleto from "../../../components/ui/Esqueleto";
+import Etiqueta from "../../../components/ui/Etiqueta";
+import ZonaPeligro from "../../../components/ui/ZonaPeligro";
+import { useAviso } from "../../../components/ui/Avisos";
 import { api } from "../../../lib/api";
 import { nombreCompleto } from "../../../lib/nombre";
 import {
@@ -14,7 +20,7 @@ import {
 import { GRAD_AZUL, VIDRIO } from "../../../lib/theme";
 
 // Pantalla: Detalle / edición de un usuario (HU-3 consulta, HU-4 edición,
-// HU-6 roles del personal).
+// HU-6 roles del personal). Vive en /panel/usuarios/:id.
 //
 //   - Los campos que se muestran dependen de los PERFILES de la persona
 //     (alumno, docente, personal CATT); una persona puede tener varios.
@@ -98,73 +104,45 @@ const claseInput = (error) => `${CLASE_INPUT_BASE} ${error ? CLASE_INPUT_ERROR :
 const claseLabel = "text-xs font-semibold uppercase tracking-wide text-slate-500";
 
 // --- Confirmación de acciones sensibles --------------------------------------
+// Cada acción de la zona de peligro mapea a un nivel de DialogoConfirmacion:
+// revocar/reactivar/reset son "simple"; eliminar es "escribir" el correo (o
+// "bloqueado" si el historial no lo permite).
 
-const TITULO_CONFIRMACION = {
-  revocar: "Revocar acceso",
-  reactivar: "Reactivar acceso",
-  reset: "Restablecer contraseña",
-  eliminar: "Eliminar cuenta",
+const CONFIG_CONFIRMACION = {
+  revocar: {
+    nivel: "simple",
+    titulo: "Revocar acceso",
+    descripcion: (nombre) =>
+      `"${nombre}" no podrá iniciar sesión y se cerrarán sus sesiones abiertas. Sus datos se conservan y puedes reactivarla después.`,
+    etiquetaConfirmar: "Revocar acceso",
+    colorConfirmar: "bg-amber-600 hover:bg-amber-700",
+  },
+  reactivar: {
+    nivel: "simple",
+    titulo: "Reactivar acceso",
+    descripcion: (nombre) => `"${nombre}" recupera su acceso al sistema de inmediato.`,
+    etiquetaConfirmar: "Reactivar acceso",
+  },
+  reset: {
+    nivel: "simple",
+    titulo: "Restablecer contraseña",
+    descripcion: (nombre) =>
+      `Se generará una contraseña temporal para "${nombre}" y se cerrarán sus sesiones. Deberá cambiarla al entrar.`,
+    etiquetaConfirmar: "Restablecer contraseña",
+  },
+  eliminar: {
+    nivel: "escribir",
+    titulo: "Eliminar cuenta",
+    descripcion: (nombre) =>
+      `Se borrará a "${nombre}" de forma permanente. Solo se permite porque la cuenta no tiene historial. No se puede deshacer.`,
+    etiquetaConfirmar: "Eliminar cuenta",
+    colorConfirmar: "bg-red-600 hover:bg-red-700",
+  },
+  "eliminar-bloqueada": {
+    nivel: "bloqueado",
+    titulo: "Eliminar cuenta",
+  },
 };
-
-const TEXTO_CONFIRMACION = {
-  revocar: (nombre) =>
-    `"${nombre}" no podrá iniciar sesión y se cerrarán sus sesiones abiertas. Sus datos se conservan y puedes reactivarla después.`,
-  reactivar: (nombre) => `"${nombre}" recupera su acceso al sistema de inmediato.`,
-  reset: (nombre) =>
-    `Se generará una contraseña temporal para "${nombre}" y se cerrarán sus sesiones. Deberá cambiarla al entrar.`,
-  eliminar: (nombre) =>
-    `Se borrará a "${nombre}" de forma permanente. Solo se permite porque la cuenta no tiene historial. No se puede deshacer.`,
-};
-
-const CLASE_BOTON_CONFIRMAR = {
-  revocar: "bg-amber-600 hover:bg-amber-700",
-  eliminar: "bg-red-600 hover:bg-red-700",
-};
-
-function ConfirmDialog({ accion, nombre, onCancelar, onConfirmar, procesando }) {
-  if (!accion) return null;
-  const claseColor = CLASE_BOTON_CONFIRMAR[accion];
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4"
-      onClick={onCancelar}
-    >
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="confirm-titulo"
-        className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-lg ring-1 ring-slate-200"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <h2 id="confirm-titulo" className="text-lg font-semibold text-slate-900">
-          {TITULO_CONFIRMACION[accion]}
-        </h2>
-        <p className="mt-2 text-sm text-slate-600">{TEXTO_CONFIRMACION[accion](nombre)}</p>
-        <div className="mt-6 flex justify-end gap-2">
-          <button
-            type="button"
-            onClick={onCancelar}
-            disabled={procesando}
-            className="rounded-lg px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100 disabled:opacity-50"
-          >
-            Cancelar
-          </button>
-          <button
-            type="button"
-            onClick={onConfirmar}
-            disabled={procesando}
-            style={claseColor ? undefined : { background: GRAD_AZUL }}
-            className={`rounded-lg px-3 py-1.5 text-sm font-medium text-white transition disabled:opacity-50 ${
-              claseColor ?? "shadow-md shadow-[#1878B6]/30"
-            }`}
-          >
-            {procesando ? "Procesando…" : TITULO_CONFIRMACION[accion]}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 // --- Validación ------------------------------------------------------------
 
@@ -313,114 +291,29 @@ function SelectEdit({ def, value, error, onChange }) {
   );
 }
 
-function ActivoBadge({ activo }) {
-  return activo ? (
-    <span className="inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-700 ring-1 ring-emerald-200">
-      Activo
-    </span>
-  ) : (
-    <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-500 ring-1 ring-slate-200">
-      Acceso revocado
-    </span>
-  );
-}
-
 function Spinner() {
   return (
     <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
   );
 }
 
-/* "Volver al listado": el bug era que la prop onVolver nunca se usaba. */
+/* "Volver al listado". */
 function VolverLink({ onVolver }) {
   if (!onVolver) return null;
   return (
     <button
       type="button"
       onClick={onVolver}
-      className="mb-3 inline-flex items-center rounded-full px-2 py-1 text-sm font-medium text-slate-500 transition hover:text-slate-800"
+      className="mb-3 inline-flex min-h-11 items-center rounded-full px-2 py-1 text-sm font-medium text-slate-500 transition hover:text-slate-800"
     >
       ← Volver al listado
     </button>
   );
 }
 
-/* Zona de peligro: revocar / reactivar acceso, restablecer contraseña y
-   eliminar la cuenta. `historial` es la respuesta de /historial (null mientras
-   carga): sin ella el botón de eliminar queda deshabilitado. */
-function ZonaPeligro({
-  activo,
-  error,
-  passwordTemporal,
-  historial,
-  onRevocar,
-  onReactivar,
-  onReset,
-  onEliminar,
-}) {
-  const puedeEliminar = Boolean(historial?.puede_eliminar);
-  return (
-    <div className="mt-6 rounded-2xl border border-red-200 bg-red-50/70 p-5">
-      <h2 className="text-sm font-bold uppercase tracking-wide text-red-700">Acceso a la cuenta</h2>
-      <p className="mt-1 text-sm text-red-700/80">
-        Revocar conserva el historial y se puede revertir. Eliminar borra la cuenta y solo está
-        disponible para cuentas sin historial (altas duplicadas o por error).
-      </p>
-      <div className="mt-4 flex flex-wrap gap-3">
-        {activo ? (
-          <button
-            type="button"
-            onClick={onRevocar}
-            className="rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-sm font-medium text-amber-700 transition hover:bg-amber-50"
-          >
-            Revocar acceso
-          </button>
-        ) : (
-          <button
-            type="button"
-            onClick={onReactivar}
-            className="rounded-lg border border-[#1878B6]/40 bg-white px-3 py-1.5 text-sm font-medium text-[#0F5C8C] transition hover:bg-[#4FB3E8]/10"
-          >
-            Reactivar acceso
-          </button>
-        )}
-        {activo && (
-          <button
-            type="button"
-            onClick={onReset}
-            className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
-          >
-            Restablecer contraseña
-          </button>
-        )}
-        <button
-          type="button"
-          onClick={onEliminar}
-          disabled={!puedeEliminar}
-          className="rounded-lg bg-red-600 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-red-600"
-        >
-          Eliminar cuenta
-        </button>
-      </div>
-      {historial && !historial.puede_eliminar && (
-        <p className="mt-2 text-xs text-red-700/80">
-          No se puede eliminar porque tiene historial: {historial.motivos.join("; ")}. Usa Revocar
-          acceso.
-        </p>
-      )}
-      {passwordTemporal && (
-        <div className="mt-4 rounded-xl bg-white p-3 text-sm text-slate-700 ring-1 ring-emerald-200">
-          Contraseña temporal (se muestra solo esta vez):{" "}
-          <code className="font-mono font-semibold tracking-wider">{passwordTemporal}</code>
-        </div>
-      )}
-      {error && <p className="mt-3 text-sm font-medium text-red-700">{error}</p>}
-    </div>
-  );
-}
-
 /* Roles: chips + botones para asignar/quitar según quién consulta. */
 function SeccionRoles({ actor, usuario, onCambio }) {
+  const aviso = useAviso();
   const [procesando, setProcesando] = useState(null);
   const [error, setError] = useState(null);
 
@@ -445,6 +338,7 @@ function SeccionRoles({ actor, usuario, onCambio }) {
       onCambio(actualizado);
     } catch (err) {
       setError(err.message);
+      aviso.error(err.message);
     } finally {
       setProcesando(null);
     }
@@ -467,7 +361,7 @@ function SeccionRoles({ actor, usuario, onCambio }) {
                   disabled={procesando !== null}
                   onClick={() => alternar(rol)}
                   aria-pressed={tiene}
-                  className={`rounded-full px-3 py-1 text-xs font-semibold transition disabled:opacity-50 ${
+                  className={`min-h-11 rounded-full px-3 py-1 text-xs font-semibold transition disabled:opacity-50 ${
                     tiene
                       ? "text-white shadow-md shadow-[#1878B6]/30"
                       : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
@@ -489,6 +383,7 @@ function SeccionRoles({ actor, usuario, onCambio }) {
 // --- Componente principal ----------------------------------------------------
 
 export default function UserProfileForm({ actor, userId, onVolver }) {
+  const aviso = useAviso();
   const [originalData, setOriginalData] = useState(null);
   const [formData, setFormData] = useState(null);
   const [academias, setAcademias] = useState([]);
@@ -499,9 +394,9 @@ export default function UserProfileForm({ actor, userId, onVolver }) {
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState(null);
 
-  const [accionPeligro, setAccionPeligro] = useState(null); // 'revocar' | 'reactivar' | 'reset' | 'eliminar'
+  // 'revocar' | 'reactivar' | 'reset' | 'eliminar' | 'eliminar-bloqueada'
+  const [accionPeligro, setAccionPeligro] = useState(null);
   const [procesandoPeligro, setProcesandoPeligro] = useState(false);
-  const [errorPeligro, setErrorPeligro] = useState(null);
   const [passwordTemporal, setPasswordTemporal] = useState(null);
   const [historial, setHistorial] = useState(null); // { puede_eliminar, motivos }
 
@@ -586,19 +481,29 @@ export default function UserProfileForm({ actor, userId, onVolver }) {
   }
 
   function pedirConfirmacion(accion) {
-    setErrorPeligro(null);
     setPasswordTemporal(null);
     setAccionPeligro(accion);
   }
 
+  // El botón "Eliminar cuenta" siempre se puede pulsar (una vez cargado el
+  // historial): si el historial lo permite abre el diálogo "escribir"; si no,
+  // abre el diálogo "bloqueado" con el motivo y qué hacer en su lugar.
+  function alPedirEliminar() {
+    if (historial?.puede_eliminar) {
+      pedirConfirmacion("eliminar");
+    } else {
+      pedirConfirmacion("eliminar-bloqueada");
+    }
+  }
+
   async function confirmarAccion() {
-    if (!accionPeligro) return;
+    if (!accionPeligro || accionPeligro === "eliminar-bloqueada") return;
     setProcesandoPeligro(true);
-    setErrorPeligro(null);
     try {
       if (accionPeligro === "eliminar") {
         await api(`/api/usuarios/${userId}`, { method: "DELETE" });
         setAccionPeligro(null);
+        aviso.exito(`Se eliminó la cuenta de ${nombreCompleto(originalData)}.`);
         onVolver?.();
         return;
       }
@@ -606,11 +511,29 @@ export default function UserProfileForm({ actor, userId, onVolver }) {
         const datos = await api(`/api/usuarios/${userId}/reset-password`, { method: "POST" });
         aplicar(datos.usuario);
         setPasswordTemporal(datos.password_temporal);
-      } else {
-        const ruta = accionPeligro === "reactivar" ? "reactivar" : "revocar";
-        aplicar(await api(`/api/usuarios/${userId}/${ruta}`, { method: "PATCH" }));
+        setAccionPeligro(null);
+        return;
       }
+      const ruta = accionPeligro === "reactivar" ? "reactivar" : "revocar";
+      const actualizado = await api(`/api/usuarios/${userId}/${ruta}`, { method: "PATCH" });
+      aplicar(actualizado);
       setAccionPeligro(null);
+      const nombre = nombreCompleto(actualizado);
+      if (accionPeligro === "revocar") {
+        aviso.exito(`Se revocó el acceso de ${nombre}.`, {
+          deshacer: async () => {
+            try {
+              const reactivado = await api(`/api/usuarios/${userId}/reactivar`, { method: "PATCH" });
+              aplicar(reactivado);
+              aviso.exito(`Se reactivó el acceso de ${nombreCompleto(reactivado)}.`);
+            } catch (err) {
+              aviso.error(err.message);
+            }
+          },
+        });
+      } else {
+        aviso.exito(`Se reactivó el acceso de ${nombre}.`);
+      }
     } catch (err) {
       // HU-7: al revocar a un docente con asignaciones vigentes el backend
       // responde 409 con la lista; se muestra completa para que se sepa qué
@@ -620,7 +543,7 @@ export default function UserProfileForm({ actor, userId, onVolver }) {
         Array.isArray(asignaciones) && asignaciones.length > 0
           ? `: ${asignaciones.map((a) => a.descripcion ?? a.rol).join("; ")}`
           : "";
-      setErrorPeligro(`${err.message || "No se pudo completar la acción."}${detalle}`);
+      aviso.error(`${err.message || "No se pudo completar la acción."}${detalle}`);
       setAccionPeligro(null);
     } finally {
       setProcesandoPeligro(false);
@@ -632,9 +555,17 @@ export default function UserProfileForm({ actor, userId, onVolver }) {
       <div className="mx-auto max-w-2xl">
         <VolverLink onVolver={onVolver} />
         <div className={`rounded-3xl p-8 ${VIDRIO} bg-white/85`}>
-          <div className="flex items-center gap-2 text-slate-500">
-            <span className="h-4 w-4 animate-spin rounded-full border-2 border-[#1878B6] border-t-transparent" />
-            <span>Cargando usuario…</span>
+          <div className="flex items-center gap-4">
+            <Esqueleto className="h-14 w-14 shrink-0 rounded-full" />
+            <div className="flex-1 space-y-2">
+              <Esqueleto className="h-4 w-1/3" />
+              <Esqueleto className="h-5 w-2/3" />
+            </div>
+          </div>
+          <div className="mt-6 space-y-3">
+            <Esqueleto className="h-4 w-full" />
+            <Esqueleto className="h-4 w-full" />
+            <Esqueleto className="h-4 w-3/4" />
           </div>
         </div>
       </div>
@@ -683,50 +614,52 @@ export default function UserProfileForm({ actor, userId, onVolver }) {
     return <FieldView key={def.key} label={def.label} value={valor} />;
   };
 
+  const configConfirmacion = CONFIG_CONFIRMACION[accionPeligro];
+
   return (
     <div className="mx-auto max-w-2xl">
       <VolverLink onVolver={onVolver} />
 
       <div className={`overflow-hidden rounded-3xl ${VIDRIO} bg-white/85`}>
-        {/* Encabezado: inicial + roles + nombre + fecha de alta */}
-        <div className="flex items-start gap-4 border-b border-slate-100 p-6 sm:p-8">
-          <span
-            className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full text-xl font-bold text-white"
-            style={{ backgroundImage: GRAD_AZUL }}
-            aria-hidden="true"
-          >
-            {inicial}
-          </span>
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <ActivoBadge activo={originalData.activo} />
-              {originalData.debe_cambiar_password && (
-                <span className="inline-flex items-center rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-medium text-amber-700 ring-1 ring-amber-200">
-                  Contraseña temporal
-                </span>
-              )}
-            </div>
-            <h1 className="mt-1.5 truncate text-xl font-bold text-slate-900">
-              {nombreCompleto(originalData)}
-            </h1>
-            <p className="mt-0.5 text-sm text-slate-500">
-              Agregado el {formatFecha(originalData.creado_en)}
-            </p>
-          </div>
-          {!isEditing && puedeEditar && (
-            <button
-              type="button"
-              onClick={() => {
-                setIsEditing(true);
-                setSaveError(null);
-              }}
-              className="shrink-0 rounded-full px-4 py-2 text-sm font-semibold text-white shadow-md shadow-[#1878B6]/30 transition hover:-translate-y-0.5"
-              style={{ background: GRAD_AZUL }}
+        <EncabezadoFicha
+          figura={
+            <span
+              className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full text-xl font-bold text-white"
+              style={{ backgroundImage: GRAD_AZUL }}
+              aria-hidden="true"
             >
-              Editar
-            </button>
-          )}
-        </div>
+              {inicial}
+            </span>
+          }
+          etiquetas={
+            <>
+              <Etiqueta variante={originalData.activo ? "exito" : "neutro"}>
+                {originalData.activo ? "Activo" : "Acceso revocado"}
+              </Etiqueta>
+              {originalData.debe_cambiar_password && (
+                <Etiqueta variante="alerta">Contraseña temporal</Etiqueta>
+              )}
+            </>
+          }
+          titulo={nombreCompleto(originalData)}
+          subtitulo={`Agregado el ${formatFecha(originalData.creado_en)}`}
+          acciones={
+            !isEditing &&
+            puedeEditar && (
+              <button
+                type="button"
+                onClick={() => {
+                  setIsEditing(true);
+                  setSaveError(null);
+                }}
+                className="min-h-11 rounded-full px-4 py-2 text-sm font-semibold text-white shadow-md shadow-[#1878B6]/30 transition hover:-translate-y-0.5"
+                style={{ background: GRAD_AZUL }}
+              >
+                Editar
+              </button>
+            )
+          }
+        />
 
         {/* Datos generales */}
         <div className="px-6 pt-2 sm:px-8">
@@ -772,7 +705,7 @@ export default function UserProfileForm({ actor, userId, onVolver }) {
               type="button"
               onClick={handleCancel}
               disabled={isSaving}
-              className="cursor-pointer rounded-full border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+              className="min-h-11 cursor-pointer rounded-full border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
             >
               Cancelar
             </button>
@@ -781,7 +714,7 @@ export default function UserProfileForm({ actor, userId, onVolver }) {
               onClick={handleSave}
               disabled={isSaving}
               style={{ background: GRAD_AZUL }}
-              className="flex cursor-pointer items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold text-white shadow-md shadow-[#1878B6]/30 transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50"
+              className="flex min-h-11 cursor-pointer items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold text-white shadow-md shadow-[#1878B6]/30 transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {isSaving && <Spinner />}
               Guardar cambios
@@ -794,23 +727,70 @@ export default function UserProfileForm({ actor, userId, onVolver }) {
 
       {!isEditing && puedeEditar && (
         <ZonaPeligro
-          activo={originalData.activo}
-          error={errorPeligro}
-          passwordTemporal={passwordTemporal}
-          historial={historial}
-          onEliminar={() => pedirConfirmacion("eliminar")}
-          onRevocar={() => pedirConfirmacion("revocar")}
-          onReactivar={() => pedirConfirmacion("reactivar")}
-          onReset={() => pedirConfirmacion("reset")}
-        />
+          titulo="Acceso a la cuenta"
+          descripcion="Revocar conserva el historial y se puede revertir. Eliminar borra la cuenta y solo está disponible para cuentas sin historial (altas duplicadas o por error)."
+        >
+          {originalData.activo ? (
+            <button
+              type="button"
+              onClick={() => pedirConfirmacion("revocar")}
+              className="min-h-11 rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-sm font-medium text-amber-700 transition hover:bg-amber-50"
+            >
+              Revocar acceso
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => pedirConfirmacion("reactivar")}
+              className="min-h-11 rounded-lg border border-[#1878B6]/40 bg-white px-3 py-1.5 text-sm font-medium text-[#0F5C8C] transition hover:bg-[#4FB3E8]/10"
+            >
+              Reactivar acceso
+            </button>
+          )}
+          {originalData.activo && (
+            <button
+              type="button"
+              onClick={() => pedirConfirmacion("reset")}
+              className="min-h-11 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+            >
+              Restablecer contraseña
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={alPedirEliminar}
+            disabled={historial === null}
+            className="min-h-11 rounded-lg bg-red-600 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-red-600"
+          >
+            Eliminar cuenta
+          </button>
+          {passwordTemporal && (
+            <div className="mt-1 w-full rounded-xl bg-white p-3 text-sm text-slate-700 ring-1 ring-emerald-200">
+              Contraseña temporal (se muestra solo esta vez):{" "}
+              <code className="font-mono font-semibold tracking-wider">{passwordTemporal}</code>
+            </div>
+          )}
+        </ZonaPeligro>
       )}
 
-      <ConfirmDialog
-        accion={accionPeligro}
-        nombre={nombreCompleto(originalData)}
-        onCancelar={() => !procesandoPeligro && setAccionPeligro(null)}
+      <DialogoConfirmacion
+        abierto={Boolean(accionPeligro)}
+        nivel={configConfirmacion?.nivel ?? "simple"}
+        titulo={configConfirmacion?.titulo}
+        descripcion={configConfirmacion?.descripcion?.(nombreCompleto(originalData))}
+        etiquetaConfirmar={configConfirmacion?.etiquetaConfirmar}
+        colorConfirmar={configConfirmacion?.colorConfirmar}
+        textoEsperado={originalData.correo}
+        motivoBloqueo={
+          accionPeligro === "eliminar-bloqueada"
+            ? `No se puede eliminar porque tiene historial: ${
+                historial?.motivos?.join("; ") ?? "sin detalle"
+              }. Usa "Revocar acceso" en su lugar.`
+            : undefined
+        }
+        cargando={procesandoPeligro}
         onConfirmar={confirmarAccion}
-        procesando={procesandoPeligro}
+        onCancelar={() => !procesandoPeligro && setAccionPeligro(null)}
       />
     </div>
   );

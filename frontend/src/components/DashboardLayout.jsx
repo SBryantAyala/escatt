@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { NavLink, useLocation } from "react-router-dom";
 import { nombreCompleto } from "../lib/nombre";
 import { AZUL_CLARO, AZUL_MEDIO, GRAD_AZUL } from "../lib/theme";
 import { IconoCerrar, IconoInicio, IconoMenu, IconoSalir } from "./iconos";
@@ -9,24 +10,23 @@ import { IconoCerrar, IconoInicio, IconoMenu, IconoSalir } from "./iconos";
 // Es puramente presentacional: no sabe qué secciones existen. Quien lo usa
 // (pages/Panel) le pasa la navegación ya filtrada por rol y decide qué
 // renderizar en `children`. En móvil la sidebar colapsa a un drawer con
-// botón hamburguesa.
+// botón hamburguesa. El ítem activo del sidebar lo decide NavLink según la
+// URL (no un estado): un link a "/panel/usuarios" queda resaltado también en
+// "/panel/usuarios/123" o "/panel/usuarios/nuevo", que es justo lo que se
+// quiere para Detalle y Alta (ocultos del sidebar, pero dentro de Usuarios).
 //
 // Props:
 //   usuario         objeto de sesión (se usa nombre + iniciales)
 //   etiquetaRol     "Alumno" | "Sinodal" | "Personal CATT"
-//   navegacion      [{ categoria, items: [{ clave, etiqueta, icono, proximamente }] }]
-//   seccionActiva   clave de la sección seleccionada
-//   onSeleccionar   (clave) => void
+//   navegacion      [{ categoria, items: [{ clave, ruta, etiqueta, icono, proximamente }] }]
 //   breadcrumb      etiqueta de la sección actual (texto)
 //   onCerrarSesion  cerrar sesión (viene de App)
 //   onVolverInicio  volver a la landing (viene de App)
-//   children        contenido de la sección activa
+//   children        contenido de la sección activa (el <Outlet/> de la ruta)
 export default function DashboardLayout({
   usuario,
   etiquetaRol,
   navegacion,
-  seccionActiva,
-  onSeleccionar,
   breadcrumb,
   onCerrarSesion,
   onVolverInicio,
@@ -36,11 +36,12 @@ export default function DashboardLayout({
   const botonMenuRef = useRef(null);
   const cerrarMenuRef = useRef(null);
   const primerRenderRef = useRef(true);
+  const location = useLocation();
 
-  // El drawer móvil se cierra al cambiar de sección o al presionar Escape.
+  // El drawer móvil se cierra al cambiar de ruta o al presionar Escape.
   useEffect(() => {
     setMenuAbierto(false);
-  }, [seccionActiva]);
+  }, [location.pathname]);
 
   useEffect(() => {
     const alPresionar = (e) => {
@@ -102,33 +103,36 @@ export default function DashboardLayout({
             </p>
             <ul className="space-y-1">
               {grupo.items.map((item) => {
-                const activo = item.clave === seccionActiva;
                 const Icono = item.icono;
                 return (
                   <li key={item.clave}>
-                    <button
-                      type="button"
-                      onClick={() => onSeleccionar(item.clave)}
-                      aria-current={activo ? "page" : undefined}
-                      className={`flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition ${
-                        activo
-                          ? "text-white shadow-md shadow-[#1878B6]/30"
-                          : "text-slate-300 hover:bg-white/5 hover:text-white"
-                      }`}
-                      style={activo ? { backgroundImage: GRAD_AZUL } : undefined}
+                    <NavLink
+                      to={item.ruta}
+                      className={({ isActive }) =>
+                        `flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition ${
+                          isActive
+                            ? "text-white shadow-md shadow-[#1878B6]/30"
+                            : "text-slate-300 hover:bg-white/5 hover:text-white"
+                        }`
+                      }
+                      style={({ isActive }) => (isActive ? { backgroundImage: GRAD_AZUL } : undefined)}
                     >
-                      <Icono className="h-5 w-5 shrink-0" />
-                      <span className="truncate">{item.etiqueta}</span>
-                      {item.proximamente && (
-                        <span
-                          className={`ml-auto rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${
-                            activo ? "bg-white/20 text-white" : "bg-white/10 text-slate-300"
-                          }`}
-                        >
-                          Pronto
-                        </span>
+                      {({ isActive }) => (
+                        <>
+                          <Icono className="h-5 w-5 shrink-0" />
+                          <span className="truncate">{item.etiqueta}</span>
+                          {item.proximamente && (
+                            <span
+                              className={`ml-auto rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${
+                                isActive ? "bg-white/20 text-white" : "bg-white/10 text-slate-300"
+                              }`}
+                            >
+                              Pronto
+                            </span>
+                          )}
+                        </>
                       )}
-                    </button>
+                    </NavLink>
                   </li>
                 );
               })}
