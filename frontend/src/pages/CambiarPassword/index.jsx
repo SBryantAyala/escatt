@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useAviso } from "../../components/ui/Avisos";
 import { api } from "../../lib/api";
-import { AZUL_CLARO, AZUL_MEDIO, GRAD_AZUL, VIDRIO } from "../../lib/theme";
+import { AZUL_CLARO, AZUL_MEDIO, VIDRIO } from "../../lib/theme";
 
 // HU-5: cambio de contraseña.
 //
@@ -133,7 +133,7 @@ export function FormCambioPassword({ onCambiada, textoBoton = "Cambiar contrase�
         type="submit"
         disabled={enviando}
         className="w-full rounded-full px-5 py-2.5 font-semibold text-white shadow-lg shadow-[#1878B6]/30 transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
-        style={{ backgroundImage: GRAD_AZUL }}
+        style={{ backgroundColor: AZUL_MEDIO }}
       >
         {enviando ? "Guardando…" : textoBoton}
       </button>

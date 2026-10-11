@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { Children, useEffect, useState } from "react";
 import { api } from "../../../lib/api";
 import { CARRERAS, ETIQUETA_ROL, PLANES, ROLES_CATT, ROLES_GESTION, tieneRol } from "../../../lib/roles";
-import { GRAD_AZUL, VIDRIO } from "../../../lib/theme";
+import { AZUL_MEDIO, VIDRIO } from "../../../lib/theme";
+import { IconoAcademia, IconoAltaUsuario, IconoCuenta, IconoDocumento } from "../../../components/iconos";
 
 // Pantalla: Alta de usuario (HU-4 docentes/alumnos, HU-6 personal CATT).
 // Vive en /panel/usuarios/nuevo?perfil=alumno|docente|personal_catt.
@@ -35,23 +36,45 @@ const CAMPOS_INICIALES = {
 };
 
 const claseInput =
-  "w-full rounded-xl border border-slate-200 bg-white/80 px-3 py-2.5 text-sm outline-none transition focus:border-[#1878B6] focus:ring-2 focus:ring-[#4FB3E8]/40";
-const claseLabel = "mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500";
+  "alta-control min-h-13 w-full min-w-0 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-800 outline-none transition duration-200 placeholder:font-normal placeholder:text-slate-500 hover:border-blue-300 focus:border-blue-600 focus:ring-4 focus:ring-blue-100 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-500";
+const claseLabel = "mb-2 flex flex-wrap items-center gap-1 text-sm font-semibold text-slate-800";
 
 function Campo({ label, opcional, children }) {
   return (
-    <label className="block">
+    <label className="block min-w-0">
       <span className={claseLabel}>
         {label}
-        {opcional && <span className="ml-1 lowercase text-slate-400">(opcional)</span>}
+        {opcional ? <span className="ml-1 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">Opcional</span> : <span aria-hidden="true" className="text-blue-700">*</span>}
       </span>
       {children}
     </label>
   );
 }
 
+function Selector({ children, className = "", ...props }) {
+  const opciones = Children.toArray(children);
+  const seleccionada = opciones.find((opcion) => String(opcion.props.value) === String(props.value)) || opciones[0];
+  return (
+    <span className="alta-selector relative grid w-full min-w-0">
+      <select {...props} className={`${claseInput} absolute inset-0 h-full appearance-none pr-11 ${className}`}>{children}</select>
+      <span aria-hidden="true" className={`pointer-events-none relative flex min-h-13 items-center break-words px-4 py-3 pr-11 text-sm leading-relaxed ${props.disabled ? "text-slate-500" : props.value ? "font-medium text-slate-800" : "text-slate-500"}`}><span>{seleccionada?.props.children}</span></span>
+      <span aria-hidden="true" className="pointer-events-none absolute inset-y-0 right-4 flex items-center"><span className="-mt-1 h-2 w-2 rotate-45 border-b-2 border-r-2 border-[#1878B6]" /></span>
+    </span>
+  );
+}
+
+function EncabezadoSeccion({ numero, titulo, Icono, academico = false }) {
+  return (
+    <div className="mb-6 flex items-center gap-3 border-b border-slate-100 pb-5">
+      <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${academico ? "bg-teal-100 text-teal-700" : "bg-blue-100 text-blue-700"}`}><Icono className="h-5 w-5" /></span>
+      <h3 className="text-lg font-bold text-slate-800">{titulo}</h3>
+      <span className={`ml-auto flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-bold ${academico ? "bg-teal-50 text-teal-700" : "bg-blue-50 text-blue-700"}`}>{numero}</span>
+    </div>
+  );
+}
+
 // Tarjeta con la contraseña temporal recién generada.
-function PasswordTemporal({ datos, onOtra, onVerDetalle }) {
+function PasswordTemporal({ datos, onOtra, onVerDetalle, etiquetaOtra }) {
   const [copiado, setCopiado] = useState(false);
   const copiar = async () => {
     try {
@@ -62,8 +85,9 @@ function PasswordTemporal({ datos, onOtra, onVerDetalle }) {
     }
   };
   return (
-    <div className="mt-5 rounded-2xl bg-emerald-50 p-5 text-sm text-emerald-800">
-      <p className="font-semibold">
+    <div className="border-l-4 border-emerald-500 bg-emerald-50 p-5 text-sm text-emerald-800 sm:p-8">
+      <p role="status" className="flex items-center gap-2 text-base font-semibold">
+        <IconoAltaUsuario className="h-5 w-5 shrink-0" />
         Cuenta creada para {datos.usuario.nombre} {datos.usuario.apellido_paterno}.
       </p>
       <p className="mt-2">
@@ -71,15 +95,15 @@ function PasswordTemporal({ datos, onOtra, onVerDetalle }) {
         seguro):
       </p>
       <div className="mt-2 flex flex-wrap items-center gap-2">
-        <code className="rounded-lg bg-white px-3 py-1.5 font-mono text-base tracking-wider text-slate-800 ring-1 ring-emerald-200">
+        <code className="max-w-full break-all rounded-lg bg-white px-4 py-3 font-mono text-lg text-slate-800 ring-1 ring-emerald-200">
           {datos.password_temporal}
         </code>
         <button
           type="button"
           onClick={copiar}
-          className="rounded-full border border-emerald-300 bg-white px-3 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-100"
+          className="min-h-11 rounded-full border border-emerald-300 bg-white px-4 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-100"
         >
-          {copiado ? "Copiada" : "Copiar"}
+          {copiado ? "Contraseña copiada" : "Copiar contraseña"}
         </button>
       </div>
       <p className="mt-2 text-xs text-emerald-700/80">
@@ -89,18 +113,18 @@ function PasswordTemporal({ datos, onOtra, onVerDetalle }) {
         <button
           type="button"
           onClick={onOtra}
-          className="rounded-full px-4 py-1.5 text-xs font-semibold text-white"
-          style={{ backgroundImage: GRAD_AZUL }}
+          className="inline-flex min-h-11 items-center gap-2 rounded-full px-4 text-sm font-semibold text-white"
+          style={{ backgroundColor: AZUL_MEDIO }}
         >
-          Registrar otra persona
+          <IconoAltaUsuario className="h-4 w-4" />{etiquetaOtra}
         </button>
         {onVerDetalle && (
           <button
             type="button"
             onClick={() => onVerDetalle(datos.usuario)}
-            className="rounded-full border border-slate-200 bg-white px-4 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+            className="inline-flex min-h-11 items-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50"
           >
-            Ver ficha
+            <IconoDocumento className="h-4 w-4" />Ver ficha
           </button>
         )}
       </div>
@@ -109,17 +133,13 @@ function PasswordTemporal({ datos, onOtra, onVerDetalle }) {
 }
 
 export default function AltaPage({ actor, perfilInicial = "alumno", academiaPreseleccionada, onVerDetalle }) {
-  const perfilesPermitidos = PERFILES.filter((p) => tieneRol(actor, ...p.altaPor));
-  const inicial = perfilesPermitidos.some((p) => p.valor === perfilInicial)
-    ? perfilInicial
-    : perfilesPermitidos[0]?.valor;
-
-  const [perfil, setPerfil] = useState(inicial);
-  const [form, setForm] = useState(() =>
-    academiaPreseleccionada
-      ? { ...CAMPOS_INICIALES, academia_id: String(academiaPreseleccionada) }
-      : CAMPOS_INICIALES,
-  );
+  const configuracion = PERFILES.find((p) => p.valor === perfilInicial);
+  const perfil = configuracion && tieneRol(actor, ...configuracion.altaPor) ? configuracion.valor : null;
+  const formularioInicial = () => ({
+    ...CAMPOS_INICIALES,
+    ...(perfil === "docente" && academiaPreseleccionada && { academia_id: String(academiaPreseleccionada) }),
+  });
+  const [form, setForm] = useState(formularioInicial);
   // Si se llegó desde "Registrar docente nuevo" en la ficha de una academia,
   // el select de Academia llega bloqueado con esa academia; "Cambiar" lo
   // desbloquea por si la persona se equivocó de ficha.
@@ -143,7 +163,7 @@ export default function AltaPage({ actor, perfilInicial = "alumno", academiaPres
   if (!perfil) {
     return (
       <div className={`mx-auto max-w-2xl rounded-3xl p-8 text-center ${VIDRIO} bg-white/85`}>
-        <p className="text-slate-600">Tu rol no puede dar de alta usuarios.</p>
+        <p className="text-slate-600">{configuracion ? `Tu rol no puede registrar ${configuracion.etiqueta.toLowerCase()}.` : "El tipo de registro solicitado no existe."}</p>
       </div>
     );
   }
@@ -187,7 +207,7 @@ export default function AltaPage({ actor, perfilInicial = "alumno", academiaPres
     try {
       const datos = await api("/api/usuarios", { method: "POST", body: payload });
       setCreado(datos);
-      setForm(CAMPOS_INICIALES);
+      setForm(academiaBloqueada ? formularioInicial() : { ...CAMPOS_INICIALES });
     } catch (err) {
       setError(err.message);
     } finally {
@@ -198,53 +218,47 @@ export default function AltaPage({ actor, perfilInicial = "alumno", academiaPres
   const titulo = PERFILES.find((p) => p.valor === perfil)?.etiqueta ?? "usuario";
 
   return (
-    <div className={`mx-auto max-w-2xl rounded-3xl p-6 sm:p-8 ${VIDRIO} bg-white/85`}>
-      <h2 className="text-2xl font-bold text-slate-800">Alta de {titulo.toLowerCase()}</h2>
-      <p className="mt-1 text-sm text-slate-500">
-        La persona recibirá una contraseña temporal y deberá cambiarla al entrar.
-      </p>
+    <div className="alta-usuario mx-auto max-w-4xl overflow-hidden rounded-[20px] bg-white shadow-md ring-1 ring-slate-100">
+      <header className="flex items-start gap-4 bg-[#1878B6] px-5 py-6 sm:px-8 sm:py-7">
+        <span className="flex h-13 w-13 shrink-0 items-center justify-center rounded-xl bg-white/25 text-white"><IconoAltaUsuario className="h-6 w-6" /></span>
+        <div className="min-w-0">
+          <h2 className="text-2xl font-bold text-white">Alta de {titulo.toLowerCase()}</h2>
+          <p className="mt-2 text-sm leading-relaxed text-blue-100">Crea su cuenta y completa los datos de su perfil en ESCATT.</p>
+        </div>
+      </header>
 
       {creado && (
         <PasswordTemporal
           datos={creado}
+          etiquetaOtra={perfil === "alumno" ? "Registrar otro alumno" : perfil === "docente" ? "Registrar otro docente" : "Registrar otro integrante CATT"}
           onOtra={() => setCreado(null)}
           onVerDetalle={onVerDetalle}
         />
       )}
 
       {error && (
-        <div role="alert" className="mt-5 rounded-2xl bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+        <div role="alert" className="mx-5 mt-5 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700 sm:mx-8">
           {error}
         </div>
       )}
 
       {!creado && (
-        <form onSubmit={enviar} className="mt-6 space-y-4">
-          {perfilesPermitidos.length > 1 && (
-            <Campo label="Tipo de persona">
-              <select
-                value={perfil}
-                onChange={(e) => setPerfil(e.target.value)}
-                className={claseInput}
-              >
-                {perfilesPermitidos.map((p) => (
-                  <option key={p.valor} value={p.valor}>
-                    {p.etiqueta}
-                  </option>
-                ))}
-              </select>
-            </Campo>
-          )}
-
+        <form onSubmit={enviar} autoComplete="off">
+          <fieldset disabled={enviando} className="min-w-0 space-y-8 px-5 py-7 disabled:opacity-70 sm:px-8 sm:py-8">
+          <section>
+          <EncabezadoSeccion numero="01" titulo="Datos personales" Icono={IconoCuenta} />
+          <div className="grid gap-5 sm:grid-cols-2">
+          <div className="sm:col-span-2">
           <Campo label="Nombre(s)">
-            <input required value={form.nombre} onChange={set("nombre")} className={claseInput} />
+            <input required value={form.nombre} onChange={set("nombre")} placeholder="Nombre o nombres de la persona" className={claseInput} />
           </Campo>
-          <div className="grid gap-4 sm:grid-cols-2">
+          </div>
             <Campo label="Apellido paterno">
               <input
                 required
                 value={form.apellido_paterno}
                 onChange={set("apellido_paterno")}
+                placeholder="Primer apellido"
                 className={claseInput}
               />
             </Campo>
@@ -253,10 +267,10 @@ export default function AltaPage({ actor, perfilInicial = "alumno", academiaPres
                 required
                 value={form.apellido_materno}
                 onChange={set("apellido_materno")}
+                placeholder="Segundo apellido"
                 className={claseInput}
               />
             </Campo>
-          </div>
           <Campo label="Correo electrónico">
             <input
               type="email"
@@ -268,10 +282,14 @@ export default function AltaPage({ actor, perfilInicial = "alumno", academiaPres
             />
           </Campo>
           <Campo label="Teléfono" opcional>
-            <input type="tel" value={form.telefono} onChange={set("telefono")} className={claseInput} />
+            <input type="tel" value={form.telefono} onChange={set("telefono")} placeholder="Ej. 5512345678" className={claseInput} />
           </Campo>
+          </div>
+          </section>
 
-          <div className="space-y-4 rounded-2xl bg-white/60 p-4">
+          <section>
+            <EncabezadoSeccion numero="02" titulo={perfil === "alumno" ? "Datos académicos" : perfil === "docente" ? "Información docente" : "Asignación en la CATT"} Icono={IconoAcademia} academico />
+            <div className="space-y-5">
             {perfil === "alumno" && (
               <>
                 <Campo label="Boleta (10 dígitos)">
@@ -279,36 +297,37 @@ export default function AltaPage({ actor, perfilInicial = "alumno", academiaPres
                     required
                     inputMode="numeric"
                     pattern="\d{10}"
+                    maxLength={10}
+                    placeholder="Ingresa los 10 dígitos de la boleta"
                     value={form.boleta}
                     onChange={set("boleta")}
                     className={claseInput}
                   />
                 </Campo>
-                <div className="grid gap-4 sm:grid-cols-2">
+                <div className="grid gap-5 sm:grid-cols-[1.4fr_1fr]">
                   <Campo label="Carrera">
-                    <select required value={form.carrera} onChange={set("carrera")} className={claseInput}>
-                      <option value="">Selecciona…</option>
+                    <Selector required value={form.carrera} onChange={set("carrera")}>
+                      <option value="">Selecciona una carrera</option>
                       {CARRERAS.map((c) => (
                         <option key={c.valor} value={c.valor}>
                           {c.etiqueta}
                         </option>
                       ))}
-                    </select>
+                    </Selector>
                   </Campo>
                   <Campo label="Plan de estudios">
-                    <select
+                    <Selector
                       required
                       value={form.plan_estudios}
                       onChange={set("plan_estudios")}
-                      className={claseInput}
                     >
-                      <option value="">Selecciona…</option>
+                      <option value="">Selecciona un plan</option>
                       {PLANES.map((p) => (
                         <option key={p} value={p}>
                           Plan {p}
                         </option>
                       ))}
-                    </select>
+                    </Selector>
                   </Campo>
                 </div>
               </>
@@ -329,14 +348,11 @@ export default function AltaPage({ actor, perfilInicial = "alumno", academiaPres
               <>
                 <Campo label="Academia">
                   <div className="flex items-center gap-2">
-                    <select
+                    <Selector
                       required
                       value={form.academia_id}
                       onChange={set("academia_id")}
                       disabled={academiaBloqueada}
-                      className={`${claseInput} ${
-                        academiaBloqueada ? "cursor-not-allowed bg-slate-100 text-slate-500" : ""
-                      }`}
                     >
                       <option value="">Selecciona…</option>
                       {academias.map((a) => (
@@ -344,7 +360,7 @@ export default function AltaPage({ actor, perfilInicial = "alumno", academiaPres
                           {a.nombre}
                         </option>
                       ))}
-                    </select>
+                    </Selector>
                     {academiaBloqueada && (
                       <button
                         type="button"
@@ -374,13 +390,13 @@ export default function AltaPage({ actor, perfilInicial = "alumno", academiaPres
             {perfil === "personal_catt" && (
               <>
                 <Campo label="Rol en la CATT">
-                  <select value={form.rol_catt} onChange={set("rol_catt")} className={claseInput}>
+                  <Selector value={form.rol_catt} onChange={set("rol_catt")}>
                     {ROLES_CATT.map((r) => (
                       <option key={r} value={r}>
                         {ETIQUETA_ROL[r]}
                       </option>
                     ))}
-                  </select>
+                  </Selector>
                 </Campo>
                 <Campo label="Cargo" opcional>
                   <input
@@ -392,16 +408,25 @@ export default function AltaPage({ actor, perfilInicial = "alumno", academiaPres
                 </Campo>
               </>
             )}
-          </div>
+            </div>
+          </section>
+          </fieldset>
 
+          <div className="flex flex-col gap-4 border-t border-blue-100 bg-blue-50 px-5 py-6 md:flex-row md:items-center md:justify-between sm:px-8">
+          <div className="min-w-0">
+            <p className="text-sm font-bold text-blue-800">Acceso con contraseña temporal</p>
+            <p className="mt-1 max-w-sm text-sm leading-relaxed text-slate-600">Se mostrará al registrar la cuenta. La persona deberá cambiarla en su primer acceso.</p>
+          </div>
           <button
             type="submit"
             disabled={enviando}
-            className="w-full rounded-full px-5 py-2.5 font-semibold text-white shadow-lg shadow-[#1878B6]/30 transition hover:-translate-y-0.5 hover:shadow-xl disabled:cursor-not-allowed disabled:opacity-60"
-            style={{ backgroundImage: GRAD_AZUL }}
+            className="inline-flex min-h-12 w-full shrink-0 items-center justify-center gap-2 rounded-full bg-[#1878B6] px-6 py-3 text-sm font-bold text-white shadow-md transition hover:bg-[#0F5C8C] hover:shadow-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 disabled:cursor-not-allowed disabled:opacity-60 md:w-auto"
           >
+            {enviando ? <span aria-hidden="true" className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white motion-reduce:animate-none" /> : <IconoAltaUsuario className="h-4 w-4" />}
             {enviando ? "Registrando…" : `Registrar ${titulo.toLowerCase()}`}
           </button>
+          </div>
+          <p className="bg-blue-50 px-5 pb-5 text-sm text-slate-600 sm:px-8"><span className="font-semibold text-blue-700">*</span> Campos obligatorios</p>
         </form>
       )}
     </div>

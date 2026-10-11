@@ -56,13 +56,13 @@ function TarjetaAcademia({ academia, indice }) {
       }`}
     >
       <div
-        className="flex items-center gap-3 px-5 py-6"
+        className="flex items-start gap-3 px-5 py-6"
         style={{ backgroundColor: inactiva ? "#64748b" : color.hex }}
       >
         <span className="flex h-13 w-13 shrink-0 items-center justify-center rounded-xl bg-white/25">
           <Icono className="h-6 w-6 text-white motion-safe:transition-transform motion-safe:duration-300 motion-safe:group-hover:rotate-6" />
         </span>
-        <span className="min-w-0 truncate text-xl font-bold text-white">{academia.nombre}</span>
+        <span className="min-w-0 text-xl font-bold leading-snug text-white">{academia.nombre}</span>
       </div>
 
       <div className="flex flex-1 flex-col gap-4 bg-white p-5">
@@ -72,7 +72,7 @@ function TarjetaAcademia({ academia, indice }) {
           </Etiqueta>
         )}
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-start gap-3">
           {academia.presidente ? (
             <>
               <span
@@ -84,7 +84,7 @@ function TarjetaAcademia({ academia, indice }) {
               </span>
               <div className="min-w-0">
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Presidente</p>
-                <p className="truncate text-sm font-medium text-slate-800">
+                <p className="text-sm font-medium leading-snug text-slate-800">
                   {academia.presidente.nombre_completo}
                 </p>
               </div>

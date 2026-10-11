@@ -86,11 +86,13 @@ export default function SelectorColorIcono({ nombre, color, icono, onCambiarColo
       <div>
         <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Vista previa</p>
         <div className="w-48 overflow-hidden rounded-[20px] shadow-md">
-          <div className="flex items-center gap-3 px-4 py-5" style={{ backgroundColor: colorActual.hex }}>
+          <div className="flex items-start gap-3 px-4 py-5" style={{ backgroundColor: colorActual.hex }}>
             <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/25">
               <IconoActual className="h-5 w-5 text-white" />
             </span>
-            <span className="truncate text-sm font-bold text-white">{nombre || "Nombre de la academia"}</span>
+            <span className="min-w-0 text-sm font-bold leading-snug text-white">
+              {nombre || "Nombre de la academia"}
+            </span>
           </div>
           <div className="bg-white p-3">
             <p className="text-xs text-slate-400">Así se verá la tarjeta.</p>

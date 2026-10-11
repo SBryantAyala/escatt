@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import useDialogoAccesible from "../../components/ui/useDialogoAccesible";
 import { CLAVES_COLOR_ACADEMIA, ICONOS_ACADEMIA } from "../../lib/academias";
-import { GRAD_AZUL } from "../../lib/theme";
+import { AZUL_MEDIO } from "../../lib/theme";
 import SelectorColorIcono from "./SelectorColorIcono";
 
 // Diálogo para dar de alta una academia: nombre, departamento, color e
@@ -94,7 +94,7 @@ export default function DialogoNuevaAcademia({ abierto, onCerrar, onCrear, crean
             <button
               type="submit"
               disabled={creando || !nombre.trim()}
-              style={{ background: GRAD_AZUL }}
+              style={{ backgroundColor: AZUL_MEDIO }}
               className="min-h-11 rounded-lg px-4 py-1.5 text-sm font-medium text-white shadow-md shadow-[#1878B6]/30 transition disabled:cursor-not-allowed disabled:opacity-50"
             >
               {creando ? "Creando…" : "Crear academia"}

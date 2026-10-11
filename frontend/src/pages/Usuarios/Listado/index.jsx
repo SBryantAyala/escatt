@@ -5,10 +5,10 @@ import Esqueleto from "../../../components/ui/Esqueleto";
 import Etiqueta from "../../../components/ui/Etiqueta";
 import Pestanas, { usePestanaUrl } from "../../../components/ui/Pestanas";
 import TablaDatos from "../../../components/ui/TablaDatos";
+import { IconoAltaUsuario, IconoUsuarios } from "../../../components/iconos";
 import { api } from "../../../lib/api";
 import { nombreCompleto } from "../../../lib/nombre";
-import { esCuentaDePersonal, ROLES_CATT, ROLES_GESTION, tieneRol } from "../../../lib/roles";
-import { GRAD_AZUL, VIDRIO } from "../../../lib/theme";
+import { CARRERAS, esCuentaDePersonal, ROLES_CATT, ROLES_GESTION, tieneRol } from "../../../lib/roles";
 
 // Pantalla: Listado de usuarios (HU-3): consulta + búsqueda por pestaña.
 // Consume GET /api/usuarios. Cada fila es clickeable y lleva al Detalle del
@@ -24,7 +24,7 @@ import { GRAD_AZUL, VIDRIO } from "../../../lib/theme";
 //   Docentes       -> perfil docente (incluye presidentes de academia)
 //   Personal CATT  -> perfil personal_catt o rol admin/CATT
 // Una persona con dos perfiles (p. ej. docente comisionado a la CATT) aparece
-// en ambas pestañas. Los roles se muestran como chips en cada fila.
+// en ambas pestañas. Las columnas se adaptan a la información de cada perfil.
 const PESTANAS = [
   {
     id: "alumnos",
@@ -63,7 +63,18 @@ const FILTROS_ESTADO = [
   { id: "todos", etiqueta: "Todos" },
   { id: "activa", etiqueta: "Activos" },
   { id: "revocada", etiqueta: "Revocados" },
+  { id: "temporal", etiqueta: "Contraseña temporal" },
 ];
+
+const TONOS_CARRERA = {
+  ISC: "bg-blue-100 text-blue-700 ring-blue-200",
+  IIA: "bg-violet-100 text-violet-700 ring-violet-200",
+  LCD: "bg-teal-100 text-teal-700 ring-teal-200",
+};
+
+function FiltroSelect({ label, children, ...props }) {
+  return <label className="relative block min-w-0"><span className="sr-only">{label}</span><select {...props} className="min-h-12 w-full appearance-none rounded-2xl border border-slate-200 bg-white py-2 pl-4 pr-10 text-sm font-medium text-slate-700 outline-none transition hover:border-blue-300 focus:border-blue-600 focus:ring-4 focus:ring-blue-100">{children}</select><span aria-hidden="true" className="pointer-events-none absolute inset-y-0 right-4 flex items-center"><span className="-mt-1 h-2 w-2 rotate-45 border-b-2 border-r-2 border-blue-700" /></span></label>;
+}
 
 // Sin acentos y en minúsculas, para que buscar "jose" también encuentre "José".
 function normalizar(texto) {
@@ -95,6 +106,7 @@ export default function ListadoPage({ actor }) {
   const [tabUrl, cambiarTabUrl] = usePestanaUrl(pestanas);
   const [busqueda, setBusqueda] = useState("");
   const [filtroEstado, setFiltroEstado] = useState("todos");
+  const [filtroCarrera, setFiltroCarrera] = useState("");
 
   const cargarUsuarios = useCallback(() => {
     setCargando(true);
@@ -113,6 +125,8 @@ export default function ListadoPage({ actor }) {
   function cambiarTab(id) {
     cambiarTabUrl(id);
     setBusqueda("");
+    setFiltroEstado("todos");
+    setFiltroCarrera("");
   }
 
   // Conteo por pestaña (sobre el total, no sobre lo filtrado).
@@ -127,10 +141,13 @@ export default function ListadoPage({ actor }) {
   const pestanaActiva = pestanas.find((p) => p.id === tabUrl) ?? pestanas[0];
   const tituloTabActiva = pestanaActiva.titulo;
   const puedeDarDeAlta = tieneRol(actor, ...pestanaActiva.altaPor);
+  const usuariosDelPerfil = useMemo(() => (usuarios ?? []).filter((u) => pestanaActiva.pertenece(u)), [usuarios, pestanaActiva]);
 
   const usuariosDeLaTab = useMemo(() => {
-    let lista = (usuarios ?? []).filter((u) => pestanaActiva.pertenece(u));
-    if (filtroEstado !== "todos") lista = lista.filter((u) => u.estado === filtroEstado);
+    let lista = usuariosDelPerfil;
+    if (filtroEstado === "temporal") lista = lista.filter((u) => u.activo && u.debe_cambiar_password);
+    else if (filtroEstado !== "todos") lista = lista.filter((u) => u.estado === filtroEstado);
+    if (pestanaActiva.id === "alumnos" && filtroCarrera) lista = lista.filter((u) => u.carrera === filtroCarrera);
     // Alfabético por nombre; las cuentas revocadas van al final del listado.
     lista = [...lista].sort(
       (a, b) =>
@@ -145,45 +162,52 @@ export default function ListadoPage({ actor }) {
         normalizar(u.correo).includes(consulta) ||
         normalizar(u[pestanaActiva.identificador.campo]).includes(consulta),
     );
-  }, [usuarios, pestanaActiva, busqueda, filtroEstado]);
+  }, [usuariosDelPerfil, pestanaActiva, busqueda, filtroEstado, filtroCarrera]);
 
   const columnas = useMemo(
     () => [
       {
         clave: "nombre",
-        titulo: "Nombre",
+        titulo: pestanaActiva.id === "alumnos" ? "Alumno" : "Usuario",
+        ordenable: true,
+        valorOrden: nombreCompleto,
         render: (u) => (
-          <>
-            <p className="font-medium text-slate-700">{nombreCompleto(u)}</p>
-            <p className="text-xs text-slate-400">{u.correo}</p>
-          </>
+          <div className="flex min-w-[240px] items-center gap-3">
+            <span aria-hidden="true" className={`usuario-avatar flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-sm font-bold ring-1 ring-inset transition-transform duration-200 ${u.activo ? TONOS_CARRERA[u.carrera] ?? "bg-blue-100 text-blue-700 ring-blue-200" : "bg-slate-100 text-slate-500 ring-slate-200"}`}>{[u.nombre?.trim()[0], u.apellido_paterno?.trim()[0]].filter(Boolean).join("").toUpperCase() || "U"}</span>
+            <div className="min-w-0"><p className="text-sm font-semibold leading-relaxed text-slate-800">{nombreCompleto(u)}</p><p className="mt-1 break-all text-sm text-slate-500">{u.correo}</p></div>
+          </div>
         ),
       },
       {
         clave: "identificador",
         titulo: pestanaActiva.identificador.label,
-        render: (u) => u[pestanaActiva.identificador.campo] || "—",
+        ordenable: true,
+        valorOrden: (u) => u[pestanaActiva.identificador.campo],
+        render: (u) => <span className="whitespace-nowrap text-sm font-medium tabular-nums text-slate-800">{u[pestanaActiva.identificador.campo] || "—"}</span>,
       },
       {
         clave: "extra",
-        titulo: pestanaActiva.extra.label,
-        render: (u) => pestanaActiva.extra.valor(u),
+        titulo: pestanaActiva.id === "alumnos" ? "Carrera" : pestanaActiva.extra.label,
+        ordenable: true,
+        valorOrden: (u) => pestanaActiva.id === "alumnos" ? u.carrera : pestanaActiva.extra.valor(u),
+        render: (u) => pestanaActiva.id === "alumnos" ? <span title={CARRERAS.find((c) => c.valor === u.carrera)?.etiqueta} className={`inline-flex rounded-full px-3 py-1.5 text-sm font-bold ${TONOS_CARRERA[u.carrera] ?? "bg-slate-100 text-slate-500"}`}>{u.carrera || "—"}</span> : <span className="text-sm font-medium leading-relaxed text-slate-700">{pestanaActiva.extra.valor(u)}</span>,
       },
-      { clave: "roles", titulo: "Roles", render: (u) => <ChipsRol roles={u.roles} /> },
+      ...(pestanaActiva.id === "alumnos" ? [{ clave: "plan", titulo: "Plan", ordenable: true, valorOrden: (u) => u.plan_estudios, render: (u) => <span className="text-sm font-medium text-slate-700">{u.plan_estudios || "—"}</span> }] : pestanaActiva.id === "docentes" ? [{ clave: "contacto", titulo: "Contacto", render: (u) => <div className="text-sm text-slate-700"><p className="whitespace-nowrap">{u.telefono || "Sin teléfono"}</p>{u.extension && <p className="mt-1 text-slate-500">Ext. {u.extension}</p>}</div> }] : [{ clave: "roles", titulo: "Responsabilidad", render: (u) => <ChipsRol roles={u.roles} /> }]),
       {
         clave: "estado",
-        titulo: "Estado",
+        titulo: "Acceso",
         render: (u) => (
           <>
-            <Etiqueta variante={u.activo ? "exito" : "neutro"}>
-              {u.activo ? "Activo" : "Acceso revocado"}
+            <Etiqueta variante={u.activo ? "exito" : "peligro"} className="gap-1.5 whitespace-nowrap !px-3 !py-1.5 !text-sm !font-semibold">
+              <span aria-hidden="true" className={`h-1.5 w-1.5 rounded-full ${u.activo ? "bg-emerald-500" : "bg-rose-500"}`} />{u.activo ? "Activo" : "Revocado"}
             </Etiqueta>
-            {u.debe_cambiar_password && (
-              <p className="mt-1 text-[11px] text-amber-600">Contraseña temporal</p>
+            {u.activo && u.debe_cambiar_password && (
+              <p className="mt-2 text-xs font-medium text-orange-700">Contraseña temporal</p>
             )}
           </>
         ),
       },
+      { clave: "abrir", titulo: <span className="sr-only">Ficha</span>, render: () => <span aria-hidden="true" className="usuario-ficha inline-flex h-8 w-8 items-center justify-center rounded-full text-slate-400 transition"><span className="h-1.5 w-1.5 rotate-45 border-r-2 border-t-2" /></span> },
     ],
     [pestanaActiva],
   );
@@ -191,38 +215,35 @@ export default function ListadoPage({ actor }) {
   const idPestanas = `listado-usuarios-${soloPresidente ? "mi-academia" : "usuarios"}`;
 
   return (
-    <div className={`rounded-3xl p-6 sm:p-8 ${VIDRIO} bg-white/85`}>
-      <div className="flex flex-wrap items-baseline justify-between gap-4">
-        <p className="text-sm text-slate-600">
-          {soloPresidente
-            ? `Docentes de ${actor.academia ?? "tu academia"}. Selecciona una fila para ver su ficha (solo consulta).`
-            : "Selecciona una fila para ver y editar el detalle del usuario."}
-        </p>
-        <div className="flex shrink-0 items-center gap-2">
+    <div className="usuarios-listado min-w-0">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="flex items-center gap-3"><span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-sky-100 text-[#1878B6]"><IconoUsuarios className="h-6 w-6" /></span><div><h2 className="text-2xl font-bold text-slate-900">{soloPresidente ? "Mi academia" : "Usuarios"}</h2><p className="mt-1 text-sm text-slate-500">{soloPresidente ? actor.academia ?? "Docentes de tu academia" : "Padrón de alumnos, docentes y personal CATT"}</p></div></div>
+        <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
             onClick={cargarUsuarios}
             disabled={cargando}
-            className="min-h-11 rounded-full border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-50 disabled:opacity-50"
+            aria-label="Actualizar listado de usuarios"
+            title="Actualizar listado"
+            className="flex h-12 w-12 items-center justify-center rounded-full border border-slate-200 bg-white text-blue-700 transition hover:border-blue-300 hover:bg-blue-50 disabled:opacity-50"
           >
-            {cargando ? "Cargando…" : "Actualizar"}
+            <span aria-hidden="true" className={`text-2xl leading-none ${cargando ? "motion-safe:animate-spin" : ""}`}>&#8635;</span>
           </button>
           {puedeDarDeAlta && (
             <button
               type="button"
               onClick={() => navigate(`/panel/usuarios/nuevo?perfil=${pestanaActiva.perfil}`)}
-              className="min-h-11 rounded-full px-5 py-2 text-sm font-semibold text-white shadow-md shadow-[#1878B6]/30 transition hover:-translate-y-0.5"
-              style={{ background: GRAD_AZUL }}
+              className="inline-flex min-h-12 items-center gap-2 rounded-full bg-[#1878B6] px-5 py-3 text-sm font-bold text-white shadow-md transition hover:bg-[#0F5C8C] hover:shadow-lg"
             >
-              {pestanaActiva?.etiquetaAlta ?? "Registrar usuario"}
+              <IconoAltaUsuario className="h-4 w-4" />{pestanaActiva?.etiquetaAlta ?? "Registrar usuario"}
             </button>
           )}
         </div>
       </div>
 
-      {errorCarga && !usuarios && (
-        <p className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-          No se pudo cargar el listado ({errorCarga}). ¿Corriste el backend en el puerto 3000?
+      {errorCarga && (
+        <p role="alert" className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+          No se pudo actualizar el listado. {errorCarga}
         </p>
       )}
 
@@ -253,42 +274,47 @@ export default function ListadoPage({ actor }) {
             role="tabpanel"
             id={`${idPestanas}-panel-${tabUrl}`}
             aria-labelledby={`${idPestanas}-tab-${tabUrl}`}
-            className="mt-4"
+            className="mt-4 min-w-0"
+            aria-busy={cargando}
           >
             <TablaDatos
+              key={tabUrl}
+              paginacion
               columnas={columnas}
               filas={usuariosDeLaTab}
               getId={(u) => u.id}
               onAbrirFila={(u) => navigate(`/panel/usuarios/${u.id}`)}
               busqueda={
-                <input
+                <label className="usuarios-busqueda relative block w-full min-w-0"><span className="sr-only">Buscar en {tituloTabActiva.toLowerCase()}</span><input
                   type="search"
                   value={busqueda}
                   onChange={(e) => setBusqueda(e.target.value)}
-                  placeholder={`Buscar en ${tituloTabActiva.toLowerCase()} por nombre, correo o ${pestanaActiva.identificador.label.toLowerCase()}…`}
-                  className="w-full rounded-full border border-slate-200 bg-white px-4 py-2 text-sm text-slate-700 placeholder:text-slate-400 focus:border-[#4FB3E8] focus:outline-none focus:ring-2 focus:ring-[#4FB3E8]/30"
-                />
+                  placeholder={`Nombre, correo o ${pestanaActiva.identificador.label.toLowerCase()}`}
+                  className="min-h-12 w-full rounded-full border border-slate-200 bg-white px-5 py-3 text-sm text-slate-800 outline-none transition placeholder:text-slate-500 hover:border-blue-300 focus:border-blue-600 focus:ring-4 focus:ring-blue-100"
+                /></label>
               }
               filtros={
-                <select
+                <div className="flex shrink-0 flex-wrap gap-2">
+                {pestanaActiva.id === "alumnos" && <FiltroSelect label="Filtrar por carrera" value={filtroCarrera} onChange={(e) => setFiltroCarrera(e.target.value)}><option value="">Todas las carreras</option>{CARRERAS.map((c) => <option key={c.valor} value={c.valor}>{c.valor}</option>)}</FiltroSelect>}
+                <FiltroSelect label="Filtrar por acceso"
                   value={filtroEstado}
                   onChange={(e) => setFiltroEstado(e.target.value)}
-                  aria-label="Filtrar por estado de la cuenta"
-                  className="min-h-11 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm text-slate-700 focus:border-[#4FB3E8] focus:outline-none focus:ring-2 focus:ring-[#4FB3E8]/30"
                 >
                   {FILTROS_ESTADO.map((f) => (
                     <option key={f.id} value={f.id}>
                       {f.etiqueta}
                     </option>
                   ))}
-                </select>
+                </FiltroSelect>
+                </div>
               }
               mensajeVacio={
-                busqueda.trim()
-                  ? "No hay resultados para tu búsqueda."
+                busqueda.trim() || filtroEstado !== "todos" || filtroCarrera
+                  ? "No hay usuarios que coincidan con estos filtros."
                   : `No hay ${tituloTabActiva.toLowerCase()} registrados.`
               }
             />
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-500"><p aria-live="polite">{usuariosDeLaTab.length} de {usuariosDelPerfil.length} {tituloTabActiva.toLowerCase()}</p>{(busqueda || filtroEstado !== "todos" || filtroCarrera) && <button type="button" onClick={() => { setBusqueda(""); setFiltroEstado("todos"); setFiltroCarrera(""); }} className="min-h-9 rounded-full px-3 font-semibold text-sky-700 transition hover:bg-sky-50">Limpiar filtros</button>}</div>
           </div>
         </>
       )}

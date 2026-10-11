@@ -4,7 +4,7 @@ import Etiqueta from "../../components/ui/Etiqueta";
 import { api } from "../../lib/api";
 import { colorDe } from "../../lib/academias";
 import { nombreCompleto } from "../../lib/nombre";
-import { GRAD_AZUL } from "../../lib/theme";
+import { AZUL_MEDIO } from "../../lib/theme";
 
 function normalizar(texto) {
   return String(texto ?? "")
@@ -80,14 +80,17 @@ export default function DialogoAgregarDocente({ abierto, academiaActualId, onCer
               const color = colorDe(u.academia_color);
               return (
                 <li key={u.id}>
-                  <label className="flex min-h-11 cursor-pointer items-center gap-3 px-1 py-2 hover:bg-slate-50">
+                  <label className="flex min-h-11 cursor-pointer items-start gap-3 px-1 py-2 hover:bg-slate-50">
                     <input
                       type="checkbox"
                       checked={seleccionados.includes(u.id)}
                       onChange={() => alternar(u.id)}
+                      className="mt-0.5"
                     />
-                    <span className="min-w-0 flex-1 truncate text-sm text-slate-700">{nombreCompleto(u)}</span>
-                    <Etiqueta style={{ backgroundColor: color.claro, color: color.hex }}>{u.academia}</Etiqueta>
+                    <span className="min-w-0 flex-1 text-sm leading-snug text-slate-700">{nombreCompleto(u)}</span>
+                    <Etiqueta className="shrink-0" style={{ backgroundColor: color.claro, color: color.hex }}>
+                      {u.academia}
+                    </Etiqueta>
                   </label>
                 </li>
               );
@@ -108,7 +111,7 @@ export default function DialogoAgregarDocente({ abierto, academiaActualId, onCer
             type="button"
             disabled={seleccionados.length === 0 || procesando}
             onClick={() => onAgregar(seleccionados)}
-            style={{ background: GRAD_AZUL }}
+            style={{ backgroundColor: AZUL_MEDIO }}
             className="min-h-11 rounded-lg px-4 py-1.5 text-sm font-medium text-white shadow-md shadow-[#1878B6]/30 transition disabled:cursor-not-allowed disabled:opacity-50"
           >
             {procesando ? "Agregando…" : `Agregar (${seleccionados.length})`}

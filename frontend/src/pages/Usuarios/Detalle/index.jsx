@@ -19,7 +19,7 @@ import {
   puedeGestionar,
   tieneRol,
 } from "../../../lib/roles";
-import { GRAD_AZUL, VIDRIO } from "../../../lib/theme";
+import { AZUL_MEDIO, VIDRIO } from "../../../lib/theme";
 
 // Pantalla: Detalle / edición de un usuario (HU-3 consulta, HU-4 edición,
 // HU-6 roles del personal). Vive en /panel/usuarios/:id.
@@ -391,7 +391,7 @@ function SeccionRoles({ actor, usuario, onCambio }) {
                       ? "text-white shadow-md shadow-[#1878B6]/30"
                       : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
                   }`}
-                  style={tiene ? { background: GRAD_AZUL } : undefined}
+                  style={tiene ? { background: AZUL_MEDIO } : undefined}
                 >
                   {procesando === rol ? "…" : `${tiene ? "✓ " : "+ "}${ETIQUETA_ROL[rol]}`}
                 </button>
@@ -644,7 +644,7 @@ export default function UserProfileForm({ actor, userId, onVolver }) {
           figura={
             <span
               className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full text-xl font-bold text-white"
-              style={{ backgroundImage: GRAD_AZUL }}
+              style={{ backgroundColor: AZUL_MEDIO }}
               aria-hidden="true"
             >
               {inicial}
@@ -672,7 +672,7 @@ export default function UserProfileForm({ actor, userId, onVolver }) {
                   setSaveError(null);
                 }}
                 className="min-h-11 rounded-full px-4 py-2 text-sm font-semibold text-white shadow-md shadow-[#1878B6]/30 transition hover:-translate-y-0.5"
-                style={{ background: GRAD_AZUL }}
+                style={{ background: AZUL_MEDIO }}
               >
                 Editar
               </button>
@@ -734,7 +734,7 @@ export default function UserProfileForm({ actor, userId, onVolver }) {
               type="button"
               onClick={handleSave}
               disabled={isSaving}
-              style={{ background: GRAD_AZUL }}
+              style={{ background: AZUL_MEDIO }}
               className="flex min-h-11 cursor-pointer items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold text-white shadow-md shadow-[#1878B6]/30 transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {isSaving && <Spinner />}

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import useDialogoAccesible from "../../components/ui/useDialogoAccesible";
-import { GRAD_AZUL } from "../../lib/theme";
+import { AZUL_MEDIO } from "../../lib/theme";
 
 function normalizar(texto) {
   return String(texto ?? "")
@@ -97,7 +97,7 @@ export default function DialogoPresidente({
                 type="button"
                 disabled={!elegido}
                 onClick={() => setPaso("confirmar")}
-                style={{ background: GRAD_AZUL }}
+                style={{ backgroundColor: AZUL_MEDIO }}
                 className="min-h-11 rounded-lg px-4 py-1.5 text-sm font-medium text-white shadow-md shadow-[#1878B6]/30 transition disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Continuar
@@ -125,7 +125,7 @@ export default function DialogoPresidente({
                 type="button"
                 onClick={() => onConfirmar(elegido.id)}
                 disabled={procesando}
-                style={{ background: GRAD_AZUL }}
+                style={{ backgroundColor: AZUL_MEDIO }}
                 className="min-h-11 rounded-lg px-4 py-1.5 text-sm font-medium text-white shadow-md shadow-[#1878B6]/30 transition disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {procesando ? "Guardando…" : "Confirmar"}

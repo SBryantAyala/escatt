@@ -3,7 +3,7 @@ import ChipsRol from "../../components/ChipsRol";
 import { useAviso } from "../../components/ui/Avisos";
 import { api } from "../../lib/api";
 import { nombreCompleto } from "../../lib/nombre";
-import { GRAD_AZUL, VIDRIO } from "../../lib/theme";
+import { AZUL_MEDIO, VIDRIO } from "../../lib/theme";
 import { FormCambioPassword } from "../CambiarPassword";
 
 // "Mi cuenta": cualquier usuario consulta sus datos, edita solo sus datos de
@@ -100,7 +100,7 @@ export default function MiCuentaPage({ usuario, onUsuarioActualizado }) {
             type="submit"
             disabled={guardando}
             className="rounded-full px-5 py-2 text-sm font-semibold text-white shadow-md shadow-[#1878B6]/30 transition hover:-translate-y-0.5 disabled:opacity-60"
-            style={{ backgroundImage: GRAD_AZUL }}
+            style={{ backgroundColor: AZUL_MEDIO }}
           >
             {guardando ? "Guardando…" : "Guardar"}
           </button>

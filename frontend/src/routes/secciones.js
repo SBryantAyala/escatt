@@ -149,6 +149,7 @@ export const SECCIONES = [
         etiqueta: "Mi cuenta",
         icono: IconoCuenta,
         roles: TODOS,
+        oculto: true,
       },
     ],
   },

@@ -91,14 +91,14 @@ const NOTICIAS = [
 
 const TEMAS = ["Todo", "Trabajo Terminal", "Oportunidades", "Comunidad", "Trámites"];
 const COLORES = {
-  "Trabajo Terminal": "bg-sky-50 text-sky-700",
-  Oportunidades: "bg-emerald-50 text-emerald-700",
-  Comunidad: "bg-violet-50 text-violet-700",
-  Trámites: "bg-amber-50 text-amber-800",
+  "Trabajo Terminal": "bg-[#1D4ED8] text-white",
+  Oportunidades: "bg-[#0F766E] text-white",
+  Comunidad: "bg-[#6D28D9] text-white",
+  Trámites: "bg-[#C2410C] text-white",
 };
 
 function Categoria({ noticia }) {
-  return <span className={`inline-flex rounded-full px-3 py-1 text-[11px] font-semibold ${COLORES[noticia.categoria]}`}>{noticia.categoria}</span>;
+  return <span className={`inline-flex rounded-full px-3 py-1.5 text-xs font-semibold ${COLORES[noticia.categoria]}`}>{noticia.categoria}</span>;
 }
 
 function Fecha({ noticia }) {
@@ -108,13 +108,13 @@ function Fecha({ noticia }) {
 
 function TarjetaNoticia({ noticia }) {
   return (
-    <article className="group flex h-full flex-col overflow-hidden rounded-lg border border-slate-200/80 bg-white shadow-sm transition duration-300 hover:-translate-y-1 hover:border-sky-200 hover:shadow-lg hover:shadow-sky-900/5">
+    <article className="group flex h-full flex-col overflow-hidden rounded-[20px] border border-slate-200 bg-white shadow-md transition duration-300 hover:-translate-y-1 hover:border-sky-200 hover:shadow-xl">
       <a href={noticia.url} target="_blank" rel="noopener noreferrer" className="relative block aspect-[16/9] overflow-hidden focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-500" aria-label={`${noticia.titulo} (abre en otra pestaña)`}>
         <img src={noticia.imagen} alt={noticia.alt} loading="lazy" decoding="async" width="800" height="450" className="h-full w-full object-cover transition-transform duration-500 motion-reduce:transition-none group-hover:scale-105" />
         <span className="absolute left-4 top-4"><Categoria noticia={noticia} /></span>
       </a>
       <div className="flex flex-1 flex-col p-5">
-        <div className="flex flex-wrap items-center gap-2 text-[11px] font-medium text-slate-500"><span>{noticia.fuente}</span><span aria-hidden="true">/</span><Fecha noticia={noticia} /></div>
+        <div className="flex flex-wrap items-center gap-2 text-xs font-medium text-slate-500"><span>{noticia.fuente}</span><span aria-hidden="true">/</span><Fecha noticia={noticia} /></div>
         <h3 className="mt-3 text-lg font-bold leading-snug text-slate-900"><a href={noticia.url} target="_blank" rel="noopener noreferrer" className="transition-colors hover:text-sky-700">{noticia.titulo}</a></h3>
         <p className="mb-5 mt-3 text-sm leading-relaxed text-slate-600">{noticia.resumen}</p>
         <a href={noticia.url} target="_blank" rel="noopener noreferrer" className="mt-auto flex min-h-10 items-center justify-between border-t border-slate-100 pt-3 text-xs font-semibold text-sky-700" aria-label={`Consultar ${noticia.titulo} en ${noticia.fuente} (abre en otra pestaña)`}>Consultar fuente<span aria-hidden="true" className="text-lg transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5">&#8599;</span></a>
@@ -134,19 +134,19 @@ export default function SeccionNoticias() {
   const destacada = NOTICIAS[0];
 
   return (
-    <section id="noticias" aria-labelledby="titulo-noticias" className="scroll-mt-36 border-t border-sky-100 bg-[#F5F9FC] px-4 py-16 text-slate-800 md:scroll-mt-28 sm:py-20">
+    <section id="noticias" aria-labelledby="titulo-noticias" className="scroll-mt-36 bg-[#F4F7FB] px-4 py-14 text-slate-800 md:scroll-mt-28">
       <div className="mx-auto max-w-6xl">
         <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.15em] text-sky-700"><span aria-hidden="true" className="h-1 w-7 rounded-full bg-sky-400" />ESCOMunidad</p>
-            <h2 id="titulo-noticias" className="mt-3 text-3xl font-black leading-tight text-slate-950 sm:text-4xl">Noticias y <span className="text-[#1878B6]">oportunidades.</span></h2>
+            <p className="text-sm font-semibold text-[#1878B6]">ESCOMunidad</p>
+            <h2 id="titulo-noticias" className="mt-2 text-3xl font-bold leading-tight text-[#102D4B]">Noticias y oportunidades</h2>
             <p className="mt-3 max-w-xl text-base leading-relaxed text-slate-600">Lo que pasa en tu comunidad y lo que sigue en tu camino: talento, convocatorias y fechas para tu TT.</p>
           </div>
-          <a href={CATT} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 w-fit shrink-0 items-center gap-3 rounded-full border border-sky-200 bg-white px-5 text-sm font-semibold text-sky-700 transition hover:border-sky-400 hover:bg-sky-50">Portal de la CATT<span aria-hidden="true">&#8599;</span></a>
+          <a href={CATT} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 w-fit shrink-0 items-center gap-3 rounded-full bg-[#1878B6] px-5 text-sm font-semibold text-white shadow-md transition hover:bg-[#0F5C8C]">Portal de la CATT<span aria-hidden="true">&#8599;</span></a>
         </div>
 
         <div className="mt-8 grid gap-6 lg:grid-cols-[1.5fr_1fr]">
-          <article className="group relative isolate flex min-h-[400px] flex-col justify-end overflow-hidden rounded-lg bg-[#092B43] p-6 text-white shadow-lg shadow-sky-900/10 sm:min-h-[460px] sm:p-8">
+          <article className="group relative isolate flex min-h-[400px] flex-col justify-end overflow-hidden rounded-[24px] bg-[#102D4B] p-6 text-white shadow-lg shadow-sky-900/10 sm:min-h-[460px] sm:p-8">
             <img src={destacada.imagen} alt={destacada.alt} loading="lazy" decoding="async" width="765" height="1020" className="absolute inset-0 -z-20 h-full w-full object-cover object-[center_65%] transition-transform duration-700 motion-reduce:transition-none group-hover:scale-105" />
             <div aria-hidden="true" className="absolute inset-0 -z-10 bg-gradient-to-t from-[#031B2F] via-[#031B2F]/65 to-transparent" />
             <span className="absolute left-6 top-6 rounded-full border border-white/30 bg-white/15 px-3 py-1.5 text-xs font-semibold backdrop-blur-md sm:left-8 sm:top-8">En portada · {destacada.tipo}</span>
@@ -158,18 +158,18 @@ export default function SeccionNoticias() {
             </div>
           </article>
           <div className="flex flex-col justify-between gap-5">
-            <p className="border-b border-sky-200 pb-3 text-xs font-semibold uppercase tracking-[0.12em] text-sky-700">También en el radar</p>
+            <p className="text-sm font-semibold text-[#102D4B]">También en el radar</p>
             {NOTICIAS.slice(1, 3).map((noticia) => (
-              <article key={noticia.id} className="group flex flex-1 flex-col justify-center border-b border-sky-200/70 pb-5">
+              <article key={noticia.id} className={`group flex flex-1 flex-col justify-center rounded-[20px] p-5 text-white shadow-md ${COLORES[noticia.categoria]}`}>
                 <div className="flex items-start gap-4">
                   <div className="min-w-0 flex-1">
-                    <Categoria noticia={noticia} />
-                    <h3 className="mt-3 text-lg font-bold leading-snug text-slate-900"><a href={noticia.url} target="_blank" rel="noopener noreferrer" className="transition-colors hover:text-sky-700">{noticia.titulo}</a></h3>
+                    <p className="text-xs font-semibold text-white">{noticia.categoria}</p>
+                    <h3 className="mt-2 text-lg font-bold leading-snug text-white"><a href={noticia.url} target="_blank" rel="noopener noreferrer" className="underline-offset-4 hover:underline">{noticia.titulo}</a></h3>
                   </div>
-                  <img src={noticia.imagen} alt={noticia.alt} loading="lazy" width="112" height="112" className="h-20 w-20 shrink-0 rounded-lg object-cover sm:h-24 sm:w-24" />
+                  <img src={noticia.imagen} alt={noticia.alt} loading="lazy" width="112" height="112" className="h-20 w-20 shrink-0 rounded-xl object-cover sm:h-24 sm:w-24" />
                 </div>
-                <p className="mt-3 text-sm leading-relaxed text-slate-600">{noticia.resumen}</p>
-                <a href={noticia.url} target="_blank" rel="noopener noreferrer" className="mt-3 flex min-h-9 items-center justify-between gap-3 text-xs font-medium text-sky-700"><span><Fecha noticia={noticia} /></span><span>Consultar &#8599;</span></a>
+                <p className="mt-3 text-sm leading-relaxed text-white">{noticia.resumen}</p>
+                <a href={noticia.url} target="_blank" rel="noopener noreferrer" className="mt-3 flex min-h-10 items-center justify-between gap-3 border-t border-white/20 pt-2 text-xs font-semibold text-white"><span><Fecha noticia={noticia} /></span><span>Consultar &#8599;</span></a>
               </article>
             ))}
           </div>

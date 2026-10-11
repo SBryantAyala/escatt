@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import useDialogoAccesible from "../../components/ui/useDialogoAccesible";
 import { api } from "../../lib/api";
 import { colorDe } from "../../lib/academias";
-import { GRAD_AZUL } from "../../lib/theme";
+import { AZUL_MEDIO } from "../../lib/theme";
 
 // Mover la selección de integrantes a otra academia: mini-tarjetas de color
 // (solo activas, sin la actual) como destino. Si la selección incluye al
@@ -96,7 +96,7 @@ export default function DialogoMoverDocentes({ abierto, docentes, academiaActual
             type="button"
             disabled={incluyePresidente || !destinoId || procesando}
             onClick={() => onMover(destinoId)}
-            style={{ background: GRAD_AZUL }}
+            style={{ backgroundColor: AZUL_MEDIO }}
             className="min-h-11 rounded-lg px-4 py-1.5 text-sm font-medium text-white shadow-md shadow-[#1878B6]/30 transition disabled:cursor-not-allowed disabled:opacity-50"
           >
             {procesando ? "Moviendo…" : "Mover"}

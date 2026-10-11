@@ -31,7 +31,6 @@ export default function PanelLayout() {
       navegacion={navegacion}
       breadcrumb={seccionActual?.etiqueta ?? "Inicio"}
       onCerrarSesion={alCerrarSesion}
-      onVolverInicio={() => navigate("/")}
     >
       <Outlet />
     </DashboardLayout>

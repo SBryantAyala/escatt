@@ -26,7 +26,7 @@ import ListadoPage from "./pages/Usuarios/Listado";
 import MiCuentaPage from "./pages/MiCuenta";
 import { api, TOKEN_KEY } from "./lib/api";
 import { CARRERAS, DOMINIO_ALUMNO, PLANES } from "./lib/roles";
-import { AZUL_CLARO, AZUL_MEDIO, AZUL_OSCURO, GRAD_AZUL, VIDRIO } from "./lib/theme";
+import { AZUL_CLARO, AZUL_MEDIO, AZUL_OSCURO, VIDRIO } from "./lib/theme";
 import NoEncontrada from "./routes/NoEncontrada";
 import RequiereInvitado from "./routes/RequiereInvitado";
 import RequiereRol from "./routes/RequiereRol";
@@ -74,6 +74,8 @@ const GUIA_ETAPAS = [
   "Revisa con tus directores el reporte técnico y consulta los avisos de entrega antes de preparar tus documentos.",
   "Prepara la exposición de tu proyecto y revisa los avisos de presentación publicados por la CATT.",
 ];
+
+const TONOS_ETAPA = ["#1D4ED8", "#0F766E", "#6D28D9", "#BE185D"];
 
 const PILARES_CATT = [
   {
@@ -662,7 +664,7 @@ function AuthPage({ modo }) {
               className="mt-1 inline-flex w-full items-center justify-center rounded-full px-5 py-3
                          font-semibold text-white shadow-lg shadow-[#1878B6]/30 transition
                          hover:-translate-y-0.5 hover:shadow-xl disabled:cursor-not-allowed disabled:opacity-60"
-              style={{ backgroundImage: GRAD_AZUL }}
+              style={{ backgroundColor: AZUL_MEDIO }}
             >
               {enviando ? "Enviando…" : esRegistro ? "Crear cuenta" : "Entrar"}
             </button>
@@ -758,13 +760,13 @@ function DiagramaProceso() {
   }, []);
 
   return (
-    <section id="proceso" className="scroll-mt-36 bg-[#EAF7FC] px-4 py-20 md:scroll-mt-28">
-      <div className="mx-auto max-w-5xl">
-        <span className="text-xs font-semibold uppercase tracking-[0.22em] text-[#1878B6]">
+    <section id="proceso" className="scroll-mt-36 bg-white px-4 py-14 md:scroll-mt-28">
+      <div className="mx-auto max-w-6xl">
+        <span className="text-sm font-semibold text-[#1878B6]">
           Ruta de titulación
         </span>
-        <h2 className="mt-3 text-3xl font-bold text-slate-900 sm:text-4xl">Proceso de la CATT</h2>
-        <p className="mt-4 max-w-2xl text-lg leading-relaxed text-slate-600">
+        <h2 className="mt-2 text-3xl font-bold text-[#102D4B]">Proceso de la CATT</h2>
+        <p className="mt-3 max-w-2xl text-base leading-relaxed text-slate-600">
           De principio a fin, la titulación curricular avanza por cuatro etapas encadenadas: cada
           una habilita la siguiente.
         </p>
@@ -783,18 +785,17 @@ function DiagramaProceso() {
               className="proceso-nodo relative md:flex-1"
               style={{ transitionDelay: `${i * 130}ms` }}
             >
-              <div className="group flex h-full flex-col rounded-[1.5rem] border border-white bg-white/80 p-5 shadow-lg shadow-[#1878B6]/10 transition duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-[#1878B6]/20">
+              <div className="group flex h-full flex-col rounded-[20px] p-5 text-white shadow-md transition duration-300 hover:-translate-y-1 hover:shadow-xl" style={{ backgroundColor: TONOS_ETAPA[i] }}>
                 <span
                   aria-hidden="true"
-                  className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white shadow-lg shadow-[#1878B6]/25 transition group-hover:scale-110"
-                  style={{ backgroundImage: GRAD_AZUL }}
+                  className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/25 text-sm font-bold text-white transition group-hover:scale-110"
                 >
                   {i + 1}
                 </span>
-                <h3 className="mt-4 text-base font-bold" style={{ color: AZUL_OSCURO }}>
+                <h3 className="mt-4 text-base font-bold text-white">
                   {etapa.titulo}
                 </h3>
-                <p className="mt-2 text-sm leading-relaxed text-slate-600">{etapa.texto}</p>
+                <p className="mt-2 text-sm leading-relaxed text-white">{etapa.texto}</p>
               </div>
 
               {i < ETAPAS.length - 1 && (
@@ -872,23 +873,7 @@ function LandingPage() {
   };
 
   return (
-    <div className="min-h-screen overflow-hidden bg-[#F3FAFD] text-slate-800">
-      {/* Fondo: blobs azules grandes, desenfocados y en movimiento lento */}
-      <div aria-hidden="true" className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
-        <div
-          className="escatt-blob-1 absolute -left-24 -top-28 h-[30rem] w-[30rem] rounded-full blur-3xl"
-          style={{ background: `radial-gradient(circle at 30% 30%, ${AZUL_CLARO}55, transparent 70%)` }}
-        />
-        <div
-          className="escatt-blob-2 absolute -right-32 top-1/3 h-[34rem] w-[34rem] rounded-full blur-3xl"
-          style={{ background: `radial-gradient(circle at 50% 50%, ${AZUL_MEDIO}44, transparent 70%)` }}
-        />
-        <div
-          className="escatt-blob-3 absolute bottom-[-12rem] left-1/4 h-[28rem] w-[28rem] rounded-full blur-3xl"
-          style={{ background: `radial-gradient(circle at 50% 50%, ${AZUL_CLARO}3d, transparent 70%)` }}
-        />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(79,179,232,0.18),transparent_34%),linear-gradient(180deg,rgba(255,255,255,0.2),rgba(243,250,253,0.92))]" />
-      </div>
+    <div className="landing-publica min-h-screen overflow-x-clip bg-[#F4F7FB] text-slate-800">
 
       {/* TOPBAR */}
       <header
@@ -901,7 +886,7 @@ function LandingPage() {
 
           <nav aria-label="Navegación principal" className="order-last flex w-full items-center justify-between gap-1 border-t border-sky-100 py-2 text-xs font-medium md:order-none md:ml-4 md:w-auto md:justify-start md:border-t-0 md:text-sm">
             {[["inicio", "Inicio"], ["catt", "¿Qué es la CATT?"], ["noticias", "Noticias"], ["proceso", "Proceso"]].map(([id, titulo]) => (
-              <a key={id} href={`#${id}`} onClick={() => setSeccionActiva(id)} aria-current={seccionActiva === id ? "location" : undefined} className={`landing-nav-link relative flex min-h-10 items-center rounded-full px-2 transition-all duration-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-500 md:px-4 ${seccionActiva === id ? "bg-sky-50 text-[#1878B6]" : "text-slate-600 hover:bg-sky-50 hover:text-[#1878B6]"}`}>
+              <a key={id} href={`#${id}`} onClick={() => setSeccionActiva(id)} aria-current={seccionActiva === id ? "location" : undefined} className={`landing-nav-link relative flex min-h-10 items-center rounded-full px-2 font-semibold transition-all duration-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-500 md:px-4 ${seccionActiva === id ? "bg-[#1878B6] text-white shadow-sm" : "text-slate-700 hover:bg-sky-50 hover:text-[#1878B6]"}`}>
                 {titulo}
               </a>
             ))}
@@ -920,15 +905,13 @@ function LandingPage() {
                   aria-expanded={perfilAbierto}
                   aria-controls="opciones-perfil"
                   title="Mi perfil"
-                  className={`group inline-flex min-h-12 items-center gap-2 rounded-full border py-1.5 pl-1.5 pr-3 text-left shadow-sm transition-all duration-300 hover:border-sky-300 hover:bg-sky-50 hover:shadow-md hover:shadow-sky-500/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-sky-500 sm:gap-3 sm:pr-4 ${perfilAbierto ? "border-sky-300 bg-sky-50 shadow-sky-500/10" : "border-sky-100 bg-[#F5FAFE]"}`}
+                  className={`group inline-flex min-h-12 items-center gap-2 rounded-2xl border px-3 py-1.5 text-right transition-all duration-300 hover:border-sky-200 hover:bg-sky-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-sky-500 sm:gap-3 ${perfilAbierto ? "border-sky-200 bg-sky-50" : "border-transparent bg-white"}`}
                 >
-                  <span aria-hidden="true" className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2 border-white bg-gradient-to-br from-[#1878B6] to-[#4FB3E8] text-xs font-bold text-white shadow-md shadow-sky-600/20 transition-transform duration-300 group-hover:scale-105 sm:h-10 sm:w-10 sm:text-sm">
-                    {[usuario.nombre?.trim()[0], usuario.apellido_paterno?.trim()[0]].filter(Boolean).join("").toUpperCase() || "U"}
-                  </span>
-                  <span className="flex max-w-[80px] flex-col gap-0.5 sm:max-w-[160px]">
+                  <span className="hidden max-w-[180px] flex-col gap-0.5 sm:flex">
                     <span className="break-words text-xs font-semibold leading-snug text-slate-800 transition-colors group-hover:text-[#1878B6] sm:text-sm">{nombrePerfil}</span>
                     <span className="text-[10px] font-medium leading-tight text-[#1878B6]/80 sm:text-xs">Mi cuenta</span>
                   </span>
+                  <span aria-hidden="true" className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#1878B6] text-sm font-bold text-white ring-4 ring-sky-50 transition-transform duration-300 group-hover:scale-105">{[usuario.nombre?.trim()[0], usuario.apellido_paterno?.trim()[0]].filter(Boolean).join("").toUpperCase() || "U"}</span>
                   <span aria-hidden="true" className="flex h-3 w-3 shrink-0 items-center justify-center">
                     <span className={`h-1.5 w-1.5 border-b-[1.5px] border-r-[1.5px] border-[#1878B6] transition-transform duration-300 ${perfilAbierto ? "rotate-[225deg]" : "rotate-45"}`} />
                   </span>
@@ -970,30 +953,29 @@ function LandingPage() {
       <main>
         <section id="inicio" aria-label="Anuncios destacados" className="relative scroll-mt-36 px-4 pb-8 pt-40 md:scroll-mt-28 md:pt-28">
           <div className="mx-auto max-w-6xl">
-            <TablonAvisos key={usuario?.id ?? "publico"} usuarioId={usuario?.id ?? "publico"} />
+            <TablonAvisos />
           </div>
         </section>
 
         {/* Guía pública: las etapas no representan el estado de un expediente. */}
-        <section aria-labelledby="titulo-guia" className="relative px-4 pb-16 pt-8">
+        <section aria-labelledby="titulo-guia" className="relative bg-white px-4 py-14">
           <div className="mx-auto grid max-w-6xl items-center gap-10 lg:grid-cols-[1fr_0.92fr]">
             <div className="landing-reveal">
-              <p className="inline-flex rounded-full border border-[#1878B6]/15 bg-white/70 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-[#1878B6] shadow-sm backdrop-blur">
+              <p className="inline-flex rounded-full bg-blue-50 px-3 py-1.5 text-sm font-semibold text-[#1878B6]">
                 Guía de titulación · ESCOM
               </p>
-              <h2 id="titulo-guia" className="mt-5 max-w-3xl text-4xl font-black leading-tight text-slate-950 sm:text-5xl">
-                Tu siguiente paso, más claro.
+              <h2 id="titulo-guia" className="mt-4 max-w-3xl text-3xl font-bold leading-tight text-[#102D4B]">
+                Tu ruta de Trabajo Terminal
               </h2>
-              <p className="mt-5 max-w-2xl text-lg leading-relaxed text-slate-600 sm:text-xl">
+              <p className="mt-4 max-w-2xl text-base leading-relaxed text-slate-600">
                 Conoce cada etapa de tu Trabajo Terminal y consulta los avisos de la CATT
                 para preparar lo que sigue.
               </p>
               <div className="mt-8 flex flex-col gap-3 sm:flex-row">
                 <a
-                  href="#noticias"
-                  onClick={() => setSeccionActiva("noticias")}
-                  className="inline-flex items-center justify-center gap-2 rounded-full px-6 py-3 text-sm font-bold text-white shadow-xl shadow-[#1878B6]/30 transition hover:-translate-y-1 hover:shadow-2xl"
-                  style={{ backgroundImage: GRAD_AZUL }}
+                  href="#inicio"
+                  onClick={() => setSeccionActiva("inicio")}
+                  className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-[#1878B6] px-6 py-3 text-sm font-bold text-white shadow-md transition hover:-translate-y-0.5 hover:bg-[#0F5C8C]"
                 >
                   Consultar avisos
                   <FlechaIcono />
@@ -1014,22 +996,18 @@ function LandingPage() {
               </div>
             </div>
 
-            <div className="relative isolate flex min-h-[480px] flex-col justify-between gap-8 p-5 sm:min-h-[500px] sm:p-8">
-              <div className="absolute inset-0 rounded-[2rem] bg-[#071826] shadow-2xl shadow-[#0F5C8C]/25" />
+            <div className="overflow-hidden rounded-[24px] bg-[#102D4B] shadow-lg">
               <img
-                src="/images/noticias/campus-escom.webp"
-                alt=""
+                src={ETAPAS[etapaGuia].imagen}
+                alt={ETAPAS[etapaGuia].alt}
                 width="900"
-                height="900"
-                className="absolute inset-0 h-full w-full rounded-[2rem] object-cover opacity-75 mix-blend-screen"
+                height="500"
+                loading="lazy"
+                className="aspect-[16/9] w-full object-cover"
               />
-              <div className="absolute inset-0 rounded-[2rem] bg-gradient-to-br from-[#0F5C8C]/95 via-[#1878B6]/70 to-[#4FB3E8]/35" />
-              <div className="relative text-white">
-                <div className="mb-6 border-b border-white/20 pb-5">
-                  <LogosInstitucionales compacto />
-                </div>
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/75">Ruta del Trabajo Terminal</p>
-                <div role="group" aria-label="Etapa de la guía" className="mt-5 grid grid-cols-2 gap-3">
+              <div className="p-5 text-white sm:p-6">
+                <p className="text-sm font-semibold text-white">Explora las etapas</p>
+                <div role="group" aria-label="Etapa de la guía" className="mt-4 grid grid-cols-2 gap-2">
                   {ETAPAS.map((etapa, i) => (
                     <button key={etapa.titulo} type="button" aria-pressed={etapaGuia === i} aria-controls="detalle-etapa-guia" onClick={() => setEtapaGuia(i)} className={`flex min-h-16 items-center gap-2 rounded-xl border px-3 py-3 text-left text-xs font-semibold transition-all duration-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white sm:text-sm ${etapaGuia === i ? "border-white bg-white text-[#0F5C8C] shadow-lg shadow-black/10" : "border-white/25 bg-white/10 text-white backdrop-blur-md hover:border-white/60 hover:bg-white/20"}`}>
                       <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] ${etapaGuia === i ? "bg-sky-100 text-[#1878B6]" : "bg-white/15 text-white"}`}>{i + 1}</span>
@@ -1038,10 +1016,10 @@ function LandingPage() {
                   ))}
                 </div>
               </div>
-              <div id="detalle-etapa-guia" aria-live="polite" aria-atomic="true" className="relative rounded-2xl border border-white/25 bg-[#061827]/55 p-5 text-white shadow-lg backdrop-blur-md sm:p-6">
+              <div id="detalle-etapa-guia" aria-live="polite" aria-atomic="true" className="border-t border-white/15 px-5 py-5 text-white sm:px-6">
                 <div key={etapaGuia} className="landing-reveal">
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-200">Etapa {etapaGuia + 1} de {ETAPAS.length}</p>
-                  <h3 className="mt-3 text-2xl font-bold">{ETAPAS[etapaGuia].titulo}</h3>
+                  <h3 className="mt-2 text-lg font-bold">{ETAPAS[etapaGuia].titulo}</h3>
                   <p className="mt-3 text-sm leading-relaxed text-white/90">{ETAPAS[etapaGuia].texto}</p>
                   <p className="mt-4 border-t border-white/20 pt-4 text-sm leading-relaxed text-sky-100">{GUIA_ETAPAS[etapaGuia]}</p>
                 </div>
@@ -1051,31 +1029,33 @@ function LandingPage() {
         </section>
 
         {/* ¿QUÉ ES LA CATT? */}
-        <section id="catt" className="scroll-mt-36 bg-white px-4 py-20 md:scroll-mt-28">
+        <section id="catt" className="scroll-mt-36 bg-[#102D4B] px-4 py-14 text-white md:scroll-mt-28">
           <div className="mx-auto grid max-w-6xl gap-10 lg:grid-cols-[0.8fr_1fr] lg:items-start">
             <div>
-              <span className="text-xs font-semibold uppercase tracking-[0.22em] text-[#1878B6]">
+              <span className="text-sm font-semibold text-sky-200">
                 ¿Qué es la CATT?
               </span>
-              <h2 className="mt-3 text-3xl font-black text-slate-950 sm:text-5xl">
-                La ruta completa de titulación, ahora más visible.
+              <h2 className="mt-3 text-3xl font-bold text-white">
+                Comisión Académica de Trabajos Terminales
               </h2>
+              <div className="mt-7"><LogosInstitucionales compacto /></div>
             </div>
             <div>
-              <p className="text-lg leading-relaxed text-slate-600">
+              <p className="text-base leading-relaxed text-sky-50">
                 La Comisión Académica de Trabajos Terminales administra el proceso de titulación
                 curricular de ESCOM: desde el registro del Protocolo, pasando por Trabajo Terminal
                 I y II, hasta la presentación final ante sinodales. ESCATT digitaliza el registro y
                 seguimiento de quienes participan en él.
               </p>
               <div className="mt-8 grid gap-4 sm:grid-cols-3">
-                {PILARES_CATT.map((pilar) => (
+                {PILARES_CATT.map((pilar, i) => (
                   <article
                     key={pilar.titulo}
-                    className="rounded-[1.5rem] border border-[#D8EEF8] bg-[#F3FAFD] p-5 transition duration-300 hover:-translate-y-1 hover:border-[#4FB3E8]/60 hover:bg-white hover:shadow-xl hover:shadow-[#1878B6]/12"
+                    className="rounded-[20px] p-5 shadow-md transition duration-300 hover:-translate-y-1 hover:shadow-xl"
+                    style={{ backgroundColor: ["#1D4ED8", "#0F766E", "#6D28D9"][i] }}
                   >
-                    <h3 className="font-bold text-slate-950">{pilar.titulo}</h3>
-                    <p className="mt-2 text-sm leading-relaxed text-slate-600">{pilar.texto}</p>
+                    <h3 className="font-bold text-white">{pilar.titulo}</h3>
+                    <p className="mt-2 text-sm leading-relaxed text-white">{pilar.texto}</p>
                   </article>
                 ))}
               </div>

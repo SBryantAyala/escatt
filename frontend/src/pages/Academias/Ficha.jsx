@@ -308,7 +308,7 @@ export default function AcademiaFicha({ actor, academiaId }) {
             </div>
           </div>
 
-          <div className="flex items-center gap-3 rounded-2xl bg-white/15 px-4 py-3">
+          <div className="flex flex-wrap items-start gap-3 rounded-2xl bg-white/15 px-4 py-3">
             {presidente ? (
               <>
                 <span
@@ -320,7 +320,7 @@ export default function AcademiaFicha({ actor, academiaId }) {
                 </span>
                 <div className="min-w-0">
                   <p className="text-xs font-medium uppercase tracking-wide text-white/70">Presidente</p>
-                  <p className="truncate text-sm font-semibold text-white">{presidente.nombre_completo}</p>
+                  <p className="text-sm font-semibold leading-snug text-white">{presidente.nombre_completo}</p>
                 </div>
               </>
             ) : (
