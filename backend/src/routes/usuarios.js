@@ -306,14 +306,11 @@ router.put(
       empleado.numero_empleado = texto(c.numero_empleado);
     }
 
+    // La academia de un docente ya no se cambia aquí: se mueve desde la ficha
+    // de la academia (POST /api/academias/:id/docentes), que valida que no
+    // sea el presidente de su academia actual antes de moverlo.
     const docente = {};
     if (objetivo.perfiles.includes("docente")) {
-      if (tiene(c, "academia_id")) {
-        if (!(await academiaValida(c.academia_id))) {
-          return res.status(400).json({ error: "Selecciona una academia válida" });
-        }
-        docente.academia_id = Number(c.academia_id);
-      }
       if (tiene(c, "cedula_profesional")) docente.cedula_profesional = opcional(c.cedula_profesional);
       if (tiene(c, "extension")) docente.extension = opcional(c.extension);
     }
@@ -376,6 +373,15 @@ async function cambiarEstado(req, res, estado, accion) {
       return;
     }
   }
+  // No se puede revocar al Presidente de una academia sin antes cambiarlo o
+  // quitarlo allá (si no, la academia se queda con un presidente "activo"
+  // que en realidad no puede entrar al sistema).
+  if (estado === "revocada" && objetivo.roles.includes("presidente_academia")) {
+    res
+      .status(409)
+      .json({ error: `Primero cambia al presidente de la academia ${objetivo.academia}` });
+    return;
+  }
   // HU-7: un docente con asignaciones vigentes (director, sinodal, seguimiento
   // o titular) no se puede revocar: 409 con la lista. Hoy la lista siempre
   // sale vacía porque el Módulo 2 aún no existe (ver asignacionesVigentes).
@@ -429,17 +435,11 @@ router.post(
 );
 
 // Reglas para asignar o quitar un rol. Devuelve un mensaje de error o null.
+// presidente_academia NO se gestiona aquí (ver las rutas de /roles abajo):
+// tiene su propia validación porque solo puede haber un presidente por
+// academia (academias.presidente_id) — eso vive en routes/academias.js.
 function validarCambioDeRol(actor, objetivo, rol) {
   if (actor.id === objetivo.id) return "No puedes cambiar tus propios roles";
-  if (rol === "presidente_academia") {
-    if (!tieneRol(actor, "catt_ejecutivo")) {
-      return "Solo el Secretario Ejecutivo asigna Presidentes de Academia";
-    }
-    if (!objetivo.perfiles.includes("docente")) {
-      return "Presidente de Academia solo se asigna a docentes";
-    }
-    return null;
-  }
   if (ROLES_CATT.includes(rol) || rol === "admin_sistema") {
     if (!tieneRol(actor, "admin_sistema")) {
       return "Solo el administrador del sistema asigna roles del personal CATT";
@@ -459,6 +459,11 @@ router.post(
     const objetivo = await cargarObjetivo(req, res);
     if (!objetivo) return;
     const rol = texto(req.body?.rol);
+    if (rol === "presidente_academia") {
+      return void res
+        .status(409)
+        .json({ error: "El Presidente de Academia se gestiona desde la ficha de la academia" });
+    }
     const error = validarCambioDeRol(req.usuario, objetivo, rol);
     if (error) return void res.status(403).json({ error });
 
@@ -483,6 +488,11 @@ router.delete(
     const objetivo = await cargarObjetivo(req, res);
     if (!objetivo) return;
     const rol = texto(req.params.rol);
+    if (rol === "presidente_academia") {
+      return void res
+        .status(409)
+        .json({ error: "El Presidente de Academia se gestiona desde la ficha de la academia" });
+    }
     const error = validarCambioDeRol(req.usuario, objetivo, rol);
     if (error) return void res.status(403).json({ error });
 

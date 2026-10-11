@@ -8,12 +8,15 @@ const VARIANTES = {
   neutro: "bg-slate-100 text-slate-500 ring-slate-200",
 };
 
-export default function Etiqueta({ variante = "neutro", className = "", children }) {
+// `style` es opcional: para etiquetas con un color propio (p. ej. el color de
+// una academia) que no es uno de las variantes fijas de arriba.
+export default function Etiqueta({ variante = "neutro", className = "", style, children }) {
   return (
     <span
       className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ${
         VARIANTES[variante] ?? VARIANTES.neutro
       } ${className}`}
+      style={style}
     >
       {children}
     </span>

@@ -1,6 +1,7 @@
 import pg from "pg";
 import "dotenv/config";
 
+import { CLAVES_COLOR_ACADEMIA, ICONOS_ACADEMIA } from "../lib/academias.js";
 import { ROLES } from "../lib/roles.js";
 
 const { Pool } = pg;
@@ -305,6 +306,83 @@ async function migrarEsquemaAnterior(client) {
   console.log("[db] Migración terminada.");
 }
 
+// Academias: columnas de presidencia y de personalización (color/ícono),
+// agregadas después del esquema original. Van en ALTER (no en el CREATE TABLE
+// de arriba) porque presidente_id referencia a `docentes`, que se crea
+// después que `academias` en este mismo archivo.
+//
+// Invariante que esta función mantiene: un usuario tiene el rol
+// presidente_academia SI Y SOLO SI es el presidente_id de alguna academia Y
+// su docentes.academia_id es esa misma academia. Es idempotente: solo toca
+// columnas/filas que todavía estén en NULL o que violen el invariante.
+async function migrarAcademiasPresidenteColorIcono(client) {
+  await client.query(`
+    ALTER TABLE academias
+      ADD COLUMN IF NOT EXISTS presidente_id INTEGER UNIQUE REFERENCES docentes(usuario_id) ON DELETE SET NULL,
+      ADD COLUMN IF NOT EXISTS color TEXT,
+      ADD COLUMN IF NOT EXISTS icono TEXT;
+  `);
+
+  // Color e ícono por orden de id, reciclando los catálogos si hay más
+  // academias que colores/íconos. Solo se tocan las que todavía no tienen.
+  const { rows: sinEstilo } = await client.query(
+    "SELECT id FROM academias WHERE color IS NULL OR icono IS NULL ORDER BY id",
+  );
+  for (let i = 0; i < sinEstilo.length; i += 1) {
+    const color = CLAVES_COLOR_ACADEMIA[i % CLAVES_COLOR_ACADEMIA.length];
+    const icono = ICONOS_ACADEMIA[i % ICONOS_ACADEMIA.length];
+    await client.query(
+      "UPDATE academias SET color = COALESCE(color, $1), icono = COALESCE(icono, $2) WHERE id = $3",
+      [color, icono, sinEstilo[i].id],
+    );
+  }
+
+  // Relleno inicial de presidente_id (solo si es NULL): el docente de menor
+  // id con rol presidente_academia en esa academia.
+  const { rows: academiasSinPresidente } = await client.query(
+    "SELECT id FROM academias WHERE presidente_id IS NULL ORDER BY id",
+  );
+  for (const { id: academiaId } of academiasSinPresidente) {
+    const { rows: candidatos } = await client.query(
+      `SELECT d.usuario_id FROM docentes d
+       JOIN usuario_roles ur ON ur.usuario_id = d.usuario_id
+       JOIN roles r ON r.id = ur.rol_id AND r.clave = 'presidente_academia'
+       WHERE d.academia_id = $1
+       ORDER BY d.usuario_id
+       LIMIT 1`,
+      [academiaId],
+    );
+    if (candidatos.length === 0) continue;
+    await client.query("UPDATE academias SET presidente_id = $1 WHERE id = $2", [
+      candidatos[0].usuario_id,
+      academiaId,
+    ]);
+  }
+
+  // A cualquier docente que conserve el rol presidente_academia sin ser el
+  // presidente_id de SU academia actual (duplicados del relleno anterior, o
+  // alguien cuyo rol quedó huérfano) se le quita el rol y se deja constancia.
+  const { rows: sobrantes } = await client.query(`
+    SELECT ur.usuario_id FROM usuario_roles ur
+    JOIN roles r ON r.id = ur.rol_id AND r.clave = 'presidente_academia'
+    JOIN docentes d ON d.usuario_id = ur.usuario_id
+    LEFT JOIN academias ac ON ac.presidente_id = ur.usuario_id AND ac.id = d.academia_id
+    WHERE ac.id IS NULL
+  `);
+  for (const { usuario_id } of sobrantes) {
+    await client.query(
+      `DELETE FROM usuario_roles
+       WHERE usuario_id = $1 AND rol_id = (SELECT id FROM roles WHERE clave = 'presidente_academia')`,
+      [usuario_id],
+    );
+    await client.query(
+      `INSERT INTO bitacora (usuario_id, accion, entidad, entidad_id, detalle)
+       VALUES (NULL, 'ajuste_presidente_migracion', 'usuarios', $1, $2)`,
+      [usuario_id, JSON.stringify({ motivo: "rol_presidente_sin_academia_valida" })],
+    );
+  }
+}
+
 async function initDb() {
   const client = await pool.connect();
   try {
@@ -314,6 +392,7 @@ async function initDb() {
     await client.query(SQL_RESTO);
     await sembrarCatalogos(client);
     if (esquemaAnterior) await migrarEsquemaAnterior(client);
+    await migrarAcademiasPresidenteColorIcono(client);
     await client.query("COMMIT");
   } catch (err) {
     await client.query("ROLLBACK");

@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { useSesion } from "../context/SesionContext";
-import { AZUL_CLARO, AZUL_MEDIO, GRAD_AZUL, VIDRIO } from "../lib/theme";
+import { AZUL_CLARO, AZUL_MEDIO, VIDRIO } from "../lib/theme";
 
 // Ruta inexistente (*): pantalla simple con enlace de vuelta, dentro o fuera
 // de sesión.
@@ -29,7 +29,7 @@ export default function NoEncontrada() {
         <Link
           to={usuario ? "/panel/inicio" : "/"}
           className="mt-6 inline-flex items-center justify-center rounded-full px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-[#1878B6]/30 transition hover:-translate-y-0.5"
-          style={{ backgroundImage: GRAD_AZUL }}
+          style={{ backgroundColor: AZUL_MEDIO }}
         >
           {usuario ? "Ir al panel" : "Ir al inicio"}
         </Link>

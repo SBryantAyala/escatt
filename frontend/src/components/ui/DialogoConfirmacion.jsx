@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { GRAD_AZUL } from "../../lib/theme";
+import { AZUL_MEDIO } from "../../lib/theme";
 
 const SELECTOR_FOCOSABLES =
   'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
@@ -124,7 +124,7 @@ export default function DialogoConfirmacion({
               type="button"
               onClick={onConfirmar}
               disabled={cargando || !puedeConfirmar}
-              style={colorConfirmar ? undefined : { background: GRAD_AZUL }}
+              style={colorConfirmar ? undefined : { backgroundColor: AZUL_MEDIO }}
               className={`min-h-11 rounded-lg px-3 py-1.5 text-sm font-medium text-white transition disabled:cursor-not-allowed disabled:opacity-50 ${
                 colorConfirmar ?? "shadow-md shadow-[#1878B6]/30"
               }`}

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import ChipsRol from "../../../components/ChipsRol";
 import DialogoConfirmacion from "../../../components/ui/DialogoConfirmacion";
 import EncabezadoFicha from "../../../components/ui/EncabezadoFicha";
@@ -7,6 +8,7 @@ import Etiqueta from "../../../components/ui/Etiqueta";
 import ZonaPeligro from "../../../components/ui/ZonaPeligro";
 import { useAviso } from "../../../components/ui/Avisos";
 import { api } from "../../../lib/api";
+import { colorDe } from "../../../lib/academias";
 import { nombreCompleto } from "../../../lib/nombre";
 import {
   CARRERAS,
@@ -17,7 +19,7 @@ import {
   puedeGestionar,
   tieneRol,
 } from "../../../lib/roles";
-import { GRAD_AZUL, VIDRIO } from "../../../lib/theme";
+import { AZUL_MEDIO, VIDRIO } from "../../../lib/theme";
 
 // Pantalla: Detalle / edición de un usuario (HU-3 consulta, HU-4 edición,
 // HU-6 roles del personal). Vive en /panel/usuarios/:id.
@@ -48,8 +50,10 @@ const GENERAL_FIELD_DEFS = [
   { key: "telefono", label: "Número de teléfono", optional: true },
 ];
 
-// Campos por perfil. `seccion` agrupa la vista.
-function camposDePerfil(usuario, academias = []) {
+// Campos por perfil. `seccion` agrupa la vista. La academia de un docente ya
+// no se edita aquí (se mueve desde la ficha de la academia); se muestra por
+// separado como una etiqueta de color con enlace — ver AcademiaDeDocente.
+function camposDePerfil(usuario) {
   const perfiles = usuario?.perfiles ?? [];
   const campos = [];
   if (perfiles.includes("alumno")) {
@@ -76,14 +80,6 @@ function camposDePerfil(usuario, academias = []) {
   }
   if (perfiles.includes("docente")) {
     campos.push(
-      {
-        seccion: "Datos de docente",
-        key: "academia_id",
-        label: "Academia",
-        type: "select",
-        options: academias.map((a) => ({ valor: String(a.id), etiqueta: a.nombre })),
-        mostrar: (u) => u.academia,
-      },
       { seccion: "Datos de docente", key: "cedula_profesional", label: "Cédula profesional", optional: true },
       { seccion: "Datos de docente", key: "extension", label: "Extensión", optional: true },
     );
@@ -92,6 +88,36 @@ function camposDePerfil(usuario, academias = []) {
     campos.push({ seccion: "Datos de personal CATT", key: "cargo", label: "Cargo", optional: true });
   }
   return campos;
+}
+
+// Academia de un docente: etiqueta de color con enlace a su ficha. Si además
+// es el Presidente, lo dice explícitamente (la academia solo tiene uno).
+function AcademiaDeDocente({ usuario }) {
+  if (!usuario.perfiles?.includes("docente") || usuario.academia_id == null) return null;
+  const color = colorDe(usuario.academia_color);
+  const esPresidente = usuario.roles?.includes("presidente_academia");
+
+  return (
+    <div className="px-6 pb-2 sm:px-8">
+      {esPresidente && (
+        <p className="pt-2 text-sm font-medium text-slate-700">
+          Presidente de la academia{" "}
+          <Link
+            to={`/panel/academias/${usuario.academia_id}`}
+            className="font-semibold underline-offset-2 hover:underline"
+            style={{ color: color.hex }}
+          >
+            {usuario.academia}
+          </Link>
+        </p>
+      )}
+      {!esPresidente && (
+        <Link to={`/panel/academias/${usuario.academia_id}`} className="inline-block pt-2">
+          <Etiqueta style={{ backgroundColor: color.claro, color: color.hex }}>{usuario.academia}</Etiqueta>
+        </Link>
+      )}
+    </div>
+  );
 }
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -175,7 +201,7 @@ function validateField(def, value) {
 }
 
 /* Valida los campos generales y los de los perfiles que tenga la persona. */
-function validateAll(data, academias = []) {
+function validateAll(data) {
   const errors = {};
 
   GENERAL_FIELD_DEFS.forEach((def) => {
@@ -183,7 +209,7 @@ function validateAll(data, academias = []) {
     if (error) errors[def.key] = error;
   });
 
-  camposDePerfil(data, academias).forEach((def) => {
+  camposDePerfil(data).forEach((def) => {
     const error = validateField(def, data[def.key]);
     if (error) errors[def.key] = error;
   });
@@ -317,11 +343,10 @@ function SeccionRoles({ actor, usuario, onCambio }) {
   const [procesando, setProcesando] = useState(null);
   const [error, setError] = useState(null);
 
+  // El Presidente de Academia ya no se asigna/quita aquí: se gestiona desde
+  // la ficha de la academia (un solo presidente por academia).
   const esPropio = actor?.id === usuario.id;
   const gestionables = [];
-  if (!esPropio && tieneRol(actor, "catt_ejecutivo") && usuario.perfiles?.includes("docente")) {
-    gestionables.push("presidente_academia");
-  }
   if (!esPropio && tieneRol(actor, "admin_sistema")) {
     if (usuario.numero_empleado != null) gestionables.push(...ROLES_CATT);
     if (esCuentaDePersonal(usuario)) gestionables.push("admin_sistema");
@@ -366,7 +391,7 @@ function SeccionRoles({ actor, usuario, onCambio }) {
                       ? "text-white shadow-md shadow-[#1878B6]/30"
                       : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
                   }`}
-                  style={tiene ? { background: GRAD_AZUL } : undefined}
+                  style={tiene ? { background: AZUL_MEDIO } : undefined}
                 >
                   {procesando === rol ? "…" : `${tiene ? "✓ " : "+ "}${ETIQUETA_ROL[rol]}`}
                 </button>
@@ -386,7 +411,6 @@ export default function UserProfileForm({ actor, userId, onVolver }) {
   const aviso = useAviso();
   const [originalData, setOriginalData] = useState(null);
   const [formData, setFormData] = useState(null);
-  const [academias, setAcademias] = useState([]);
   const [errors, setErrors] = useState({});
   const [isEditing, setIsEditing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -421,11 +445,6 @@ export default function UserProfileForm({ actor, userId, onVolver }) {
       .then((user) => {
         if (!active) return;
         aplicar(user);
-        if (user.perfiles?.includes("docente")) {
-          api("/api/academias")
-            .then((a) => active && setAcademias(a))
-            .catch(() => {});
-        }
       })
       .catch((err) => {
         if (!active) return;
@@ -457,7 +476,7 @@ export default function UserProfileForm({ actor, userId, onVolver }) {
   }
 
   async function handleSave() {
-    const validationErrors = validateAll(formData, academias);
+    const validationErrors = validateAll(formData);
     setErrors(validationErrors);
     if (Object.keys(validationErrors).length > 0) return;
 
@@ -586,7 +605,7 @@ export default function UserProfileForm({ actor, userId, onVolver }) {
   }
 
   const puedeEditar = puedeGestionar(actor, originalData);
-  const campos = camposDePerfil(originalData, academias);
+  const campos = camposDePerfil(originalData);
   const secciones = [...new Set(campos.map((c) => c.seccion))];
   const inicial = (originalData.nombre ?? "").trim().charAt(0).toUpperCase() || "U";
 
@@ -625,7 +644,7 @@ export default function UserProfileForm({ actor, userId, onVolver }) {
           figura={
             <span
               className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full text-xl font-bold text-white"
-              style={{ backgroundImage: GRAD_AZUL }}
+              style={{ backgroundColor: AZUL_MEDIO }}
               aria-hidden="true"
             >
               {inicial}
@@ -653,13 +672,15 @@ export default function UserProfileForm({ actor, userId, onVolver }) {
                   setSaveError(null);
                 }}
                 className="min-h-11 rounded-full px-4 py-2 text-sm font-semibold text-white shadow-md shadow-[#1878B6]/30 transition hover:-translate-y-0.5"
-                style={{ background: GRAD_AZUL }}
+                style={{ background: AZUL_MEDIO }}
               >
                 Editar
               </button>
             )
           }
         />
+
+        <AcademiaDeDocente usuario={originalData} />
 
         {/* Datos generales */}
         <div className="px-6 pt-2 sm:px-8">
@@ -713,7 +734,7 @@ export default function UserProfileForm({ actor, userId, onVolver }) {
               type="button"
               onClick={handleSave}
               disabled={isSaving}
-              style={{ background: GRAD_AZUL }}
+              style={{ background: AZUL_MEDIO }}
               className="flex min-h-11 cursor-pointer items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold text-white shadow-md shadow-[#1878B6]/30 transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {isSaving && <Spinner />}

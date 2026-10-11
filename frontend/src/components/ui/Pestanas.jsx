@@ -1,6 +1,6 @@
 import { useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
-import { GRAD_AZUL } from "../../lib/theme";
+import { AZUL_MEDIO } from "../../lib/theme";
 
 // Hook: lee/escribe la pestaña activa en ?tab= (o el parámetro que se indique)
 // de la URL. Si el valor en la URL no es uno de los ids válidos, cae al
@@ -71,7 +71,7 @@ export default function Pestanas({ pestanas, activa, onCambiar, idBase = "pestan
                 ? "text-white shadow-md shadow-[#1878B6]/30"
                 : "border border-slate-200 text-slate-600 hover:bg-slate-50"
             }`}
-            style={esActiva ? { background: GRAD_AZUL } : undefined}
+            style={esActiva ? { backgroundColor: AZUL_MEDIO } : undefined}
           >
             {p.etiqueta}
             {p.contador != null && (
