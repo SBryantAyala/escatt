@@ -108,7 +108,7 @@ export default function TablaDatos({
   }
 
   return (
-    <div>
+    <div className="tabla-datos">
       {(busqueda || filtros) && (
         <div className="mb-4 flex flex-col gap-2 sm:flex-row">
           {busqueda}

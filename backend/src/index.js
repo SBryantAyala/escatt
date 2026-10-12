@@ -7,6 +7,7 @@ import healthRouter from "./routes/health.js";
 import usuariosRouter from "./routes/usuarios.js";
 import authRouter from "./routes/auth.js";
 import academiasRouter from "./routes/academias.js";
+import bitacoraRouter from "./routes/bitacora.js";
 
 const app = express();
 
@@ -22,6 +23,7 @@ app.use("/api", healthRouter);
 app.use("/api/usuarios", usuariosRouter);
 app.use("/api/auth", authRouter);
 app.use("/api/academias", academiasRouter);
+app.use("/api/bitacora", bitacoraRouter);
 
 // Punto único para registrar las rutas de cada pantalla.
 // Cada integrante agrega aquí SU router desde su rama feature/*:

@@ -109,6 +109,15 @@ export const SECCIONES = [
         roles: ADMIN_Y_CATT,
         oculto: true,
       },
+      {
+        // HU-15: quién hizo cada alta, baja o cambio de rol. Mismos roles que
+        // ya exige el backend en GET /api/bitacora.
+        clave: "bitacora",
+        ruta: "/panel/bitacora",
+        etiqueta: "Bitácora",
+        icono: IconoDocumento,
+        roles: ADMIN_Y_CATT,
+      },
     ],
   },
   {

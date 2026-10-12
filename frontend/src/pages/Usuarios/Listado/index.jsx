@@ -285,7 +285,7 @@ export default function ListadoPage({ actor }) {
               getId={(u) => u.id}
               onAbrirFila={(u) => navigate(`/panel/usuarios/${u.id}`)}
               busqueda={
-                <label className="usuarios-busqueda relative block w-full min-w-0"><span className="sr-only">Buscar en {tituloTabActiva.toLowerCase()}</span><input
+                <label className="tabla-busqueda relative block w-full min-w-0"><span className="sr-only">Buscar en {tituloTabActiva.toLowerCase()}</span><input
                   type="search"
                   value={busqueda}
                   onChange={(e) => setBusqueda(e.target.value)}

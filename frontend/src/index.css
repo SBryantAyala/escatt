@@ -206,24 +206,27 @@ html {
   color: #1264a3;
 }
 
-.usuarios-listado .overflow-x-auto {
+/* Estilo de tabla compartido por TablaDatos (clase .tabla-datos puesta por el
+   propio componente): así Usuarios, Bitácora y cualquier tabla futura se ven
+   igual sin repetir CSS por página. */
+.tabla-datos .overflow-x-auto {
   border: 1px solid #e2e8f0;
   border-radius: 20px;
   background: white;
   box-shadow: 0 4px 6px -1px rgb(15 23 42 / 0.08), 0 2px 4px -2px rgb(15 23 42 / 0.06);
 }
 
-.usuarios-listado table {
+.tabla-datos table {
   min-width: 760px;
   border-collapse: separate;
   border-spacing: 0;
 }
 
-.usuarios-listado thead {
+.tabla-datos thead {
   background: #1878b6;
 }
 
-.usuarios-listado th {
+.tabla-datos th {
   padding: 10px 20px;
   color: white;
   font-size: 14px;
@@ -233,49 +236,49 @@ html {
   white-space: nowrap;
 }
 
-.usuarios-listado th button {
+.tabla-datos th button {
   border-radius: 8px;
 }
 
-.usuarios-listado th button:focus-visible {
+.tabla-datos th button:focus-visible {
   outline: 2px solid white;
   outline-offset: 4px;
 }
 
-.usuarios-listado th button span {
+.tabla-datos th button span {
   color: #dbeafe;
 }
 
-.usuarios-listado td {
+.tabla-datos td {
   padding: 20px;
   border-bottom: 1px solid #e9eef5;
   vertical-align: middle;
 }
 
-.usuarios-listado tbody tr {
+.tabla-datos tbody tr {
   animation: usuario-fila-entrada 350ms ease-out both;
   transition: background-color 180ms ease, box-shadow 180ms ease;
 }
 
-.usuarios-listado tbody tr:nth-child(2) { animation-delay: 25ms; }
-.usuarios-listado tbody tr:nth-child(3) { animation-delay: 50ms; }
-.usuarios-listado tbody tr:nth-child(4) { animation-delay: 75ms; }
-.usuarios-listado tbody tr:nth-child(5) { animation-delay: 100ms; }
-.usuarios-listado tbody tr:nth-child(n+6) { animation-delay: 125ms; }
-.usuarios-listado tbody tr:nth-child(even) { background-color: #f8fafc; }
-.usuarios-listado tbody tr:hover,
-.usuarios-listado tbody tr:focus-visible {
+.tabla-datos tbody tr:nth-child(2) { animation-delay: 25ms; }
+.tabla-datos tbody tr:nth-child(3) { animation-delay: 50ms; }
+.tabla-datos tbody tr:nth-child(4) { animation-delay: 75ms; }
+.tabla-datos tbody tr:nth-child(5) { animation-delay: 100ms; }
+.tabla-datos tbody tr:nth-child(n+6) { animation-delay: 125ms; }
+.tabla-datos tbody tr:nth-child(even) { background-color: #f8fafc; }
+.tabla-datos tbody tr:hover,
+.tabla-datos tbody tr:focus-visible {
   background-color: #eff6ff;
   box-shadow: inset 4px 0 #1878b6;
 }
-.usuarios-listado tbody tr:hover .usuario-avatar { transform: scale(1.05); }
-.usuarios-listado tbody tr:hover .usuario-ficha,
-.usuarios-listado tbody tr:focus-visible .usuario-ficha {
+.tabla-datos tbody tr:hover .usuario-avatar { transform: scale(1.05); }
+.tabla-datos tbody tr:hover .usuario-ficha,
+.tabla-datos tbody tr:focus-visible .usuario-ficha {
   background: #e0f2fe;
   color: #1878b6;
   transform: translateX(2px);
 }
-.usuarios-listado tbody tr:last-child td { border-bottom: 0; }
+.tabla-datos tbody tr:last-child td { border-bottom: 0; }
 
 @keyframes usuario-fila-entrada {
   from { opacity: 0; transform: translateY(5px); }
@@ -283,21 +286,21 @@ html {
 }
 
 @media (min-width: 640px) {
-  .usuarios-listado [role="tabpanel"] > div > div:first-child {
+  .tabla-datos > div:first-child {
     flex-wrap: wrap;
   }
-  .usuarios-listado .usuarios-busqueda {
+  .tabla-datos .tabla-busqueda {
     flex: 1 1 240px;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .usuarios-listado tbody tr { animation: none; transition: none; }
-  .usuarios-listado .usuario-avatar,
-  .usuarios-listado .usuario-ficha { transform: none; transition: none; }
-  .usuarios-listado tbody tr:hover .usuario-avatar,
-  .usuarios-listado tbody tr:hover .usuario-ficha,
-  .usuarios-listado tbody tr:focus-visible .usuario-ficha { transform: none; }
+  .tabla-datos tbody tr { animation: none; transition: none; }
+  .tabla-datos .usuario-avatar,
+  .tabla-datos .usuario-ficha { transform: none; transition: none; }
+  .tabla-datos tbody tr:hover .usuario-avatar,
+  .tabla-datos tbody tr:hover .usuario-ficha,
+  .tabla-datos tbody tr:focus-visible .usuario-ficha { transform: none; }
 }
 
 .alta-selector > select {

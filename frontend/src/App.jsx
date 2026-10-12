@@ -16,6 +16,7 @@ import { AvisoProvider } from "./components/ui/Avisos";
 import { SesionProvider, useSesion } from "./context/SesionContext";
 import AcademiasPage from "./pages/Academias";
 import AcademiaFicha from "./pages/Academias/Ficha";
+import BitacoraPage from "./pages/Bitacora";
 import CambioObligatorioPage from "./pages/CambiarPassword";
 import PanelInicio from "./pages/Panel/Inicio";
 import PanelLayout from "./pages/Panel";
@@ -1278,6 +1279,14 @@ function AppRoutes() {
           element={
             <RequiereRol clave="academia-ficha">
               <AcademiaFichaRoute />
+            </RequiereRol>
+          }
+        />
+        <Route
+          path="bitacora"
+          element={
+            <RequiereRol clave="bitacora">
+              <BitacoraPage />
             </RequiereRol>
           }
         />
