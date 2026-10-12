@@ -546,9 +546,19 @@ async function quedaOtroActivoConRol(client, rol, usuarioId) {
 // DELETE /api/usuarios/:id -> borrado real, solo para cuentas sin historial
 // (altas duplicadas o hechas por error). Lo normal es la baja lógica con
 // /revocar. Mismos permisos que editar.
+//
+// HU-1: deshabilitado fuera de desarrollo (mismo criterio que Express usa
+// para NODE_ENV: sin definir se asume "development"). El borrado real queda
+// disponible únicamente en local; en cualquier otro entorno se usa Revocar.
 router.delete(
   "/:id",
   ruta(async (req, res) => {
+    if ((process.env.NODE_ENV || "development") !== "development") {
+      return res
+        .status(403)
+        .json({ error: "Eliminar cuentas está deshabilitado fuera de desarrollo; usa Revocar acceso." });
+    }
+
     const objetivo = await cargarObjetivo(req, res);
     if (!objetivo || !exigirGestion(req, res, objetivo)) return;
 
