@@ -124,12 +124,15 @@ export const SECCIONES = [
     categoria: "PROCESO",
     items: [
       {
+        // HU-12 (alumno sube evidencia) y HU-13 (la CATT valida). El admin
+        // del sistema solo consulta (como en Usuarios/Academias/Bitácora);
+        // docente y presidente_academia, sin rol de la CATT, siguen viendo
+        // "próximamente" hasta que exista algo para ellos aquí.
         clave: "protocolo",
         ruta: "/panel/protocolo",
         etiqueta: "Protocolo",
         icono: IconoDocumento,
-        roles: ["alumno", ...ACADEMICOS],
-        proximamente: true,
+        roles: ["admin_sistema", "alumno", ...ACADEMICOS],
       },
       {
         clave: "trabajo-terminal",

@@ -149,6 +149,7 @@ const SQL_RESTO = `
     evidencia_url TEXT,
     validado_por  INTEGER     REFERENCES usuarios(id) ON DELETE SET NULL,
     validado_en   TIMESTAMPTZ,
+    creado_en     TIMESTAMPTZ NOT NULL DEFAULT now(),
     UNIQUE (alumno_id, periodo)
   );
 
@@ -393,6 +394,10 @@ async function initDb() {
     await sembrarCatalogos(client);
     if (esquemaAnterior) await migrarEsquemaAnterior(client);
     await migrarAcademiasPresidenteColorIcono(client);
+    // creado_en se agregó después del CREATE TABLE original de elegibilidad.
+    await client.query(
+      "ALTER TABLE elegibilidad ADD COLUMN IF NOT EXISTS creado_en TIMESTAMPTZ NOT NULL DEFAULT now()",
+    );
     await client.query("COMMIT");
   } catch (err) {
     await client.query("ROLLBACK");

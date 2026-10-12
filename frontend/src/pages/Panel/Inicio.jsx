@@ -4,8 +4,9 @@ import { useSesion } from "../../context/SesionContext";
 import { IconoCuenta, IconoDocumento, IconoSalir, IconoUsuarios } from "../../components/iconos";
 import Esqueleto from "../../components/ui/Esqueleto";
 import { api } from "../../lib/api";
-import { etiquetaRolPrincipal } from "../../lib/roles";
+import { etiquetaRolPrincipal, rolPrincipal } from "../../lib/roles";
 import { ADMIN_Y_CATT, navegacionPara } from "../../routes/secciones";
+import InicioAlumno from "./InicioAlumno";
 
 const DESCRIPCION_SECCION = {
   usuarios: "Alumnos, docentes y personal CATT",
@@ -49,6 +50,7 @@ function TarjetaEstadistica({ etiqueta, valor, total, descripcion, Icono, fondo 
 export default function PanelInicio() {
   const { usuario } = useSesion();
   const esPersonal = usuario.roles?.some((r) => ADMIN_Y_CATT.includes(r));
+  const esSoloAlumno = rolPrincipal(usuario) === "alumno";
   const [usuarios, setUsuarios] = useState(null);
   const [errorCarga, setErrorCarga] = useState(null);
   const [reintentos, setReintentos] = useState(0);
@@ -64,8 +66,13 @@ export default function PanelInicio() {
     return () => { vivo = false; };
   }, [esPersonal, reintentos]);
 
+  // navegacionPara(...) es barato de recalcular aunque no se use (rama
+  // alumno); se deja antes del return para no llamar useMemo condicionalmente.
   const accesos = useMemo(() => navegacionPara(usuario.roles ?? [])
     .flatMap((g) => g.items).filter((item) => item.clave !== "inicio"), [usuario.roles]);
+
+  if (esSoloAlumno) return <InicioAlumno usuario={usuario} />;
+
   const total = usuarios?.length ?? 0;
   const activos = usuarios?.filter((u) => u.activo).length ?? 0;
   const pendientes = usuarios?.filter((u) => u.activo && u.debe_cambiar_password).length ?? 0;

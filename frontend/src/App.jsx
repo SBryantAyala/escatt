@@ -20,6 +20,7 @@ import BitacoraPage from "./pages/Bitacora";
 import CambioObligatorioPage from "./pages/CambiarPassword";
 import PanelInicio from "./pages/Panel/Inicio";
 import PanelLayout from "./pages/Panel";
+import ProtocoloPage from "./pages/Protocolo";
 import SeccionProximamente from "./pages/Panel/SeccionProximamente";
 import AltaPage from "./pages/Usuarios/Alta";
 import DetallePage from "./pages/Usuarios/Detalle";
@@ -1138,6 +1139,11 @@ function AcademiasRoute() {
   return <AcademiasPage actor={usuario} />;
 }
 
+function ProtocoloRoute() {
+  const { usuario } = useSesion();
+  return <ProtocoloPage actor={usuario} />;
+}
+
 function AcademiaFichaRoute() {
   const { usuario } = useSesion();
   const { id } = useParams();
@@ -1302,7 +1308,7 @@ function AppRoutes() {
           path="protocolo"
           element={
             <RequiereRol clave="protocolo">
-              <SeccionProximamente titulo="Protocolo" descripcion={DESCRIPCION_PROXIMAMENTE} />
+              <ProtocoloRoute />
             </RequiereRol>
           }
         />

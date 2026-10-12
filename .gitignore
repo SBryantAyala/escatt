@@ -46,3 +46,6 @@ Thumbs.db
 
 # Credenciales de usuarios de prueba (demo) — no subir
 backend/scripts/credenciales-demo.txt
+
+# Evidencia subida por alumnos (kárdex/boleta) — datos locales, no se suben
+backend/uploads/

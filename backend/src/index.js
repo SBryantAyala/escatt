@@ -1,6 +1,7 @@
 import "dotenv/config";
 import express from "express";
 import cors from "cors";
+import multer from "multer";
 
 import { pool } from "./db/index.js";
 import healthRouter from "./routes/health.js";
@@ -8,10 +9,18 @@ import usuariosRouter from "./routes/usuarios.js";
 import authRouter from "./routes/auth.js";
 import academiasRouter from "./routes/academias.js";
 import bitacoraRouter from "./routes/bitacora.js";
+import elegibilidadRouter from "./routes/elegibilidad.js";
 
 const app = express();
 
-app.use(cors({ origin: process.env.CORS_ORIGIN || "http://localhost:5173" }));
+app.use(
+  cors({
+    origin: process.env.CORS_ORIGIN || "http://localhost:5173",
+    // Sin esto el navegador no deja leer este header entre orígenes distintos;
+    // lo usa el frontend para nombrar el archivo al descargar evidencia TT.
+    exposedHeaders: ["Content-Disposition"],
+  }),
+);
 app.use(express.json());
 
 app.get("/", (_req, res) => {
@@ -24,6 +33,7 @@ app.use("/api/usuarios", usuariosRouter);
 app.use("/api/auth", authRouter);
 app.use("/api/academias", academiasRouter);
 app.use("/api/bitacora", bitacoraRouter);
+app.use("/api/elegibilidad", elegibilidadRouter);
 
 // Punto único para registrar las rutas de cada pantalla.
 // Cada integrante agrega aquí SU router desde su rama feature/*:
@@ -38,6 +48,17 @@ app.use("/api", (_req, res) => res.status(404).json({ error: "Ruta no encontrada
 app.use((err, _req, res, _next) => {
   if (err.type === "entity.parse.failed") {
     return res.status(400).json({ error: "El cuerpo de la petición no es JSON válido" });
+  }
+  if (err instanceof multer.MulterError) {
+    const mensajes = {
+      LIMIT_FILE_SIZE: "El archivo supera el tamaño máximo permitido (10 MB)",
+    };
+    return res.status(400).json({ error: mensajes[err.code] || "No se pudo subir el archivo" });
+  }
+  // Errores propios marcados con `status` (p. ej. el fileFilter de multer en
+  // routes/elegibilidad.js) responden con ese código en vez del 500 genérico.
+  if (err.status) {
+    return res.status(err.status).json({ error: err.message });
   }
   console.error("[api] error:", err);
   return res.status(500).json({ error: "Error interno del servidor" });
