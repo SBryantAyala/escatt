@@ -25,7 +25,7 @@ function fechaValida(v) {
   return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === v;
 }
 
-// GET /api/bitacora?desde=&hasta=&accion=&usuario_id=&limite=
+// GET /api/bitacora?desde=&hasta=&accion=&q=&usuario_id=&limite=
 //   Ve quién hizo cada alta, baja o cambio de rol: el Secretario Ejecutivo,
 //   el resto del personal CATT y el administrador del sistema.
 router.get(
@@ -57,6 +57,16 @@ router.get(
     if (accion) {
       valores.push(accion);
       condiciones.push(`b.accion = $${valores.length}`);
+    }
+
+    // Búsqueda libre por el nombre de quien hizo la acción (HU-15: filtro
+    // por usuario). Separado de usuario_id, que filtra por id exacto.
+    const q = texto(req.query.q);
+    if (q) {
+      valores.push(`%${q}%`);
+      condiciones.push(
+        `(u.nombre || ' ' || u.apellido_paterno || ' ' || u.apellido_materno) ILIKE $${valores.length}`,
+      );
     }
 
     const usuarioId = Number(req.query.usuario_id);

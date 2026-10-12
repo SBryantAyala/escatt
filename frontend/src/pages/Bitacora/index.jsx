@@ -56,14 +56,12 @@ function formatearFecha(iso) {
   });
 }
 
-const DIACRITICOS_RE = new RegExp("[\\u0300-\\u036f]", "g");
-
-function normalizar(texto) {
-  return String(texto ?? "")
-    .normalize("NFD")
-    .replace(DIACRITICOS_RE, "")
-    .toLowerCase();
-}
+// Opciones del filtro de acción: el catálogo fijo de arriba, no lo que haya
+// en la página actual de resultados (si no, al filtrar por una acción las
+// demás desaparecerían del propio selector).
+const OPCIONES_ACCION = Object.entries(ETIQUETAS_ACCION)
+  .map(([valor, etiqueta]) => ({ valor, etiqueta }))
+  .sort((a, b) => a.etiqueta.localeCompare(b.etiqueta, "es"));
 
 function FiltroSelect({ label, children, ...props }) {
   return (
@@ -104,38 +102,35 @@ export default function BitacoraPage() {
   const [hasta, setHasta] = useState("");
   const [accionFiltro, setAccionFiltro] = useState("");
   const [busqueda, setBusqueda] = useState("");
+  const [busquedaAplicada, setBusquedaAplicada] = useState("");
 
-  // desde/hasta se mandan al backend (reduce lo que trae de la base); acción
-  // y la búsqueda por nombre se filtran en el cliente sobre lo ya traído.
+  // Debounce: espera a que la persona deje de escribir antes de pedirle al
+  // backend (si no, cada tecla dispararía una consulta distinta).
+  useEffect(() => {
+    const temporizador = setTimeout(() => setBusquedaAplicada(busqueda.trim()), 300);
+    return () => clearTimeout(temporizador);
+  }, [busqueda]);
+
+  // Todos los filtros (fecha, acción y quién) se mandan al backend: así
+  // funcionan sobre toda la bitácora, no solo sobre la página ya cargada.
   const cargarBitacora = useCallback(() => {
     setCargando(true);
     setErrorCarga(null);
     const params = new URLSearchParams();
     if (desde) params.set("desde", desde);
     if (hasta) params.set("hasta", hasta);
+    if (accionFiltro) params.set("accion", accionFiltro);
+    if (busquedaAplicada) params.set("q", busquedaAplicada);
     const query = params.toString();
     api(`/api/bitacora${query ? `?${query}` : ""}`)
       .then((data) => setRegistros(Array.isArray(data) ? data : []))
       .catch((e) => setErrorCarga(e.message))
       .finally(() => setCargando(false));
-  }, [desde, hasta]);
+  }, [desde, hasta, accionFiltro, busquedaAplicada]);
 
   useEffect(() => {
     cargarBitacora();
   }, [cargarBitacora]);
-
-  const acciones = useMemo(
-    () => [...new Set((registros ?? []).map((r) => r.accion))].sort((a, b) => etiquetaAccion(a).localeCompare(etiquetaAccion(b), "es")),
-    [registros],
-  );
-
-  const registrosFiltrados = useMemo(() => {
-    let lista = registros ?? [];
-    if (accionFiltro) lista = lista.filter((r) => r.accion === accionFiltro);
-    const consulta = normalizar(busqueda.trim());
-    if (consulta) lista = lista.filter((r) => normalizar(r.usuario).includes(consulta));
-    return lista;
-  }, [registros, accionFiltro, busqueda]);
 
   const columnas = useMemo(
     () => [
@@ -257,7 +252,7 @@ export default function BitacoraPage() {
           <TablaDatos
             paginacion
             columnas={columnas}
-            filas={registrosFiltrados}
+            filas={registros}
             getId={(r) => r.id}
             onAbrirFila={abrirRegistro}
             busqueda={
@@ -278,9 +273,9 @@ export default function BitacoraPage() {
                 <FiltroFecha label="Hasta" value={hasta} min={desde || undefined} onChange={(e) => setHasta(e.target.value)} />
                 <FiltroSelect label="Filtrar por acción" value={accionFiltro} onChange={(e) => setAccionFiltro(e.target.value)}>
                   <option value="">Todas las acciones</option>
-                  {acciones.map((a) => (
-                    <option key={a} value={a}>
-                      {etiquetaAccion(a)}
+                  {OPCIONES_ACCION.map((a) => (
+                    <option key={a.valor} value={a.valor}>
+                      {a.etiqueta}
                     </option>
                   ))}
                 </FiltroSelect>
@@ -289,9 +284,7 @@ export default function BitacoraPage() {
             mensajeVacio={hayFiltros ? "No hay registros que coincidan con estos filtros." : "Todavía no hay acciones registradas."}
           />
           <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-500">
-            <p aria-live="polite">
-              {registrosFiltrados.length} de {registros.length} registros
-            </p>
+            <p aria-live="polite">{registros.length} registros</p>
             {hayFiltros && (
               <button
                 type="button"
