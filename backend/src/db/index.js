@@ -172,6 +172,10 @@ const SQL_RESTO = `
     PRIMARY KEY (protocolo_id, docente_id)
   );
 
+  -- La llave primaria empieza por protocolo_id; HU-25 busca por docente.
+  CREATE INDEX IF NOT EXISTS protocolo_directores_docente_idx
+    ON protocolo_directores (docente_id);
+
   CREATE TABLE IF NOT EXISTS bitacora (
     id         SERIAL      PRIMARY KEY,
     usuario_id INTEGER     REFERENCES usuarios(id) ON DELETE SET NULL,
