@@ -116,11 +116,14 @@ export async function asignacionesVigentes(_client, _usuarioId) {
 // Devuelve textos legibles; un arreglo vacío significa "sin historial"
 // (alta duplicada o hecha por error).
 //
-// Pendiente (Módulo 2): agregar aquí protocolos, participaciones en TT
-// (alumno, director, sinodal, seguimiento), evaluaciones y actas.
+// Pendiente (Módulo 2): agregar aquí participaciones como sinodal o profesor
+// de seguimiento, evaluaciones y actas. Ya cuentan los protocolos propios
+// (alumno) y como director.
 export async function motivosHistorial(client, usuarioId) {
   const { rows } = await client.query(
     `SELECT
+       (SELECT count(*)::int FROM protocolos WHERE alumno_id = $1) AS protocolos_propios,
+       (SELECT count(*)::int FROM protocolo_directores WHERE docente_id = $1) AS protocolos_dirigidos,
        (SELECT count(*)::int FROM usuarios WHERE creado_por = $1) AS cuentas_creadas,
        (SELECT count(*)::int FROM usuario_roles
          WHERE asignado_por = $1 AND usuario_id <> $1) AS roles_asignados,
@@ -133,6 +136,8 @@ export async function motivosHistorial(client, usuarioId) {
   );
   const n = rows[0];
   const motivos = [];
+  if (n.protocolos_propios > 0) motivos.push(`tiene ${n.protocolos_propios} protocolo(s) como alumno`);
+  if (n.protocolos_dirigidos > 0) motivos.push(`dirige ${n.protocolos_dirigidos} protocolo(s)`);
   if (n.cuentas_creadas > 0) motivos.push(`dio de alta ${n.cuentas_creadas} cuenta(s)`);
   if (n.roles_asignados > 0) motivos.push(`asignó ${n.roles_asignados} rol(es) a otras cuentas`);
   if (n.elegibilidad_propia > 0) {
