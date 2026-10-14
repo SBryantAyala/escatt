@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import BienvenidaPanel from "../../components/ui/BienvenidaPanel";
 import Esqueleto from "../../components/ui/Esqueleto";
 import Etiqueta from "../../components/ui/Etiqueta";
 import { IconoCuenta, IconoDocumento } from "../../components/iconos";
@@ -35,15 +36,6 @@ function formatearFecha(iso) {
   return new Date(iso).toLocaleDateString("es-MX", { dateStyle: "medium" });
 }
 
-const fechaLarga = () =>
-  new Date().toLocaleDateString("es-MX", {
-    timeZone: "America/Mexico_City",
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
-
 export default function InicioAlumno({ usuario }) {
   const [historial, setHistorial] = useState(null);
   const [errorCarga, setErrorCarga] = useState(null);
@@ -62,48 +54,16 @@ export default function InicioAlumno({ usuario }) {
     };
   }, []);
 
-  const fechaActual = new Date();
-  const partesFecha = Object.fromEntries(
-    new Intl.DateTimeFormat("es-MX", {
-      timeZone: "America/Mexico_City",
-      weekday: "long",
-      day: "numeric",
-      month: "long",
-      year: "numeric",
-    }).formatToParts(fechaActual).map(({ type, value }) => [type, value]),
-  );
-
   const ultimo = historial?.[0] ?? null;
   const estado = ultimo ? ESTADOS[ultimo.estado] : null;
 
   return (
     <div className="space-y-6">
-      <header className="inicio-bienvenida relative flex min-h-36 flex-wrap items-center justify-between gap-x-6 gap-y-4 overflow-hidden rounded-[24px] border border-white/15 p-5 text-white sm:px-7">
-        <div className="relative z-10 min-w-0 flex-1 basis-64">
-          <p className="mb-3 inline-flex rounded-full border border-white/15 bg-white/10 px-2.5 py-1 text-xs font-medium text-white">
-            Alumno{usuario.carrera ? ` · ${usuario.carrera}` : ""}
-          </p>
-          <h1 className="text-2xl font-bold leading-tight text-white">
-            <span className="font-normal text-sky-100">Hola,</span> {usuario.nombre}
-          </h1>
-          <p className="mt-2 max-w-lg text-sm leading-relaxed text-sky-100">
-            {usuario.boleta ? `Boleta ${usuario.boleta} · ` : ""}Tu espacio de seguimiento para Trabajo Terminal.
-          </p>
-        </div>
-        <time
-          dateTime={fechaActual.toLocaleDateString("en-CA", { timeZone: "America/Mexico_City" })}
-          aria-label={fechaLarga()}
-          className="relative z-10 flex shrink-0 items-center gap-3 text-white sm:border-l sm:border-white/25 sm:pl-6"
-        >
-          <span className="text-4xl font-semibold tabular-nums leading-none">{partesFecha.day}</span>
-          <span className="text-xs leading-relaxed">
-            <span className="block font-semibold capitalize">{partesFecha.weekday}</span>
-            <span className="block capitalize text-sky-100">
-              {partesFecha.month} {partesFecha.year}
-            </span>
-          </span>
-        </time>
-      </header>
+      <BienvenidaPanel
+        etiqueta={`Alumno${usuario.carrera ? ` · ${usuario.carrera}` : ""}`}
+        nombre={usuario.nombre}
+        descripcion={`${usuario.boleta ? `Boleta ${usuario.boleta} · ` : ""}Tu espacio de seguimiento para Trabajo Terminal.`}
+      />
 
       <section aria-labelledby="inicio-elegibilidad">
         <h2 id="inicio-elegibilidad" className="mb-3 text-base font-bold text-[#102D4B]">

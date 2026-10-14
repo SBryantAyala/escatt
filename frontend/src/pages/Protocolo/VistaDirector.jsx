@@ -3,23 +3,20 @@ import Esqueleto from "../../components/ui/Esqueleto";
 import Etiqueta from "../../components/ui/Etiqueta";
 import { IconoDocumento } from "../../components/iconos";
 import { api } from "../../lib/api";
+import { estadoDe } from "./estados";
 
 // Pantalla: protocolos que dirijo y su estado (HU-25). Solo lectura: el
 // director da seguimiento, no edita el protocolo. Consume
 // GET /api/protocolos/dirigidos, que ya filtra por la sesión.
-
-const ESTADOS = {
-  registrado: { etiqueta: "Registrado", variante: "info" },
-  en_evaluacion: { etiqueta: "En evaluación", variante: "alerta" },
-  aprobado: { etiqueta: "Aprobado", variante: "exito" },
-  no_aprobado: { etiqueta: "No aprobado", variante: "peligro" },
-};
+//
+// `encabezado={false}` la deja sin título cuando vive dentro de las pestañas
+// de "Mis protocolos" (VistaDocente); `onCargado` le avisa la lista actual.
 
 function formatearFecha(iso) {
   return new Date(iso).toLocaleDateString("es-MX", { dateStyle: "medium" });
 }
 
-export default function VistaDirector() {
+export default function VistaDirector({ encabezado = true, onCargado }) {
   const [protocolos, setProtocolos] = useState(null);
   const [errorCarga, setErrorCarga] = useState(null);
 
@@ -29,17 +26,23 @@ export default function VistaDirector() {
       .catch((e) => setErrorCarga(e.message));
   }, []);
 
+  useEffect(() => {
+    if (protocolos) onCargado?.(protocolos);
+  }, [protocolos, onCargado]);
+
   return (
     <div className="min-w-0">
-      <div className="flex items-center gap-3">
-        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-sky-100 text-[#1878B6]">
-          <IconoDocumento className="h-6 w-6" />
-        </span>
-        <div>
-          <h2 className="text-2xl font-bold text-slate-900">Protocolos que dirijo</h2>
-          <p className="mt-1 text-sm text-slate-500">Consulta de solo lectura del estado de cada protocolo</p>
+      {encabezado && (
+        <div className="flex items-center gap-3">
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-sky-100 text-[#1878B6]">
+            <IconoDocumento className="h-6 w-6" />
+          </span>
+          <div>
+            <h2 className="text-2xl font-bold text-slate-900">Protocolos que dirijo</h2>
+            <p className="mt-1 text-sm text-slate-500">Consulta de solo lectura del estado de cada protocolo</p>
+          </div>
         </div>
-      </div>
+      )}
 
       {errorCarga && (
         <p role="alert" className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
@@ -56,13 +59,16 @@ export default function VistaDirector() {
       )}
 
       {protocolos && protocolos.length === 0 && (
-        <p className="mt-6 text-sm text-slate-400">Todavía no diriges ningún protocolo.</p>
+        <p className="mt-6 text-sm text-slate-500">
+          Todavía no diriges ningún protocolo. Cuando un alumno te registre como su director, aparecerá aquí con su
+          estado y, al tener dictamen, las observaciones de los sinodales.
+        </p>
       )}
 
       {protocolos && protocolos.length > 0 && (
         <ul className="mt-6 space-y-3">
           {protocolos.map((p) => {
-            const estado = ESTADOS[p.estado] ?? { etiqueta: p.estado, variante: "neutro" };
+            const estado = estadoDe(p.estado);
             const otros = p.directores.length > 1 ? p.directores.map((d) => d.nombre).join(" · ") : null;
             return (
               <li key={p.id} className="rounded-2xl border border-slate-200 bg-white p-4">

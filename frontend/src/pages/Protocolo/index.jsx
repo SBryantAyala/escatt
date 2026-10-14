@@ -6,6 +6,7 @@ import MiProtocolo from "./MiProtocolo";
 import VistaAlumno from "./VistaAlumno";
 import VistaCambiosDirector from "./VistaCambiosDirector";
 import VistaDirector from "./VistaDirector";
+import VistaDocente from "./VistaDocente";
 import VistaSinodal from "./VistaSinodal";
 import VistaValidacion from "./VistaValidacion";
 
@@ -37,9 +38,12 @@ export default function ProtocoloPage({ actor }) {
     return <SeccionProximamente titulo="Protocolo" descripcion={DESCRIPCION_PROXIMAMENTE} />;
   }
 
-  // Una misma persona puede ser a la vez personal CATT y docente (docente
-  // comisionado): ve todas sus vistas, una debajo de la otra. La de sinodal
-  // va antes que la de director porque es la que pide acción.
+  // El docente sin funciones de la CATT ve "Mis protocolos" con pestañas.
+  if (!esPersonal) return <VistaDocente />;
+
+  // Personal CATT o admin que además es docente (docente comisionado): ve
+  // todas sus vistas, una debajo de la otra. La de sinodal va antes que la
+  // de director porque es la que pide acción.
   return (
     <div className="space-y-10">
       {esPersonal && <VistaValidacion actor={actor} />}

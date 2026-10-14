@@ -2,11 +2,13 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useSesion } from "../../context/SesionContext";
 import { IconoCuenta, IconoDocumento, IconoSalir, IconoUsuarios } from "../../components/iconos";
+import BienvenidaPanel from "../../components/ui/BienvenidaPanel";
 import Esqueleto from "../../components/ui/Esqueleto";
 import { api } from "../../lib/api";
 import { etiquetaRolPrincipal, rolPrincipal } from "../../lib/roles";
 import { ADMIN_Y_CATT, etiquetaDe, navegacionPara } from "../../routes/secciones";
 import InicioAlumno from "./InicioAlumno";
+import InicioDocente from "./InicioDocente";
 
 const DESCRIPCION_SECCION = {
   usuarios: "Alumnos, docentes y personal CATT",
@@ -25,14 +27,6 @@ const TONOS_ACCESO = {
   "trabajo-terminal": "bg-[#BE185D] text-white",
   presentaciones: "bg-[#1D4ED8] text-white",
 };
-
-const fechaLarga = () => new Date().toLocaleDateString("es-MX", {
-  timeZone: "America/Mexico_City",
-  weekday: "long",
-  day: "numeric",
-  month: "long",
-  year: "numeric",
-});
 
 function TarjetaEstadistica({ etiqueta, valor, total, descripcion, Icono, fondo }) {
   const porcentaje = total ? Math.round(valor / total * 100) : 0;
@@ -73,14 +67,13 @@ export default function PanelInicio() {
     .map((item) => ({ ...item, etiqueta: etiquetaDe(item, usuario) })), [usuario.roles, usuario.academia]);
 
   if (esSoloAlumno) return <InicioAlumno usuario={usuario} />;
+  if (["docente", "presidente_academia"].includes(rolPrincipal(usuario))) {
+    return <InicioDocente usuario={usuario} />;
+  }
 
   const total = usuarios?.length ?? 0;
   const activos = usuarios?.filter((u) => u.activo).length ?? 0;
   const pendientes = usuarios?.filter((u) => u.activo && u.debe_cambiar_password).length ?? 0;
-  const fechaActual = new Date();
-  const partesFecha = Object.fromEntries(new Intl.DateTimeFormat("es-MX", {
-    timeZone: "America/Mexico_City", weekday: "long", day: "numeric", month: "long", year: "numeric",
-  }).formatToParts(fechaActual).map(({ type, value }) => [type, value]));
   const estadisticas = [
     { etiqueta: "Usuarios registrados", valor: total, descripcion: "Total del padrón disponible", Icono: IconoUsuarios, fondo: "bg-[#1D4ED8]" },
     { etiqueta: "Acceso activo", valor: activos, descripcion: "Cuentas habilitadas", Icono: IconoCuenta, fondo: "bg-[#0F766E]" },
@@ -90,17 +83,11 @@ export default function PanelInicio() {
 
   return (
     <div className="panel-inicio min-w-0 space-y-5 lg:space-y-4">
-      <header className="inicio-bienvenida relative flex min-h-36 flex-wrap items-center justify-between gap-x-6 gap-y-4 overflow-hidden rounded-[24px] border border-white/15 p-5 text-white sm:px-7">
-        <div className="relative z-10 min-w-0 flex-1 basis-64">
-          <p className="mb-3 inline-flex rounded-full border border-white/15 bg-white/10 px-2.5 py-1 text-xs font-medium text-white">{etiquetaRolPrincipal(usuario)}</p>
-          <h1 className="text-2xl font-bold leading-tight text-white"><span className="font-normal text-sky-100">Hola,</span> {usuario.nombre}</h1>
-          <p className="mt-2 max-w-lg text-sm leading-relaxed text-sky-100">{esPersonal ? "Administración académica y seguimiento de Trabajo Terminal." : "Tu espacio de seguimiento académico en ESCATT."}</p>
-        </div>
-        <time dateTime={fechaActual.toLocaleDateString("en-CA", { timeZone: "America/Mexico_City" })} aria-label={fechaLarga()} className="relative z-10 flex shrink-0 items-center gap-3 text-white sm:border-l sm:border-white/25 sm:pl-6">
-          <span className="text-4xl font-semibold tabular-nums leading-none">{partesFecha.day}</span>
-          <span className="text-xs leading-relaxed"><span className="block font-semibold capitalize">{partesFecha.weekday}</span><span className="block capitalize text-sky-100">{partesFecha.month} {partesFecha.year}</span></span>
-        </time>
-      </header>
+      <BienvenidaPanel
+        etiqueta={etiquetaRolPrincipal(usuario)}
+        nombre={usuario.nombre}
+        descripcion={esPersonal ? "Administración académica y seguimiento de Trabajo Terminal." : "Tu espacio de seguimiento académico en ESCATT."}
+      />
 
       {esPersonal && (
         <section aria-labelledby="inicio-resumen">
