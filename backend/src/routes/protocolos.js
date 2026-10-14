@@ -8,6 +8,7 @@ import multer from "multer";
 
 import { enTransaccion, pool } from "../db/index.js";
 import { autenticar, exigeCambioResuelto, requiereRol } from "../lib/auth.js";
+import { aplicarDictamen } from "../lib/dictamen.js";
 import { ROLES_STAFF, tieneRol } from "../lib/roles.js";
 import { ruta } from "../lib/ruta.js";
 import { registrarBitacora } from "../lib/usuarios.js";
@@ -176,14 +177,32 @@ async function academiaPresidida(usuarioId, client = pool) {
 // HU-25: protocolos que dirijo
 // ---------------------------------------------------------------------------
 
-// Observaciones de los sinodales por protocolo (HU-25, criterio 2: "si
-// aplica"). Pendiente (HU-22): los sinodales ya capturan sus evaluaciones
-// (HU-21, protocolo_sinodales.dictamen/observaciones). Esta es la ÚNICA
-// función que falta completar para mostrarlas: debe devolver un Map
-// de protocolo_id -> [{ sinodal, observaciones }] y la ruta y la pantalla ya
-// las muestran.
-async function observacionesPorProtocolo(_client, _protocoloIds) {
-  return new Map();
+async function observacionesPorProtocolo(client, protocoloIds) {
+  const mapa = new Map();
+  if (protocoloIds.length === 0) return mapa;
+  const { rows } = await client.query(
+    `SELECT s.protocolo_id, s.dictamen, s.observaciones, s.evaluado_en,
+            concat_ws(' ', u.nombre, u.apellido_paterno, u.apellido_materno) AS sinodal
+       FROM protocolo_sinodales s
+       JOIN protocolos p ON p.id = s.protocolo_id
+       JOIN usuarios u ON u.id = s.docente_id
+      WHERE s.protocolo_id = ANY($1)
+        AND p.estado IN ('aprobado', 'no_aprobado')
+        AND s.dictamen IS NOT NULL
+        AND nullif(btrim(s.observaciones), '') IS NOT NULL
+      ORDER BY s.evaluado_en, s.docente_id`,
+    [protocoloIds],
+  );
+  for (const r of rows) {
+    if (!mapa.has(r.protocolo_id)) mapa.set(r.protocolo_id, []);
+    mapa.get(r.protocolo_id).push({
+      sinodal: r.sinodal,
+      dictamen: r.dictamen,
+      observaciones: r.observaciones,
+      evaluado_en: r.evaluado_en,
+    });
+  }
+  return mapa;
 }
 
 // GET /api/protocolos/dirigidos -> protocolos donde la persona autenticada
@@ -250,12 +269,9 @@ router.get(
 const DICTAMENES = ["aprobado", "no_aprobado"];
 const MAX_OBSERVACIONES = 5000;
 
-// Se llama dentro de la transacción, justo después de guardar cada
-// evaluación. Pendiente (HU-22): aquí se calcula el dictamen final y se
-// escribe en protocolos.estado ("no_aprobado" con el primer sinodal que no
-// aprueba, "aprobado" cuando aprueban los 3). Es la ÚNICA función que falta
-// completar para HU-22 del lado de la evaluación; la ruta ya la llama.
-async function alRegistrarEvaluacion(_client, _protocoloId) {}
+async function alRegistrarEvaluacion(client, protocoloId) {
+  await aplicarDictamen(client, protocoloId);
+}
 
 // GET /api/protocolos/por-evaluar -> protocolos donde la persona es sinodal,
 // con SU evaluación (null si no la ha entregado). Primero los pendientes.
@@ -368,7 +384,11 @@ router.get(
       `${SELECT_FICHA} WHERE p.alumno_id = $1 ORDER BY p.creado_en DESC, p.id DESC`,
       [req.usuario.id],
     );
-    res.json(rows.map(serializarFicha));
+    const observaciones = await observacionesPorProtocolo(
+      pool,
+      rows.map((r) => r.id),
+    );
+    res.json(rows.map((r) => ({ ...serializarFicha(r), observaciones: observaciones.get(r.id) ?? [] })));
   }),
 );
 

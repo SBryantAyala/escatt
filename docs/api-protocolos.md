@@ -149,7 +149,20 @@ Body JSON `{ "dictamen": "aprobado" | "no_aprobado", "observaciones": "…" }`
 > Pendiente (HU-27): validar el plazo de entrega con el Calendario de la CATT.
 
 La ficha común **no** expone el dictamen ni las observaciones de cada
-sinodal (solo `evaluo: true/false`). Solo el propio sinodal ve la suya.
+sinodal (solo `evaluo: true/false`). Solo el propio sinodal ve la suya; el
+alumno y los directores las ven con el dictamen final (ver HU-22).
+
+## HU-22 — Dictamen final
+
+Sin ruta propia: se calcula al guardar cada evaluación (HU-21).
+
+- `no_aprobado` en cuanto un sinodal evalúa `no_aprobado`, sin esperar a los otros dos.
+- `aprobado` solo cuando los 3 sinodales evaluaron `aprobado`.
+- Registra `dictamen_protocolo` en la bitácora (sin usuario: lo calcula el sistema).
+- `GET /api/protocolos/mio` (alumno) y `GET /api/protocolos/dirigidos` (director)
+  traen `observaciones`: `[{ sinodal, dictamen, observaciones, evaluado_en }]`,
+  una por sinodal que dejó texto. Es `[]` mientras el protocolo siga
+  `en_evaluacion`, para no exponer evaluaciones parciales.
 
 ## Consulta común
 
@@ -177,16 +190,12 @@ protocolo_sinodales   (protocolo_id, docente_id), asignado_por, asignado_en,
 Usa estas tablas y nombres tal cual; no crees tablas paralelas de protocolos,
 directores o sinodales.
 
-- **HU-22 (dictamen):** HU-21 ya guarda la evaluación de cada sinodal en su
-  fila de `protocolo_sinodales` (`dictamen`, `observaciones`, `evaluado_en`;
-  `NULL` = no ha evaluado). Faltan dos funciones en `routes/protocolos.js`,
-  que ya se llaman desde las rutas:
-  - `alRegistrarEvaluacion(client, protocoloId)`: corre dentro de la
-    transacción, después de cada evaluación. Escribe el dictamen final en
-    `protocolos.estado`: `no_aprobado` en cuanto una fila tenga `no_aprobado`,
-    y `aprobado` cuando las 3 tengan `aprobado`.
-  - `observacionesPorProtocolo()`: para que alumno y director vean las
-    observaciones (ya la usa `/dirigidos`).
+- **HU-22 (dictamen):** `alRegistrarEvaluacion()` llama a `aplicarDictamen()`
+  (`lib/dictamen.js`) dentro de la transacción de cada evaluación: `no_aprobado`
+  en cuanto una fila tenga `no_aprobado`, `aprobado` cuando las 3 tengan
+  `aprobado`, y registra `dictamen_protocolo` en la bitácora. Las observaciones
+  salen por `observacionesPorProtocolo()` en `GET /api/protocolos/mio` y
+  `/dirigidos` (campo `observaciones`), solo con dictamen final.
 - **HU-24 (cambio de director):** los directores vigentes están en
   `protocolo_directores`; al aprobarse la solicitud se reemplazan ahí. La
   solicitud en sí va en una tabla nueva (sugerencia: `solicitudes_cambio_director`
@@ -194,5 +203,5 @@ directores o sinodales.
   Registra cada acción en la bitácora con `registrarBitacora()`.
 
 Acciones de bitácora que ya existen: `registrar_protocolo`,
-`turnar_protocolo_academia`, `asignar_sinodales`, `evaluar_protocolo`
-(entidad `protocolos`).
+`turnar_protocolo_academia`, `asignar_sinodales`, `evaluar_protocolo`,
+`dictamen_protocolo` (entidad `protocolos`).
