@@ -5,18 +5,15 @@ import Etiqueta from "../../components/ui/Etiqueta";
 import { useAviso } from "../../components/ui/Avisos";
 import { IconoDocumento } from "../../components/iconos";
 import { api, descargarArchivo } from "../../lib/api";
+import { estadoDe } from "./estados";
 
 // Pantalla: protocolos que evalúo como sinodal (HU-21). Consume
 // GET /api/protocolos/por-evaluar (ya filtra por la sesión y trae primero los
 // pendientes) y POST /api/protocolos/:id/evaluacion. Una evaluación entregada
 // no se puede modificar, por eso se confirma antes de enviarla.
-
-const ESTADOS = {
-  registrado: { etiqueta: "Registrado", variante: "info" },
-  en_evaluacion: { etiqueta: "En evaluación", variante: "alerta" },
-  aprobado: { etiqueta: "Aprobado", variante: "exito" },
-  no_aprobado: { etiqueta: "No aprobado", variante: "peligro" },
-};
+//
+// `encabezado={false}` la deja sin título cuando vive dentro de las pestañas
+// de "Mis protocolos" (VistaDocente); `onCargado` le avisa la lista actual.
 
 const DICTAMENES = {
   aprobado: { etiqueta: "Aprobado", variante: "exito" },
@@ -142,7 +139,7 @@ function FormularioEvaluacion({ protocolo, onEntregada }) {
   );
 }
 
-export default function VistaSinodal() {
+export default function VistaSinodal({ encabezado = true, onCargado }) {
   const aviso = useAviso();
   const [protocolos, setProtocolos] = useState(null);
   const [errorCarga, setErrorCarga] = useState(null);
@@ -152,6 +149,10 @@ export default function VistaSinodal() {
       .then((data) => setProtocolos(Array.isArray(data) ? data : []))
       .catch((e) => setErrorCarga(e.message));
   }, []);
+
+  useEffect(() => {
+    if (protocolos) onCargado?.(protocolos);
+  }, [protocolos, onCargado]);
 
   function reemplazar(actualizado) {
     setProtocolos((lista) => lista.map((p) => (p.id === actualizado.id ? actualizado : p)));
@@ -167,19 +168,21 @@ export default function VistaSinodal() {
 
   return (
     <div className="min-w-0">
-      <div className="flex items-center gap-3">
-        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-sky-100 text-[#1878B6]">
-          <IconoDocumento className="h-6 w-6" />
-        </span>
-        <div>
-          <h2 className="text-2xl font-bold text-slate-900">Protocolos que evalúo</h2>
-          <p className="mt-1 text-sm text-slate-500">
-            {protocolos && pendientes > 0
-              ? `Tienes ${pendientes} ${pendientes === 1 ? "evaluación pendiente" : "evaluaciones pendientes"}`
-              : "Protocolos donde eres sinodal"}
-          </p>
+      {encabezado && (
+        <div className="flex items-center gap-3">
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-sky-100 text-[#1878B6]">
+            <IconoDocumento className="h-6 w-6" />
+          </span>
+          <div>
+            <h2 className="text-2xl font-bold text-slate-900">Protocolos que evalúo</h2>
+            <p className="mt-1 text-sm text-slate-500">
+              {protocolos && pendientes > 0
+                ? `Tienes ${pendientes} ${pendientes === 1 ? "evaluación pendiente" : "evaluaciones pendientes"}`
+                : "Protocolos donde eres sinodal"}
+            </p>
+          </div>
         </div>
-      </div>
+      )}
 
       {errorCarga && (
         <p role="alert" className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
@@ -196,13 +199,16 @@ export default function VistaSinodal() {
       )}
 
       {protocolos && protocolos.length === 0 && (
-        <p className="mt-6 text-sm text-slate-400">No tienes protocolos asignados como sinodal.</p>
+        <p className="mt-6 text-sm text-slate-500">
+          No tienes protocolos asignados como sinodal. Cuando el Presidente de tu academia te asigne uno, aparecerá
+          aquí para que lo evalúes.
+        </p>
       )}
 
       {protocolos && protocolos.length > 0 && (
         <ul className="mt-6 space-y-3">
           {protocolos.map((p) => {
-            const estado = ESTADOS[p.estado] ?? { etiqueta: p.estado, variante: "neutro" };
+            const estado = estadoDe(p.estado);
             const mia = p.mi_evaluacion;
             return (
               <li key={p.id} className="rounded-2xl border border-slate-200 bg-white p-4">

@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import DashboardLayout from "../../components/DashboardLayout";
-import PanelAlumnoLayout from "../../components/PanelAlumnoLayout";
+import PanelSencilloLayout from "../../components/PanelSencilloLayout";
 import { useSesion } from "../../context/SesionContext";
 import { etiquetaRolPrincipal, rolPrincipal } from "../../lib/roles";
 import { etiquetaDe, navegacionPara, seccionPorRuta } from "../../routes/secciones";
@@ -11,10 +11,12 @@ import { etiquetaDe, navegacionPara, seccionPorRuta } from "../../routes/seccion
 // la navegación visible para el rol y el breadcrumb a partir de la URL, y
 // monta el shell correspondiente + <Outlet/>.
 //
-// Quien SOLO es alumno (sin ningún otro rol) usa PanelAlumnoLayout: topbar
-// simple sin sidebar, porque solo tiene 3 secciones y un dashboard tipo
-// "administrador" le queda grande. Todos los demás roles (incluido un
-// alumno que además fuera, p. ej., personal CATT) siguen en DashboardLayout.
+// Quien no hace funciones administrativas usa PanelSencilloLayout (topbar
+// sin sidebar): el que SOLO es alumno, y el docente o presidente de academia
+// sin ningún rol de la CATT ni de administrador. Tienen pocas secciones y un
+// dashboard tipo "administrador" les queda grande. Todos los demás (incluido
+// un docente comisionado a la CATT) siguen en DashboardLayout.
+const ROLES_SENCILLOS = ["alumno", "docente", "presidente_academia"];
 export default function PanelLayout() {
   const { usuario, cerrarSesion } = useSesion();
   const navigate = useNavigate();
@@ -32,18 +34,36 @@ export default function PanelLayout() {
   );
   const etiquetaRol = etiquetaRolPrincipal(usuario);
   const seccionActual = seccionPorRuta(location.pathname);
-  const esSoloAlumno = rolPrincipal(usuario) === "alumno";
+  const rol = rolPrincipal(usuario);
 
   async function alCerrarSesion() {
     await cerrarSesion();
     navigate("/");
   }
 
-  if (esSoloAlumno) {
+  if (ROLES_SENCILLOS.includes(rol)) {
+    // En la barra va la etiqueta fija de cada sección ("Mi academia"), no
+    // la personalizada del sidebar: el nombre completo de la academia no cabe.
+    // Para el docente, "Protocolo" se llama como su página: "Mis protocolos".
+    const detalleCuenta =
+      rol === "alumno"
+        ? `Alumno · ${usuario.boleta ?? "sin boleta"}`
+        : `${etiquetaRol} · ${usuario.academia ?? "sin academia"}`;
     return (
-      <PanelAlumnoLayout usuario={usuario} navegacion={navegacion} onCerrarSesion={alCerrarSesion}>
+      <PanelSencilloLayout
+        usuario={usuario}
+        etiquetaRol={etiquetaRol}
+        detalleCuenta={detalleCuenta}
+        navegacion={navegacionPara(clavesRoles.split(",")).map((grupo) => ({
+          ...grupo,
+          items: grupo.items.map((item) =>
+            item.clave === "protocolo" && rol !== "alumno" ? { ...item, etiqueta: "Mis protocolos" } : item,
+          ),
+        }))}
+        onCerrarSesion={alCerrarSesion}
+      >
         <Outlet />
-      </PanelAlumnoLayout>
+      </PanelSencilloLayout>
     );
   }
 
