@@ -12,7 +12,7 @@ Este repositorio contiene **únicamente el código** del proyecto ESCATT.
 
 ```
 docs/
-└── api-protocolos.md   # contrato de API del Módulo 2 (HU-18/19/20) y esquema de protocolos
+└── api-protocolos.md   # contrato de API del Módulo 2 (HU-18 a HU-21) y esquema de protocolos
 backend/
 ├── scripts/
 │   ├── crear-admin.js           # crea el primer Administrador del sistema

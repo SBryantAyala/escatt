@@ -16,6 +16,7 @@ import { registrarBitacora } from "../lib/usuarios.js";
 //   HU-18  el alumno registra su protocolo (POST /, GET /mio)
 //   HU-19  el Secretario Ejecutivo lo turna a una Academia (PATCH /:id/academia)
 //   HU-20  el Presidente de esa Academia asigna 3 sinodales (PUT /:id/sinodales)
+//   HU-21  cada sinodal entrega su evaluación (GET /por-evaluar, POST /:id/evaluacion)
 //   HU-25  el director consulta los protocolos que dirige (GET /dirigidos)
 // El contrato completo (formas de request/response) está en docs/api-protocolos.md.
 const router = Router();
@@ -176,9 +177,9 @@ async function academiaPresidida(usuarioId, client = pool) {
 // ---------------------------------------------------------------------------
 
 // Observaciones de los sinodales por protocolo (HU-25, criterio 2: "si
-// aplica"). Pendiente (HU-21/HU-22): las evaluaciones ya tienen dónde vivir
-// (protocolo_sinodales.dictamen/observaciones), pero todavía nadie las
-// captura. Esta es la ÚNICA función que falta completar: debe devolver un Map
+// aplica"). Pendiente (HU-22): los sinodales ya capturan sus evaluaciones
+// (HU-21, protocolo_sinodales.dictamen/observaciones). Esta es la ÚNICA
+// función que falta completar para mostrarlas: debe devolver un Map
 // de protocolo_id -> [{ sinodal, observaciones }] y la ruta y la pantalla ya
 // las muestran.
 async function observacionesPorProtocolo(_client, _protocoloIds) {
@@ -239,6 +240,117 @@ router.get(
         observaciones: observaciones.get(r.id) ?? [],
       })),
     );
+  }),
+);
+
+// ---------------------------------------------------------------------------
+// HU-21: el sinodal evalúa
+// ---------------------------------------------------------------------------
+
+const DICTAMENES = ["aprobado", "no_aprobado"];
+const MAX_OBSERVACIONES = 5000;
+
+// Se llama dentro de la transacción, justo después de guardar cada
+// evaluación. Pendiente (HU-22): aquí se calcula el dictamen final y se
+// escribe en protocolos.estado ("no_aprobado" con el primer sinodal que no
+// aprueba, "aprobado" cuando aprueban los 3). Es la ÚNICA función que falta
+// completar para HU-22 del lado de la evaluación; la ruta ya la llama.
+async function alRegistrarEvaluacion(_client, _protocoloId) {}
+
+// GET /api/protocolos/por-evaluar -> protocolos donde la persona es sinodal,
+// con SU evaluación (null si no la ha entregado). Primero los pendientes.
+// Solo cuentas con perfil de docente; el filtro sale de la sesión.
+router.get(
+  "/por-evaluar",
+  ruta(async (req, res) => {
+    if (!req.usuario.perfiles?.includes("docente")) {
+      return res.status(403).json({ error: "Solo el personal docente puede evaluar protocolos" });
+    }
+    const { rows } = await pool.query(
+      `${SELECT_FICHA}
+         JOIN protocolo_sinodales ms ON ms.protocolo_id = p.id AND ms.docente_id = $1
+        ORDER BY (ms.dictamen IS NOT NULL), p.creado_en ASC, p.id ASC`,
+      [req.usuario.id],
+    );
+    // SELECT_FICHA no trae la evaluación propia; se consulta aparte para no
+    // exponer la de los otros sinodales en la ficha común.
+    const { rows: propias } = await pool.query(
+      `SELECT protocolo_id, dictamen, observaciones, evaluado_en
+         FROM protocolo_sinodales WHERE docente_id = $1`,
+      [req.usuario.id],
+    );
+    const porProtocolo = new Map(propias.map((e) => [e.protocolo_id, e]));
+    res.json(
+      rows.map((r) => {
+        const e = porProtocolo.get(r.id);
+        return {
+          ...serializarFicha(r),
+          mi_evaluacion: e?.dictamen
+            ? { dictamen: e.dictamen, observaciones: e.observaciones, evaluado_en: e.evaluado_en }
+            : null,
+        };
+      }),
+    );
+  }),
+);
+
+// POST /api/protocolos/:id/evaluacion { dictamen, observaciones? } -> el
+// sinodal entrega su evaluación (HU-21). Observaciones obligatorias si es
+// "no_aprobado". Una vez entregada no se puede modificar.
+//
+// Pendiente (HU-27): el plazo de entrega sale del Calendario de Actividades
+// de la CATT, que todavía no existe. Cuando exista, se valida aquí.
+router.post(
+  "/:id/evaluacion",
+  ruta(async (req, res) => {
+    const id = idDeParams(req);
+    if (!id) return res.status(400).json({ error: "El id debe ser un número entero positivo" });
+    const dictamen = texto(req.body?.dictamen);
+    const observaciones = texto(req.body?.observaciones) || null;
+    if (!DICTAMENES.includes(dictamen)) {
+      return res.status(400).json({ error: "dictamen debe ser aprobado o no_aprobado" });
+    }
+    if (dictamen === "no_aprobado" && !observaciones) {
+      return res.status(400).json({ error: "Escribe tus observaciones para marcar el protocolo como no aprobado" });
+    }
+    if (observaciones && observaciones.length > MAX_OBSERVACIONES) {
+      return res.status(400).json({ error: `Las observaciones no pueden pasar de ${MAX_OBSERVACIONES} caracteres` });
+    }
+
+    const resultado = await enTransaccion(async (client) => {
+      const { rows: prot } = await client.query("SELECT estado FROM protocolos WHERE id = $1 FOR UPDATE", [id]);
+      if (!prot[0]) return { status: 404, error: "No existe ese protocolo" };
+
+      const { rows: asignado } = await client.query(
+        "SELECT dictamen FROM protocolo_sinodales WHERE protocolo_id = $1 AND docente_id = $2",
+        [id, req.usuario.id],
+      );
+      if (!asignado[0]) return { status: 403, error: "Solo puedes evaluar protocolos donde eres sinodal" };
+      if (asignado[0].dictamen) {
+        return { status: 409, error: "Ya entregaste tu evaluación de este protocolo; no se puede modificar" };
+      }
+      if (prot[0].estado !== "en_evaluacion") {
+        return { status: 409, error: "Este protocolo ya no está en evaluación" };
+      }
+
+      await client.query(
+        `UPDATE protocolo_sinodales
+            SET dictamen = $1, observaciones = $2, evaluado_en = now()
+          WHERE protocolo_id = $3 AND docente_id = $4`,
+        [dictamen, observaciones, id, req.usuario.id],
+      );
+      await registrarBitacora(client, req.usuario.id, "evaluar_protocolo", "protocolos", id, { dictamen });
+      await alRegistrarEvaluacion(client, id);
+      return null;
+    });
+    if (resultado) return res.status(resultado.status).json({ error: resultado.error });
+
+    const ficha = serializarFicha(await obtenerFila(id));
+    const { rows } = await pool.query(
+      "SELECT dictamen, observaciones, evaluado_en FROM protocolo_sinodales WHERE protocolo_id = $1 AND docente_id = $2",
+      [id, req.usuario.id],
+    );
+    res.status(201).json({ ...ficha, mi_evaluacion: rows[0] });
   }),
 );
 

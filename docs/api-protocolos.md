@@ -1,7 +1,7 @@
 # API de protocolos (Módulo 2)
 
-Contrato del backend de HU-18, HU-19 y HU-20, y el esquema sobre el que se
-construyen HU-21, HU-22, HU-24 y HU-25. Todo vive en
+Contrato del backend de HU-18, HU-19, HU-20 y HU-21, y el esquema sobre el
+que se construyen HU-22, HU-24 y HU-25. Todo vive en
 `backend/src/routes/protocolos.js` y cuelga de `/api/protocolos`.
 
 Todas las rutas requieren `Authorization: Bearer <token>`. Los errores son
@@ -22,6 +22,8 @@ node scripts/seed-demo-protocolos.js
 | Secretario Ejecutivo | `karla.islas@ipn.mx` | `PersonalDemo1` | HU-19 (turnar) |
 | Presidente de Ing. de Software | `roberto.mendoza@ipn.mx` | `DocenteDemo1` | HU-20 (sinodales) |
 | Presidenta de Ciencias de la Computación | `patricia.guzman@ipn.mx` | `DocenteDemo1` | HU-20 |
+| Sinodal con una evaluación pendiente | `gabriela.rincon@ipn.mx` | `DocenteDemo1` | HU-21 (evaluar) |
+| Sinodal que ya evaluó (aprobó uno, rechazó otro) | `hector.zuniga@ipn.mx` | `DocenteDemo1` | HU-21 (consulta) |
 | Director (y Consulta CATT) | `francisco.cabanas@ipn.mx` / `rosamaria.beltran@ipn.mx` | `DocenteDemo1` / `PersonalDemo1` | HU-25 / consulta |
 
 El seed deja un protocolo en cada estado: dos `registrado` sin Academia, uno
@@ -122,6 +124,33 @@ Body JSON `{ "sinodales": [28, 31, 14] }` → ficha con `estado: "en_evaluacion"
 - Reemplaza la terna completa; se puede corregir mientras ningún sinodal haya
   evaluado. Después, o si el protocolo ya tiene dictamen, `409`.
 
+## HU-21 — Evaluar protocolo (sinodal)
+
+### `GET /api/protocolos/por-evaluar`
+Solo cuentas con perfil de docente. Protocolos donde la persona es sinodal,
+primero los pendientes. Cada elemento es la ficha más `mi_evaluacion`:
+
+```json
+{ "...ficha": "…", "mi_evaluacion": null }
+{ "...ficha": "…", "mi_evaluacion": { "dictamen": "no_aprobado", "observaciones": "…", "evaluado_en": "…" } }
+```
+
+`null` = todavía no la entrega. Se puede evaluar si `mi_evaluacion` es `null`
+**y** `estado` es `en_evaluacion`.
+
+### `POST /api/protocolos/:id/evaluacion`
+Body JSON `{ "dictamen": "aprobado" | "no_aprobado", "observaciones": "…" }`
+→ `201` con la ficha y `mi_evaluacion`.
+- `observaciones` es obligatoria si es `no_aprobado` (máx. 5000), opcional si es `aprobado` (`400`).
+- Solo un sinodal asignado a ese protocolo (`403`).
+- Una vez entregada no se puede modificar (`409`).
+- Solo mientras el protocolo esté `en_evaluacion` (`409`).
+
+> Pendiente (HU-27): validar el plazo de entrega con el Calendario de la CATT.
+
+La ficha común **no** expone el dictamen ni las observaciones de cada
+sinodal (solo `evaluo: true/false`). Solo el propio sinodal ve la suya.
+
 ## Consulta común
 
 ### `GET /api/protocolos/:id`
@@ -148,13 +177,16 @@ protocolo_sinodales   (protocolo_id, docente_id), asignado_por, asignado_en,
 Usa estas tablas y nombres tal cual; no crees tablas paralelas de protocolos,
 directores o sinodales.
 
-- **HU-21/HU-22 (evaluación y dictamen):** la evaluación de cada sinodal se
-  guarda en su fila de `protocolo_sinodales` (`dictamen`, `observaciones`,
-  `evaluado_en`; `NULL` = no ha evaluado). El dictamen final se escribe en
-  `protocolos.estado`: `no_aprobado` en cuanto una fila tenga `no_aprobado`;
-  `aprobado` cuando las 3 tengan `aprobado`. Para que alumno y director vean
-  las observaciones, completa `observacionesPorProtocolo()` en
-  `routes/protocolos.js` (ya la usa `/dirigidos`).
+- **HU-22 (dictamen):** HU-21 ya guarda la evaluación de cada sinodal en su
+  fila de `protocolo_sinodales` (`dictamen`, `observaciones`, `evaluado_en`;
+  `NULL` = no ha evaluado). Faltan dos funciones en `routes/protocolos.js`,
+  que ya se llaman desde las rutas:
+  - `alRegistrarEvaluacion(client, protocoloId)`: corre dentro de la
+    transacción, después de cada evaluación. Escribe el dictamen final en
+    `protocolos.estado`: `no_aprobado` en cuanto una fila tenga `no_aprobado`,
+    y `aprobado` cuando las 3 tengan `aprobado`.
+  - `observacionesPorProtocolo()`: para que alumno y director vean las
+    observaciones (ya la usa `/dirigidos`).
 - **HU-24 (cambio de director):** los directores vigentes están en
   `protocolo_directores`; al aprobarse la solicitud se reemplazan ahí. La
   solicitud en sí va en una tabla nueva (sugerencia: `solicitudes_cambio_director`
@@ -162,4 +194,5 @@ directores o sinodales.
   Registra cada acción en la bitácora con `registrarBitacora()`.
 
 Acciones de bitácora que ya existen: `registrar_protocolo`,
-`turnar_protocolo_academia`, `asignar_sinodales` (entidad `protocolos`).
+`turnar_protocolo_academia`, `asignar_sinodales`, `evaluar_protocolo`
+(entidad `protocolos`).
