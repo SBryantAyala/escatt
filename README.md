@@ -11,10 +11,13 @@ Este repositorio contiene **únicamente el código** del proyecto ESCATT.
 ## Estructura
 
 ```
+docs/
+└── api-protocolos.md   # contrato de API del Módulo 2 (HU-18/19/20) y esquema de protocolos
 backend/
 ├── scripts/
 │   ├── crear-admin.js           # crea el primer Administrador del sistema
 │   ├── seed-demo-usuarios.js    # usuarios de prueba (uno o más por rol)
+│   ├── seed-demo-protocolos.js  # protocolos de prueba, uno en cada estado (correr después del anterior)
 │   └── asignar-credenciales.js  # asigna contraseña a un usuario desde la terminal
 └── src/
     ├── index.js        # arranque, registro de rutas y manejador de errores
