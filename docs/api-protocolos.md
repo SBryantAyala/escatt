@@ -20,8 +20,8 @@ node scripts/seed-demo-protocolos.js
 |---|---|---|---|
 | Alumno elegible sin protocolo | `jonathan.salazar@alumno.ipn.mx` | `AlumnoDemo1` | HU-18 (registrar) |
 | Secretario Ejecutivo | `karla.islas@ipn.mx` | `PersonalDemo1` | HU-19 (turnar) |
-| Presidente de Ing. de Software | `roberto.mendoza@ipn.mx` | `DocenteDemo1` | HU-20 (sinodales) |
-| Presidenta de Ciencias de la Computación | `patricia.guzman@ipn.mx` | `DocenteDemo1` | HU-20 |
+| Presidenta de Ing. de Software | `mriverad@ipn.mx` | `DocenteDemo1` | HU-20 (sinodales) |
+| Presidenta de Ciencias de la Computación | `sandra.diaz@ipn.mx` | `DocenteDemo1` | HU-20 |
 | Sinodal con una evaluación pendiente | `gabriela.rincon@ipn.mx` | `DocenteDemo1` | HU-21 (evaluar) |
 | Sinodal que ya evaluó (aprobó uno, rechazó otro) | `hector.zuniga@ipn.mx` | `DocenteDemo1` | HU-21 (consulta) |
 | Director (y Consulta CATT) | `francisco.cabanas@ipn.mx` / `rosamaria.beltran@ipn.mx` | `DocenteDemo1` / `PersonalDemo1` | HU-25 / consulta |

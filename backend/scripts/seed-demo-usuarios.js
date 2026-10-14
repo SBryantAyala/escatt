@@ -59,6 +59,21 @@ const DOCENTES = [
   { nombre: "Claudia Berenice", apellido_paterno: "Espinoza", apellido_materno: "Tovar", correo: "claudia.espinoza@ipn.mx", telefono: "5588990011", numero_empleado: "483561", academia: "Academia de Ingeniería de Software" },
   { nombre: "Miguel Ángel", apellido_paterno: "Casarrubias", apellido_materno: "León", correo: "miguel.casarrubias@ipn.mx", telefono: "5599001122", numero_empleado: "462738", academia: "Academia de Sistemas Distribuidos" },
   { nombre: "Norma Alicia", apellido_paterno: "Guerrero", apellido_materno: "Bátiz", correo: "norma.guerrero@ipn.mx", telefono: "5500112233", numero_empleado: "470195", academia: "Academia de Ingeniería de Software" },
+
+  // Presidentes de academia según la hoja "Jefes y Presidentes de Academia"
+  // de la CATT. El nombre es para ubicarlos; el correo es el de la hoja o uno
+  // inventado si no venía, y el número de empleado es inventado.
+  { nombre: "Florencio", apellido_paterno: "Guzmán", apellido_materno: "Aguilar", correo: "fguzmana@ipn.mx", numero_empleado: "440101", academia: "Academia de Ciencias Básicas" },
+  { nombre: "Sandra", apellido_paterno: "Díaz", apellido_materno: "Santiago", correo: "sandra.diaz@ipn.mx", numero_empleado: "440102", academia: "Academia de Ciencias de la Computación" },
+  { nombre: "Juan Carlos", apellido_paterno: "Téllez", apellido_materno: "Barrera", correo: "jtellezb@ipn.mx", numero_empleado: "440103", academia: "Academia de Fundamentos de Sistemas Electrónicos" },
+  { nombre: "Saúl", apellido_paterno: "De la O", apellido_materno: "Torres", correo: "sdelaot@ipn.mx", numero_empleado: "440104", academia: "Academia de Inteligencia Artificial" },
+  { nombre: "Sandra Luz", apellido_paterno: "Morales", apellido_materno: "Guitrón", correo: "slmorales@ipn.mx", numero_empleado: "440105", academia: "Academia de Ciencia de Datos" },
+  { nombre: "Mónica", apellido_paterno: "Rivera", apellido_materno: "De la Rosa", correo: "mriverad@ipn.mx", numero_empleado: "440106", academia: "Academia de Ingeniería de Software" },
+  { nombre: "César", apellido_paterno: "Mújica", apellido_materno: "Ascencio", correo: "cesar.mujica@ipn.mx", numero_empleado: "440107", academia: "Academia de Sistemas Digitales" },
+  { nombre: "Benjamín", apellido_paterno: "Cruz", apellido_materno: "Torres", correo: "bcruzt@ipn.mx", numero_empleado: "440108", academia: "Academia de Sistemas Distribuidos" },
+  { nombre: "Eduardo", apellido_paterno: "Rodríguez", apellido_materno: "Flores", correo: "erodrigrezf@ipn.mx", numero_empleado: "440109", academia: "Academia de Proyectos Estratégicos y Toma de Decisiones" },
+  { nombre: "Araceli", apellido_paterno: "Loyola", apellido_materno: "Espinosa", correo: "aloyolae@ipn.mx", numero_empleado: "440110", academia: "Academia de Ciencias Sociales" },
+  { nombre: "Adriana Berenice", apellido_paterno: "Celis", apellido_materno: "Domínguez", correo: "bcelisd@ipn.mx", numero_empleado: "440111", academia: "Academia de Trabajo Terminal" },
 ];
 
 const PERSONAL = [
@@ -74,21 +89,36 @@ const PERSONAL = [
   { nombre: "Oscar Iván", apellido_paterno: "Malpica", apellido_materno: "Serrano", correo: "oscar.malpica@ipn.mx", telefono: "5501200987", numero_empleado: "502951", cargo: "Personal Administrativo" },
 ];
 
-// Roles extra de algunos docentes (además de "docente").
+// Roles extra de algunos docentes (además de "docente"). El de presidente no
+// va aquí: sale de PRESIDENCIAS.
 const ROLES_EXTRA_DOCENTE = {
-  "roberto.mendoza@ipn.mx": ["presidente_academia"],
-  "patricia.guzman@ipn.mx": ["presidente_academia"],
   // Docente comisionado a la CATT: tiene perfil docente Y personal_catt.
   "miguel.casarrubias@ipn.mx": ["catt_ejecutivo"],
 };
 
-// A qué academia preside cada presidente de la demo (debe ser la misma
-// academia en la que quedó el docente arriba). Mantiene el invariante
-// academias.presidente_id <-> rol presidente_academia.
-const PRESIDENCIAS_DEMO = {
-  "roberto.mendoza@ipn.mx": "Academia de Ingeniería de Software",
-  "patricia.guzman@ipn.mx": "Academia de Ciencias de la Computación",
+// Presidente de cada academia (debe ser docente de esa misma academia en
+// DOCENTES). Mantiene el invariante academias.presidente_id <-> rol
+// presidente_academia: quien está aquí recibe el rol y nadie más lo tiene.
+const PRESIDENCIAS = {
+  "fguzmana@ipn.mx": "Academia de Ciencias Básicas",
+  "sandra.diaz@ipn.mx": "Academia de Ciencias de la Computación",
+  "jtellezb@ipn.mx": "Academia de Fundamentos de Sistemas Electrónicos",
+  "sdelaot@ipn.mx": "Academia de Inteligencia Artificial",
+  "slmorales@ipn.mx": "Academia de Ciencia de Datos",
+  "mriverad@ipn.mx": "Academia de Ingeniería de Software",
+  "cesar.mujica@ipn.mx": "Academia de Sistemas Digitales",
+  "bcruzt@ipn.mx": "Academia de Sistemas Distribuidos",
+  "erodrigrezf@ipn.mx": "Academia de Proyectos Estratégicos y Toma de Decisiones",
+  "aloyolae@ipn.mx": "Academia de Ciencias Sociales",
+  "bcelisd@ipn.mx": "Academia de Trabajo Terminal",
 };
+
+for (const [correo, academia] of Object.entries(PRESIDENCIAS)) {
+  const docente = DOCENTES.find((d) => d.correo === correo);
+  if (docente?.academia !== academia) {
+    throw new Error(`${correo} preside ${academia} pero no es docente de esa academia en DOCENTES`);
+  }
+}
 
 // Rol CATT de cada integrante del personal.
 const ROL_PERSONAL = {
@@ -191,7 +221,10 @@ await enTransaccion(async (client) => {
        ON CONFLICT (usuario_id) DO UPDATE SET academia_id = EXCLUDED.academia_id`,
       [id, await academiaId(client, d.academia)],
     );
-    const extra = ROLES_EXTRA_DOCENTE[d.correo] ?? [];
+    const extra = [
+      ...(ROLES_EXTRA_DOCENTE[d.correo] ?? []),
+      ...(PRESIDENCIAS[d.correo] ? ["presidente_academia"] : []),
+    ];
     if (extra.some((r) => r.startsWith("catt_"))) {
       await personalCatt(client, id, "Docente comisionado a la CATT");
     }
@@ -204,9 +237,9 @@ await enTransaccion(async (client) => {
   // Presidentes de academia: hay un solo presidente por academia
   // (academias.presidente_id). Se limpia primero para que una corrida
   // posterior no deje apuntando a alguien que ya perdió el rol arriba (p. ej.
-  // si se quita a alguien de ROLES_EXTRA_DOCENTE en el futuro).
+  // si se quita a alguien de PRESIDENCIAS en el futuro).
   await client.query("UPDATE academias SET presidente_id = NULL");
-  for (const [correo, academia] of Object.entries(PRESIDENCIAS_DEMO)) {
+  for (const [correo, academia] of Object.entries(PRESIDENCIAS)) {
     await client.query("UPDATE academias SET presidente_id = $1 WHERE nombre = $2", [
       idDocentePorCorreo[correo],
       academia,
