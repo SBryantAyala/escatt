@@ -153,6 +153,29 @@ const SQL_RESTO = `
     UNIQUE (alumno_id, periodo)
   );
 
+  -- Módulo 2 (provisional, lo mínimo que necesita HU-25). Si el esquema de
+  -- protocolos de HU-18 llega a main antes, se reemplaza por ese y se
+  -- conserva solo la consulta de routes/protocolos.js.
+  CREATE TABLE IF NOT EXISTS protocolos (
+    id        SERIAL      PRIMARY KEY,
+    alumno_id INTEGER     NOT NULL REFERENCES alumnos(usuario_id),
+    titulo    TEXT        NOT NULL,
+    estado    TEXT        NOT NULL DEFAULT 'registrado'
+              CHECK (estado IN ('registrado', 'en_evaluacion', 'aprobado', 'no_aprobado')),
+    creado_en TIMESTAMPTZ NOT NULL DEFAULT now()
+  );
+
+  -- Uno o dos directores por protocolo (el límite lo valida el registro, HU-18).
+  CREATE TABLE IF NOT EXISTS protocolo_directores (
+    protocolo_id INTEGER NOT NULL REFERENCES protocolos(id) ON DELETE CASCADE,
+    docente_id   INTEGER NOT NULL REFERENCES docentes(usuario_id),
+    PRIMARY KEY (protocolo_id, docente_id)
+  );
+
+  -- La llave primaria empieza por protocolo_id; HU-25 busca por docente.
+  CREATE INDEX IF NOT EXISTS protocolo_directores_docente_idx
+    ON protocolo_directores (docente_id);
+
   CREATE TABLE IF NOT EXISTS bitacora (
     id         SERIAL      PRIMARY KEY,
     usuario_id INTEGER     REFERENCES usuarios(id) ON DELETE SET NULL,
