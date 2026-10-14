@@ -124,8 +124,9 @@ export const SECCIONES = [
     categoria: "PROCESO",
     items: [
       {
-        // HU-12 (alumno sube evidencia), HU-13 (la CATT valida) y HU-25
-        // (el docente consulta los protocolos que dirige). El admin del
+        // HU-12 (alumno sube evidencia), HU-13 (la CATT valida), HU-21 (el
+        // sinodal evalúa) y HU-25 (el docente consulta los protocolos que
+        // dirige). El admin del
         // sistema solo consulta (como en Usuarios/Academias/Bitácora).
         clave: "protocolo",
         ruta: "/panel/protocolo",
