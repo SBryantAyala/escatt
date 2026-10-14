@@ -18,7 +18,7 @@ backend/
 │   ├── crear-admin.js           # crea el primer Administrador del sistema
 │   ├── seed-demo-usuarios.js    # usuarios de prueba (uno o más por rol)
 │   ├── seed-demo-protocolos.js  # protocolos de prueba, uno en cada estado (correr después del anterior)
-│   ├── cargar-presidentes.js    # asigna los presidentes reales desde presidentes.local.json (no se sube a git)
+│   ├── cargar-presidentes.js    # asigna los presidentes reales desde presidentes.json
 │   └── asignar-credenciales.js  # asigna contraseña a un usuario desde la terminal
 └── src/
     ├── index.js        # arranque, registro de rutas y manejador de errores
