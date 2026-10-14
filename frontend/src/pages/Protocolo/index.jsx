@@ -1,7 +1,9 @@
 import SeccionProximamente from "../Panel/SeccionProximamente";
 import { ADMIN_Y_CATT } from "../../routes/secciones";
 import { tieneRol } from "../../lib/roles";
+import CambioDirector from "./CambioDirector";
 import VistaAlumno from "./VistaAlumno";
+import VistaCambiosDirector from "./VistaCambiosDirector";
 import VistaDirector from "./VistaDirector";
 import VistaSinodal from "./VistaSinodal";
 import VistaValidacion from "./VistaValidacion";
@@ -14,7 +16,14 @@ const DESCRIPCION_PROXIMAMENTE =
 // evalúa) y HU-25 (el director consulta los protocolos que dirige). El resto
 // del flujo de protocolo (registro, turnar, sinodales) sigue pendiente.
 export default function ProtocoloPage({ actor }) {
-  if (tieneRol(actor, "alumno")) return <VistaAlumno />;
+  if (tieneRol(actor, "alumno")) {
+    return (
+      <div className="space-y-10">
+        <VistaAlumno />
+        <CambioDirector />
+      </div>
+    );
+  }
 
   const esPersonal = tieneRol(actor, ...ADMIN_Y_CATT);
   // Cualquier cuenta con perfil de docente puede ser director (HU-25) o
@@ -31,6 +40,7 @@ export default function ProtocoloPage({ actor }) {
   return (
     <div className="space-y-10">
       {esPersonal && <VistaValidacion actor={actor} />}
+      {esPersonal && <VistaCambiosDirector actor={actor} />}
       {esDirector && <VistaSinodal />}
       {esDirector && <VistaDirector />}
     </div>
