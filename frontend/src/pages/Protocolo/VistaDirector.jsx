@@ -88,7 +88,11 @@ export default function VistaDirector() {
                     <ul className="mt-2 space-y-2">
                       {p.observaciones.map((o, i) => (
                         <li key={i} className="text-sm text-slate-700">
-                          {o.sinodal && <span className="font-semibold">{o.sinodal}: </span>}
+                          {o.sinodal && <span className="font-semibold">{o.sinodal}</span>}
+                          {o.dictamen && (
+                            <span className="text-slate-500"> ({o.dictamen === "aprobado" ? "Aprobado" : "No aprobado"})</span>
+                          )}
+                          {o.sinodal ? ": " : ""}
                           {o.observaciones}
                         </li>
                       ))}
