@@ -47,5 +47,8 @@ Thumbs.db
 # Credenciales de usuarios de prueba (demo) — no subir
 backend/scripts/credenciales-demo.txt
 
+# Presidentes de academia reales (nombres y correos) — no subir; ver scripts/cargar-presidentes.js
+backend/scripts/presidentes.local.json
+
 # Evidencia subida por alumnos (kárdex/boleta) — datos locales, no se suben
 backend/uploads/

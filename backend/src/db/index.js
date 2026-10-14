@@ -241,13 +241,21 @@ const SQL_RESTO = `
   );
 `;
 
-// Academias de ejemplo para desarrollo. La lista oficial de ESCOM no está
-// publicada; el Secretario Ejecutivo administra el catálogo desde el sistema.
-const ACADEMIAS_EJEMPLO = [
-  ["Academia de Ciencias de la Computación", "Ciencias e Ingeniería de la Computación"],
-  ["Academia de Ingeniería de Software", "Ingeniería en Sistemas Computacionales"],
-  ["Academia de Sistemas Distribuidos", "Ingeniería en Sistemas Computacionales"],
+// Catálogo oficial de academias de ESCOM (hoja "Jefes y Presidentes de
+// Academia" de la CATT). Se siembra una sola vez; después el Secretario
+// Ejecutivo lo administra desde el sistema. El departamento solo se conoce
+// para las cinco academias que ya existían en el catálogo de ejemplo.
+const ACADEMIAS_OFICIALES = [
   ["Academia de Ciencias Básicas", "Formación Básica"],
+  ["Academia de Ciencias de la Computación", "Ciencias e Ingeniería de la Computación"],
+  ["Academia de Fundamentos de Sistemas Electrónicos", null],
+  ["Academia de Inteligencia Artificial", null],
+  ["Academia de Ciencia de Datos", null],
+  ["Academia de Ingeniería de Software", "Ingeniería en Sistemas Computacionales"],
+  ["Academia de Sistemas Digitales", null],
+  ["Academia de Sistemas Distribuidos", "Ingeniería en Sistemas Computacionales"],
+  ["Academia de Proyectos Estratégicos y Toma de Decisiones", null],
+  ["Academia de Ciencias Sociales", null],
   ["Academia de Trabajo Terminal", "Formación Integral e Institucional"],
 ];
 
@@ -271,15 +279,29 @@ async function sembrarCatalogos(client) {
     );
   }
 
-  const { rows } = await client.query("SELECT count(*)::int AS n FROM academias");
-  if (rows[0].n === 0) {
-    for (const [nombre, departamento] of ACADEMIAS_EJEMPLO) {
-      await client.query("INSERT INTO academias (nombre, departamento) VALUES ($1, $2)", [
-        nombre,
-        departamento,
-      ]);
-    }
+  // Una sola vez por base: en una nueva siembra las 11; en una que ya tenía
+  // el catálogo de ejemplo agrega las que faltan sin tocar las existentes.
+  // La marca en la bitácora evita volver a crear una academia que el
+  // Secretario Ejecutivo haya renombrado después.
+  const { rows } = await client.query(
+    "SELECT 1 FROM bitacora WHERE accion = 'migracion_catalogo_academias' LIMIT 1",
+  );
+  if (rows.length > 0) return;
+
+  const agregadas = [];
+  for (const [nombre, departamento] of ACADEMIAS_OFICIALES) {
+    const { rowCount } = await client.query(
+      `INSERT INTO academias (nombre, departamento) VALUES ($1, $2)
+       ON CONFLICT (nombre) DO NOTHING`,
+      [nombre, departamento],
+    );
+    if (rowCount > 0) agregadas.push(nombre);
   }
+  await client.query(
+    `INSERT INTO bitacora (usuario_id, accion, entidad, detalle)
+     VALUES (NULL, 'migracion_catalogo_academias', 'academias', $1)`,
+    [JSON.stringify({ agregadas })],
+  );
 }
 
 // Migra una base con el esquema anterior (una sola tabla `usuarios` con
