@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import DialogoConfirmacion from "../../components/ui/DialogoConfirmacion";
 import Esqueleto from "../../components/ui/Esqueleto";
 import Etiqueta from "../../components/ui/Etiqueta";
@@ -19,7 +19,7 @@ function formatearFecha(iso) {
   return new Date(iso).toLocaleDateString("es-MX", { dateStyle: "medium" });
 }
 
-function Solicitud({ solicitud, puedeResolver, onResuelta }) {
+function Solicitud({ solicitud, puedeResolver, onResuelta, onDesactualizada }) {
   const aviso = useAviso();
   const [rechazando, setRechazando] = useState(false);
   const [observaciones, setObservaciones] = useState("");
@@ -44,6 +44,12 @@ function Solicitud({ solicitud, puedeResolver, onResuelta }) {
     } catch (err) {
       setAprobando(false);
       aviso.error(err.message);
+      // 409: otra persona de la CATT la resolvió primero (o cambió el
+      // protocolo). Se recarga la lista para mostrar el estado real.
+      if (err.status === 409) {
+        setRechazando(false);
+        onDesactualizada();
+      }
     } finally {
       setEnviando(false);
     }
@@ -159,11 +165,15 @@ export default function VistaCambiosDirector({ actor }) {
   const [errorCarga, setErrorCarga] = useState(null);
   const puedeResolver = tieneRol(actor, "catt_ejecutivo", "catt_auxiliar");
 
-  useEffect(() => {
+  const cargar = useCallback(() => {
     api("/api/cambios-director")
       .then((data) => setSolicitudes(Array.isArray(data) ? data : []))
       .catch((e) => setErrorCarga(e.message));
   }, []);
+
+  useEffect(() => {
+    cargar();
+  }, [cargar]);
 
   function reemplazar(actualizada) {
     setSolicitudes((lista) => lista.map((s) => (s.id === actualizada.id ? actualizada : s)));
@@ -208,7 +218,13 @@ export default function VistaCambiosDirector({ actor }) {
       {solicitudes && solicitudes.length > 0 && (
         <ul className="mt-6 space-y-3">
           {solicitudes.map((s) => (
-            <Solicitud key={s.id} solicitud={s} puedeResolver={puedeResolver} onResuelta={reemplazar} />
+            <Solicitud
+              key={s.id}
+              solicitud={s}
+              puedeResolver={puedeResolver}
+              onResuelta={reemplazar}
+              onDesactualizada={cargar}
+            />
           ))}
         </ul>
       )}
