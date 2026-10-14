@@ -23,9 +23,9 @@ import { enTransaccion, pool } from "../src/db/index.js";
 
 const PERIODO = "2026-2";
 
-const ACADEMIA_IS = "Academia de Ingeniería de Software"; // preside roberto.mendoza
-const ACADEMIA_CC = "Academia de Ciencias de la Computación"; // preside patricia.guzman
-const ACADEMIA_SD = "Academia de Sistemas Distribuidos"; // sin presidente en la demo
+const ACADEMIA_IS = "Academia de Ingeniería de Software"; // preside mriverad
+const ACADEMIA_CC = "Academia de Ciencias de la Computación"; // preside sandra.diaz
+const ACADEMIA_SD = "Academia de Sistemas Distribuidos"; // preside bcruzt
 
 const PROTOCOLOS = [
   {
