@@ -125,6 +125,8 @@ export async function motivosHistorial(client, usuarioId) {
        (SELECT count(*)::int FROM protocolos WHERE alumno_id = $1) AS protocolos_propios,
        (SELECT count(*)::int FROM protocolo_directores WHERE docente_id = $1) AS protocolos_dirigidos,
        (SELECT count(*)::int FROM protocolo_sinodales WHERE docente_id = $1) AS protocolos_sinodal,
+       (SELECT count(*)::int FROM solicitudes_cambio_director
+         WHERE director_saliente_id = $1 OR director_propuesto_id = $1) AS solicitudes_cambio,
        (SELECT count(*)::int FROM usuarios WHERE creado_por = $1) AS cuentas_creadas,
        (SELECT count(*)::int FROM usuario_roles
          WHERE asignado_por = $1 AND usuario_id <> $1) AS roles_asignados,
@@ -140,6 +142,9 @@ export async function motivosHistorial(client, usuarioId) {
   if (n.protocolos_propios > 0) motivos.push(`tiene ${n.protocolos_propios} protocolo(s) como alumno`);
   if (n.protocolos_dirigidos > 0) motivos.push(`dirige ${n.protocolos_dirigidos} protocolo(s)`);
   if (n.protocolos_sinodal > 0) motivos.push(`es sinodal de ${n.protocolos_sinodal} protocolo(s)`);
+  if (n.solicitudes_cambio > 0) {
+    motivos.push(`aparece en ${n.solicitudes_cambio} solicitud(es) de cambio de director`);
+  }
   if (n.cuentas_creadas > 0) motivos.push(`dio de alta ${n.cuentas_creadas} cuenta(s)`);
   if (n.roles_asignados > 0) motivos.push(`asignó ${n.roles_asignados} rol(es) a otras cuentas`);
   if (n.elegibilidad_propia > 0) {

@@ -207,6 +207,29 @@ const SQL_RESTO = `
   CREATE INDEX IF NOT EXISTS protocolo_sinodales_docente_idx
     ON protocolo_sinodales (docente_id);
 
+  CREATE TABLE IF NOT EXISTS solicitudes_cambio_director (
+    id                       SERIAL      PRIMARY KEY,
+    protocolo_id             INTEGER     NOT NULL REFERENCES protocolos(id) ON DELETE CASCADE,
+    solicitante_id           INTEGER     NOT NULL REFERENCES usuarios(id),
+    director_saliente_id     INTEGER     NOT NULL REFERENCES docentes(usuario_id),
+    director_propuesto_id    INTEGER     NOT NULL REFERENCES docentes(usuario_id),
+    motivo                   TEXT        NOT NULL,
+    constancia_archivo       TEXT        NOT NULL,
+    estado                   TEXT        NOT NULL DEFAULT 'pendiente'
+                             CHECK (estado IN ('pendiente', 'aprobada', 'rechazada')),
+    resuelta_por             INTEGER     REFERENCES usuarios(id) ON DELETE SET NULL,
+    resuelta_en              TIMESTAMPTZ,
+    observaciones_resolucion TEXT,
+    creado_en                TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CHECK (director_saliente_id <> director_propuesto_id)
+  );
+
+  CREATE UNIQUE INDEX IF NOT EXISTS solicitudes_cambio_director_pendiente_uq
+    ON solicitudes_cambio_director (protocolo_id) WHERE estado = 'pendiente';
+
+  CREATE INDEX IF NOT EXISTS solicitudes_cambio_director_estado_idx
+    ON solicitudes_cambio_director (estado, creado_en);
+
   CREATE TABLE IF NOT EXISTS bitacora (
     id         SERIAL      PRIMARY KEY,
     usuario_id INTEGER     REFERENCES usuarios(id) ON DELETE SET NULL,
