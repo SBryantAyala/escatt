@@ -1,0 +1,13 @@
+[
+  {"academia": "Academia de Ciencias Básicas", "nombre": "Florencio", "apellido_paterno": "Guzmán", "apellido_materno": "Aguilar", "correo": "fguzmana@ipn.mx", "extension": "52027"},
+  {"academia": "Academia de Ciencias de la Computación", "nombre": "Sandra", "apellido_paterno": "Díaz", "apellido_materno": "Santiago", "correo": "sandra.diaz.pendiente@correo.invalid", "extension": "52022"},
+  {"academia": "Academia de Fundamentos de Sistemas Electrónicos", "nombre": "Juan Carlos", "apellido_paterno": "Téllez", "apellido_materno": "Barrera", "correo": "jtellezb@ipn.mx", "extension": "52054"},
+  {"academia": "Academia de Inteligencia Artificial", "nombre": "Saúl", "apellido_paterno": "De la O", "apellido_materno": "Torres", "correo": "sdelaot@ipn.mx", "extension": "52022"},
+  {"academia": "Academia de Ciencia de Datos", "nombre": "Sandra Luz", "apellido_paterno": "Morales", "apellido_materno": "Guitrón", "correo": "slmorales@ipn.mx", "extension": "52039"},
+  {"academia": "Academia de Ingeniería de Software", "nombre": "Mónica", "apellido_paterno": "Rivera", "apellido_materno": "De la Rosa", "correo": "mriverad@ipn.mx", "extension": "52039"},
+  {"academia": "Academia de Sistemas Digitales", "nombre": "César", "apellido_paterno": "Mújica", "apellido_materno": "Ascencio", "correo": "cesar.mujica.pendiente@correo.invalid", "extension": "52032"},
+  {"academia": "Academia de Sistemas Distribuidos", "nombre": "Benjamín", "apellido_paterno": "Cruz", "apellido_materno": "Torres", "correo": "bcruzt@ipn.mx", "extension": "52032"},
+  {"academia": "Academia de Proyectos Estratégicos y Toma de Decisiones", "nombre": "Eduardo", "apellido_paterno": "Rodríguez", "apellido_materno": "Flores", "correo": "erodrigrezf@ipn.mx", "extension": "52039"},
+  {"academia": "Academia de Ciencias Sociales", "nombre": "Araceli", "apellido_paterno": "Loyola", "apellido_materno": "Espinosa", "correo": "aloyolae@ipn.mx", "extension": "52070"},
+  {"academia": "Academia de Trabajo Terminal", "nombre": "Adriana Berenice", "apellido_paterno": "Celis", "apellido_materno": "Domínguez", "correo": "bcelisd@ipn.mx", "extension": "52069"}
+]

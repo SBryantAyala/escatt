@@ -1,8 +1,8 @@
 // Carga a los presidentes de academia desde un archivo local y los asigna
 // como presidentes en el sistema.
 //
-// Los datos (nombres y correos reales) NO se suben a git: viven en
-// scripts/presidentes.local.json, que está en .gitignore. Formato:
+// Los datos viven en
+// scripts/presidentes.json. Formato:
 //
 //   [
 //     {
@@ -39,7 +39,7 @@ import { enTransaccion, pool } from "../src/db/index.js";
 import { asignarRol, quitarRol, registrarBitacora } from "../src/lib/usuarios.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const archivo = process.argv[2] ?? path.join(__dirname, "presidentes.local.json");
+const archivo = process.argv[2] ?? path.join(__dirname, "presidentes.json");
 
 if (!fs.existsSync(archivo)) {
   console.error(`Error: no existe ${archivo}. Ver el formato al inicio de este script.`);
