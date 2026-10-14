@@ -106,7 +106,7 @@ export default function DialogoPresidente({
           </>
         ) : (
           <>
-            <h2 className="text-lg font-semibold text-slate-900">
+            <h2 id="dialogo-presidente-titulo" className="text-lg font-semibold text-slate-900">
               {presidenteActual ? "Confirmar cambio de presidente" : "Confirmar presidente"}
             </h2>
             {presidenteActual ? (
@@ -117,7 +117,7 @@ export default function DialogoPresidente({
                 </p>
                 <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-slate-600">
                   <li>&quot;{presidenteActual.nombre_completo}&quot; pierde el acceso de presidente y la sección de su academia.</li>
-                  <li>&quot;{elegido.nombre_completo}&quot; lo recibe al guardar.</li>
+                  <li>&quot;{elegido.nombre_completo}&quot; lo recibe al confirmar.</li>
                   <li>Solo puede haber un presidente por academia.</li>
                 </ul>
               </>
