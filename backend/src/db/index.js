@@ -58,6 +58,9 @@ export async function enTransaccion(fn) {
 //   usuario_roles  roles de cada usuario (N:M)
 //   academias      catálogo de academias
 //   elegibilidad   requisitos para TT por alumno y periodo
+//   protocolos            protocolos de TT (Módulo 2)
+//   protocolo_directores  1 o 2 directores por protocolo
+//   protocolo_sinodales   3 sinodales por protocolo + su evaluación
 //   bitacora       historial de acciones sensibles
 //   credenciales   contraseña (scrypt) de cada usuario
 //   sesiones       tokens Bearer activos
@@ -153,16 +156,26 @@ const SQL_RESTO = `
     UNIQUE (alumno_id, periodo)
   );
 
-  -- Módulo 2 (provisional, lo mínimo que necesita HU-25). Si el esquema de
-  -- protocolos de HU-18 llega a main antes, se reemplaza por ese y se
-  -- conserva solo la consulta de routes/protocolos.js.
+  -- Módulo 2: protocolos de TT.
+  --   registrado    -> lo registró el alumno (HU-18); falta Academia/sinodales
+  --   en_evaluacion -> ya tiene Academia (HU-19) y sus 3 sinodales (HU-20)
+  --   aprobado / no_aprobado -> dictamen (HU-22)
+  -- Las columnas que no están en el CREATE original (resumen, periodo,
+  -- academia…) también se agregan con ALTER en migrarProtocolos(), para las
+  -- bases que ya tenían la tabla provisional de HU-25.
   CREATE TABLE IF NOT EXISTS protocolos (
-    id        SERIAL      PRIMARY KEY,
-    alumno_id INTEGER     NOT NULL REFERENCES alumnos(usuario_id),
-    titulo    TEXT        NOT NULL,
-    estado    TEXT        NOT NULL DEFAULT 'registrado'
-              CHECK (estado IN ('registrado', 'en_evaluacion', 'aprobado', 'no_aprobado')),
-    creado_en TIMESTAMPTZ NOT NULL DEFAULT now()
+    id                   SERIAL      PRIMARY KEY,
+    alumno_id            INTEGER     NOT NULL REFERENCES alumnos(usuario_id),
+    titulo               TEXT        NOT NULL,
+    resumen              TEXT        NOT NULL DEFAULT '',
+    periodo              TEXT,
+    visto_bueno_archivo  TEXT,
+    academia_id          INTEGER     REFERENCES academias(id),
+    academia_asignada_por INTEGER    REFERENCES usuarios(id) ON DELETE SET NULL,
+    academia_asignada_en TIMESTAMPTZ,
+    estado               TEXT        NOT NULL DEFAULT 'registrado'
+                         CHECK (estado IN ('registrado', 'en_evaluacion', 'aprobado', 'no_aprobado')),
+    creado_en            TIMESTAMPTZ NOT NULL DEFAULT now()
   );
 
   -- Uno o dos directores por protocolo (el límite lo valida el registro, HU-18).
@@ -175,6 +188,24 @@ const SQL_RESTO = `
   -- La llave primaria empieza por protocolo_id; HU-25 busca por docente.
   CREATE INDEX IF NOT EXISTS protocolo_directores_docente_idx
     ON protocolo_directores (docente_id);
+
+  -- Exactamente 3 sinodales por protocolo (lo valida HU-20 al asignar).
+  -- dictamen/observaciones/evaluado_en son la evaluación de cada sinodal
+  -- (HU-21); el dictamen final del protocolo se calcula a partir de estas
+  -- tres filas (HU-22). NULL en dictamen = todavía no evalúa.
+  CREATE TABLE IF NOT EXISTS protocolo_sinodales (
+    protocolo_id  INTEGER     NOT NULL REFERENCES protocolos(id) ON DELETE CASCADE,
+    docente_id    INTEGER     NOT NULL REFERENCES docentes(usuario_id),
+    asignado_por  INTEGER     REFERENCES usuarios(id) ON DELETE SET NULL,
+    asignado_en   TIMESTAMPTZ NOT NULL DEFAULT now(),
+    dictamen      TEXT        CHECK (dictamen IN ('aprobado', 'no_aprobado')),
+    observaciones TEXT,
+    evaluado_en   TIMESTAMPTZ,
+    PRIMARY KEY (protocolo_id, docente_id)
+  );
+
+  CREATE INDEX IF NOT EXISTS protocolo_sinodales_docente_idx
+    ON protocolo_sinodales (docente_id);
 
   CREATE TABLE IF NOT EXISTS bitacora (
     id         SERIAL      PRIMARY KEY,
@@ -407,6 +438,35 @@ async function migrarAcademiasPresidenteColorIcono(client) {
   }
 }
 
+// Protocolos: completa la tabla provisional de HU-25 con lo que piden
+// HU-18/HU-19 y agrega la regla de HU-19 en la propia base: un protocolo no
+// sale de "registrado" sin Academia asignada. Idempotente.
+async function migrarProtocolos(client) {
+  await client.query(`
+    ALTER TABLE protocolos
+      ADD COLUMN IF NOT EXISTS resumen TEXT NOT NULL DEFAULT '',
+      ADD COLUMN IF NOT EXISTS periodo TEXT,
+      ADD COLUMN IF NOT EXISTS visto_bueno_archivo TEXT,
+      ADD COLUMN IF NOT EXISTS academia_id INTEGER REFERENCES academias(id),
+      ADD COLUMN IF NOT EXISTS academia_asignada_por INTEGER REFERENCES usuarios(id) ON DELETE SET NULL,
+      ADD COLUMN IF NOT EXISTS academia_asignada_en TIMESTAMPTZ;
+  `);
+  await client.query("CREATE INDEX IF NOT EXISTS protocolos_academia_idx ON protocolos (academia_id)");
+  await client.query("CREATE INDEX IF NOT EXISTS protocolos_alumno_idx ON protocolos (alumno_id)");
+
+  const { rows } = await client.query(
+    "SELECT 1 FROM pg_constraint WHERE conname = 'protocolos_academia_antes_de_evaluar'",
+  );
+  if (rows.length === 0) {
+    // NOT VALID: no revisa filas viejas (p. ej. las sembradas para HU-25
+    // antes de que existiera academia_id), pero sí toda escritura nueva.
+    await client.query(`
+      ALTER TABLE protocolos ADD CONSTRAINT protocolos_academia_antes_de_evaluar
+        CHECK (estado = 'registrado' OR academia_id IS NOT NULL) NOT VALID
+    `);
+  }
+}
+
 async function initDb() {
   const client = await pool.connect();
   try {
@@ -417,6 +477,7 @@ async function initDb() {
     await sembrarCatalogos(client);
     if (esquemaAnterior) await migrarEsquemaAnterior(client);
     await migrarAcademiasPresidenteColorIcono(client);
+    await migrarProtocolos(client);
     // creado_en se agregó después del CREATE TABLE original de elegibilidad.
     await client.query(
       "ALTER TABLE elegibilidad ADD COLUMN IF NOT EXISTS creado_en TIMESTAMPTZ NOT NULL DEFAULT now()",
