@@ -106,12 +106,27 @@ export default function DialogoPresidente({
           </>
         ) : (
           <>
-            <h2 className="text-lg font-semibold text-slate-900">Confirmar presidente</h2>
-            <p className="mt-2 text-sm text-slate-600">
-              {presidenteActual
-                ? `"${elegido.nombre_completo}" será el nuevo presidente; "${presidenteActual.nombre_completo}" deja de serlo.`
-                : `"${elegido.nombre_completo}" será el nuevo presidente de la academia.`}
-            </p>
+            <h2 className="text-lg font-semibold text-slate-900">
+              {presidenteActual ? "Confirmar cambio de presidente" : "Confirmar presidente"}
+            </h2>
+            {presidenteActual ? (
+              <>
+                <p className="mt-2 text-sm text-slate-600">
+                  Los permisos de Presidente de Academia pasarán de &quot;{presidenteActual.nombre_completo}&quot; a
+                  &quot;{elegido.nombre_completo}&quot;.
+                </p>
+                <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-slate-600">
+                  <li>&quot;{presidenteActual.nombre_completo}&quot; pierde el acceso de presidente y la sección de su academia.</li>
+                  <li>&quot;{elegido.nombre_completo}&quot; lo recibe al guardar.</li>
+                  <li>Solo puede haber un presidente por academia.</li>
+                </ul>
+              </>
+            ) : (
+              <p className="mt-2 text-sm text-slate-600">
+                &quot;{elegido.nombre_completo}&quot; será el presidente de la academia y recibirá los permisos de
+                Presidente de Academia. Solo puede haber un presidente por academia.
+              </p>
+            )}
             <div className="mt-5 flex justify-end gap-2">
               <button
                 type="button"

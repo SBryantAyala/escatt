@@ -5,7 +5,7 @@ import { IconoCuenta, IconoDocumento, IconoSalir, IconoUsuarios } from "../../co
 import Esqueleto from "../../components/ui/Esqueleto";
 import { api } from "../../lib/api";
 import { etiquetaRolPrincipal, rolPrincipal } from "../../lib/roles";
-import { ADMIN_Y_CATT, navegacionPara } from "../../routes/secciones";
+import { ADMIN_Y_CATT, etiquetaDe, navegacionPara } from "../../routes/secciones";
 import InicioAlumno from "./InicioAlumno";
 
 const DESCRIPCION_SECCION = {
@@ -69,7 +69,8 @@ export default function PanelInicio() {
   // navegacionPara(...) es barato de recalcular aunque no se use (rama
   // alumno); se deja antes del return para no llamar useMemo condicionalmente.
   const accesos = useMemo(() => navegacionPara(usuario.roles ?? [])
-    .flatMap((g) => g.items).filter((item) => item.clave !== "inicio"), [usuario.roles]);
+    .flatMap((g) => g.items).filter((item) => item.clave !== "inicio")
+    .map((item) => ({ ...item, etiqueta: etiquetaDe(item, usuario) })), [usuario.roles, usuario.academia]);
 
   if (esSoloAlumno) return <InicioAlumno usuario={usuario} />;
 

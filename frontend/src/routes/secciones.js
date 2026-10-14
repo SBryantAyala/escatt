@@ -184,6 +184,12 @@ export function seccionPorRuta(pathname) {
   return TODAS_SECCIONES.find((s) => s.ruta === pathname);
 }
 
+// Etiqueta visible de una sección para esta persona. La sección "Mi academia"
+// del Presidente muestra el nombre de su academia (si lo tiene) en vez del
+// texto genérico; el resto de las secciones usa su etiqueta fija.
+export const etiquetaDe = (item, usuario) =>
+  item?.clave === "mi-academia" && usuario?.academia ? usuario.academia : item?.etiqueta;
+
 export const permiteA = (item, roles = []) =>
   item.roles.some((r) => roles.includes(r)) && !(item.excepto ?? []).some((r) => roles.includes(r));
 
