@@ -4,7 +4,7 @@ import DashboardLayout from "../../components/DashboardLayout";
 import PanelAlumnoLayout from "../../components/PanelAlumnoLayout";
 import { useSesion } from "../../context/SesionContext";
 import { etiquetaRolPrincipal, rolPrincipal } from "../../lib/roles";
-import { navegacionPara, seccionPorRuta } from "../../routes/secciones";
+import { etiquetaDe, navegacionPara, seccionPorRuta } from "../../routes/secciones";
 
 // PanelLayout: el centro de navegación del sistema. Ya no decide qué pantalla
 // mostrar (eso lo hacen las rutas hijas de /panel en App.jsx); solo calcula
@@ -21,7 +21,15 @@ export default function PanelLayout() {
   const location = useLocation();
 
   const clavesRoles = (usuario.roles ?? []).join(",");
-  const navegacion = useMemo(() => navegacionPara(clavesRoles.split(",")), [clavesRoles]);
+  const academia = usuario.academia ?? null;
+  const navegacion = useMemo(
+    () =>
+      navegacionPara(clavesRoles.split(",")).map((grupo) => ({
+        ...grupo,
+        items: grupo.items.map((item) => ({ ...item, etiqueta: etiquetaDe(item, { academia }) })),
+      })),
+    [clavesRoles, academia],
+  );
   const etiquetaRol = etiquetaRolPrincipal(usuario);
   const seccionActual = seccionPorRuta(location.pathname);
   const esSoloAlumno = rolPrincipal(usuario) === "alumno";
@@ -44,7 +52,7 @@ export default function PanelLayout() {
       usuario={usuario}
       etiquetaRol={etiquetaRol}
       navegacion={navegacion}
-      breadcrumb={seccionActual?.etiqueta ?? "Inicio"}
+      breadcrumb={seccionActual ? etiquetaDe(seccionActual, usuario) : "Inicio"}
       onCerrarSesion={alCerrarSesion}
     >
       <Outlet />
