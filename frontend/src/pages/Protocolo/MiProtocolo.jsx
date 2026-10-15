@@ -3,6 +3,8 @@ import Esqueleto from "../../components/ui/Esqueleto";
 import Etiqueta from "../../components/ui/Etiqueta";
 import { IconoDocumento } from "../../components/iconos";
 import { api } from "../../lib/api";
+import { integrantesDe } from "../../lib/integrantes";
+import Integrantes from "./Integrantes";
 
 const ESTADOS = {
   registrado: {
@@ -36,7 +38,7 @@ const DICTAMEN = {
   no_aprobado: "No aprobado",
 };
 
-export default function MiProtocolo() {
+export default function MiProtocolo({ actor }) {
   const [protocolos, setProtocolos] = useState(null);
   const [errorCarga, setErrorCarga] = useState(null);
 
@@ -59,6 +61,9 @@ export default function MiProtocolo() {
   const actual = protocolos[0];
   const estado = ESTADOS[actual.estado] ?? { etiqueta: actual.estado, variante: "neutro", titulo: actual.titulo, texto: "" };
   const evaluaron = actual.sinodales.filter((s) => s.evaluo).length;
+  const equipo = integrantesDe(actual);
+  const responsable = equipo.find((i) => i.es_responsable);
+  const soyResponsable = responsable?.id === actor?.id;
 
   return (
     <section aria-labelledby="mi-protocolo" className="min-w-0">
@@ -85,6 +90,20 @@ export default function MiProtocolo() {
           </div>
           <Etiqueta variante={estado.variante}>{estado.etiqueta}</Etiqueta>
         </div>
+
+        {equipo.length > 1 && (
+          <div className="mt-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Equipo ({equipo.length} alumnos)
+            </p>
+            <Integrantes protocolo={actual} className="mt-1" />
+            <p className="mt-1 text-xs text-slate-500">
+              {soyResponsable
+                ? "Eres el responsable: registras el protocolo y envías las solicitudes del equipo."
+                : `El responsable del equipo es ${responsable?.nombre}; solo él envía las solicitudes.`}
+            </p>
+          </div>
+        )}
 
         <p className="mt-3 text-sm font-semibold text-slate-800">{estado.titulo}</p>
         <p className="mt-1 text-sm text-slate-600">{estado.texto}</p>
