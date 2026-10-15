@@ -225,7 +225,8 @@ Alumnos, `catt_ejecutivo` y `catt_auxiliar`. **multipart/form-data**:
 { "id": 5, "nombre": "Mariana Soto Reyes", "institucion": "UNAM", "correo": "msoto@unam.mx",
   "cedula_numero": "12345678", "creado_en": "2026-10-15T16:40:00.000Z" }
 ```
-`400` si falta algo o el archivo no es válido.
+`400` si falta algo o el archivo no es válido. `409` si ya existe un externo con ese
+correo: se elige de la lista en lugar de registrarlo otra vez.
 
 ### `GET /api/directores-externos`
 El catálogo completo, por nombre. Es el selector de `directores_externos`.

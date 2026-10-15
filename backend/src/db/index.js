@@ -513,6 +513,90 @@ async function migrarProtocolos(client) {
   }
 }
 
+async function agregarCheck(client, tabla, nombre, expresion) {
+  const { rows } = await client.query("SELECT 1 FROM pg_constraint WHERE conname = $1", [nombre]);
+  if (rows.length === 0) {
+    await client.query(`ALTER TABLE ${tabla} ADD CONSTRAINT ${nombre} CHECK (${expresion})`);
+  }
+}
+
+async function migrarDirectoresExternos(client) {
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS directores_externos (
+      id                 SERIAL      PRIMARY KEY,
+      nombre             TEXT        NOT NULL,
+      institucion        TEXT        NOT NULL,
+      correo             TEXT        NOT NULL,
+      cedula_numero      TEXT        NOT NULL,
+      cedula_archivo     TEXT        NOT NULL,
+      curriculum_archivo TEXT        NOT NULL,
+      registrado_por     INTEGER     REFERENCES usuarios(id) ON DELETE SET NULL,
+      creado_en          TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
+  await client.query(
+    "CREATE UNIQUE INDEX IF NOT EXISTS directores_externos_correo_uq ON directores_externos (lower(correo))",
+  );
+
+  await client.query(`
+    ALTER TABLE protocolo_directores
+      ADD COLUMN IF NOT EXISTS id SERIAL,
+      ADD COLUMN IF NOT EXISTS externo_id INTEGER REFERENCES directores_externos(id)
+  `);
+  const { rows: pkViejo } = await client.query(`
+    SELECT conname FROM pg_constraint
+     WHERE conrelid = 'protocolo_directores'::regclass AND contype = 'p' AND array_length(conkey, 1) = 2
+  `);
+  if (pkViejo.length > 0) {
+    await client.query(`ALTER TABLE protocolo_directores DROP CONSTRAINT "${pkViejo[0].conname}"`);
+    await client.query("ALTER TABLE protocolo_directores ADD PRIMARY KEY (id)");
+  }
+  await client.query("ALTER TABLE protocolo_directores ALTER COLUMN docente_id DROP NOT NULL");
+  await agregarCheck(
+    client,
+    "protocolo_directores",
+    "protocolo_directores_uno_solo",
+    "(docente_id IS NOT NULL) <> (externo_id IS NOT NULL)",
+  );
+  await client.query(`
+    CREATE UNIQUE INDEX IF NOT EXISTS protocolo_directores_docente_uq
+      ON protocolo_directores (protocolo_id, docente_id) WHERE docente_id IS NOT NULL
+  `);
+  await client.query(`
+    CREATE UNIQUE INDEX IF NOT EXISTS protocolo_directores_externo_uq
+      ON protocolo_directores (protocolo_id, externo_id) WHERE externo_id IS NOT NULL
+  `);
+  await client.query(
+    "CREATE INDEX IF NOT EXISTS protocolo_directores_externo_idx ON protocolo_directores (externo_id)",
+  );
+
+  await client.query(`
+    ALTER TABLE solicitudes_cambio_director
+      ADD COLUMN IF NOT EXISTS director_saliente_externo_id INTEGER REFERENCES directores_externos(id),
+      ADD COLUMN IF NOT EXISTS director_propuesto_externo_id INTEGER REFERENCES directores_externos(id),
+      ALTER COLUMN director_saliente_id DROP NOT NULL,
+      ALTER COLUMN director_propuesto_id DROP NOT NULL
+  `);
+  await agregarCheck(
+    client,
+    "solicitudes_cambio_director",
+    "solicitudes_cambio_director_saliente_uno",
+    "(director_saliente_id IS NOT NULL) <> (director_saliente_externo_id IS NOT NULL)",
+  );
+  await agregarCheck(
+    client,
+    "solicitudes_cambio_director",
+    "solicitudes_cambio_director_propuesto_uno",
+    "(director_propuesto_id IS NOT NULL) <> (director_propuesto_externo_id IS NOT NULL)",
+  );
+  await agregarCheck(
+    client,
+    "solicitudes_cambio_director",
+    "solicitudes_cambio_director_externos_distintos",
+    "director_saliente_externo_id IS NULL OR director_propuesto_externo_id IS NULL OR director_saliente_externo_id <> director_propuesto_externo_id",
+  );
+}
+
 // Equipos de TT (Documento Rector, Art. 4: "preferentemente en equipo"): un
 // protocolo lo desarrollan uno o más alumnos. protocolo_integrantes lista a
 // todos, con exactamente un responsable; protocolos.alumno_id sigue siendo el
@@ -553,6 +637,7 @@ async function initDb() {
     await migrarAcademiasPresidenteColorIcono(client);
     await migrarProtocolos(client);
     await migrarEquiposTT(client);
+    await migrarDirectoresExternos(client);
     // creado_en se agregó después del CREATE TABLE original de elegibilidad.
     await client.query(
       "ALTER TABLE elegibilidad ADD COLUMN IF NOT EXISTS creado_en TIMESTAMPTZ NOT NULL DEFAULT now()",

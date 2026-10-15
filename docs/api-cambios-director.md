@@ -56,9 +56,11 @@ Las constancias se guardan en `backend/uploads/cambios-director/`.
 ```
 
 Con un director externo, `id` es `null`, `externo` es `true` y se agregan
-`externo_id`, `institucion`, `correo` y `cedula_numero`; el personal CATT
-descarga su cédula y currículum con `GET /api/directores-externos/:id/cedula`
-y `/curriculum`. Es la misma forma que `directores` en la ficha del protocolo.
+`externo_id` e `institucion`. `correo` y `cedula_numero` solo llegan al
+personal CATT (`GET /api/cambios-director` y la respuesta de `PATCH`); el
+alumno no los recibe. El personal CATT descarga su cédula y currículum con
+`GET /api/directores-externos/:id/cedula` y `/curriculum`. Es la misma forma
+que `directores` en la ficha del protocolo.
 
 ## Rutas
 
