@@ -4,6 +4,7 @@ import Etiqueta from "../../components/ui/Etiqueta";
 import { IconoDocumento } from "../../components/iconos";
 import { api } from "../../lib/api";
 import { estadoDe } from "./estados";
+import Integrantes from "./Integrantes";
 
 // Pantalla: protocolos que dirijo y su estado (HU-25). Solo lectura: el
 // director da seguimiento, no edita el protocolo. Consume
@@ -75,9 +76,7 @@ export default function VistaDirector({ encabezado = true, onCargado }) {
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="font-semibold text-slate-800">{p.titulo}</p>
-                    <p className="mt-1 text-sm text-slate-600">
-                      {p.alumno.nombre} · {p.alumno.boleta} · {p.alumno.carrera}
-                    </p>
+                    <Integrantes protocolo={p} className="mt-1" />
                     <p className="mt-1 text-xs text-slate-500">
                       Registrado el {formatearFecha(p.creado_en)}
                       {otros ? ` · Directores: ${otros}` : ""}

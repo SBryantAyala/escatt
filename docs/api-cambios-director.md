@@ -77,14 +77,17 @@ Solo alumnos. **multipart/form-data**:
 De cada pareja (saliente, propuesto) se envía exactamente un campo; `400` si
 vienen los dos o ninguno.
 
-`201` con la solicitud. El protocolo se toma de la sesión: el alumno vigente
-más reciente. Errores: `400` datos o director inválido, `409` sin protocolo
-vigente o ya hay una solicitud pendiente.
+`201` con la solicitud. El protocolo se toma de la sesión: el protocolo vigente
+más reciente del alumno. Solo lo solicita el **responsable del equipo**
+(`403` si es un compañero); la solicitud trae `integrantes` y la ven todos los
+integrantes en `GET /mias` y al descargar la constancia. Errores: `400` datos o
+director inválido, `403` no es el responsable, `409` sin protocolo vigente o ya
+hay una solicitud pendiente.
 
 El selector del formulario usa `GET /api/protocolos/candidatos-director`.
 
 ### `GET /api/cambios-director/mias`
-Solo alumnos. Sus solicitudes, la más reciente primero.
+Solo alumnos. Las solicitudes de los protocolos de los que es integrante, la más reciente primero.
 
 ### `GET /api/cambios-director?estado=pendiente|aprobada|rechazada`
 Personal CATT (Ejecutivo, Auxiliar, Consulta) y administrador. Primero las
