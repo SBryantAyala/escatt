@@ -27,10 +27,10 @@ export default function ProtocoloPage({ actor }) {
   if (tieneRol(actor, "alumno")) {
     return (
       <div className="space-y-10">
-        <MiProtocolo key={`mi-${version}`} />
+        <MiProtocolo key={`mi-${version}`} actor={actor} />
         <VistaAlumno />
         <RegistroProtocolo key={`registro-${version}`} onRegistrado={() => setVersion((v) => v + 1)} />
-        <CambioDirector key={`cambio-${version}`} />
+        <CambioDirector key={`cambio-${version}`} actor={actor} />
       </div>
     );
   }

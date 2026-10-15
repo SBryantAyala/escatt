@@ -26,7 +26,7 @@ function ordenarPorNombre(lista) {
   return [...lista].sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
 }
 
-export default function CambioDirector() {
+export default function CambioDirector({ actor }) {
   const aviso = useAviso();
   const [protocolo, setProtocolo] = useState(null);
   const [solicitudes, setSolicitudes] = useState([]);
@@ -78,6 +78,7 @@ export default function CambioDirector() {
   if (!protocolo) return null;
 
   const pendiente = solicitudes.find((s) => s.estado === "pendiente");
+  const soyResponsable = protocolo.alumno.id === actor?.id;
   const docentesExcluidos = new Set(
     [...protocolo.directores.filter((d) => !d.externo), ...protocolo.sinodales].map((p) => p.id),
   );
@@ -151,9 +152,13 @@ export default function CambioDirector() {
 
       {pendiente ? (
         <p className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-          Tu solicitud para sustituir a {nombreDirector(pendiente.director_saliente)} por{" "}
-          {nombreDirector(pendiente.director_propuesto)} está en revisión. No puedes enviar otra hasta que la CATT la
-          resuelva.
+          {soyResponsable ? "Tu solicitud" : "La solicitud de tu equipo"} para sustituir a{" "}
+          {nombreDirector(pendiente.director_saliente)} por {nombreDirector(pendiente.director_propuesto)} está en
+          revisión. No se puede enviar otra hasta que la CATT la resuelva.
+        </p>
+      ) : !soyResponsable ? (
+        <p className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+          Solo el responsable del equipo ({protocolo.alumno.nombre}) puede solicitar el cambio de director.
         </p>
       ) : (
         <form

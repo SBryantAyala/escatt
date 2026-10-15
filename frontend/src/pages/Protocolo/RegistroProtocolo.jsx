@@ -10,6 +10,9 @@ import { claseArchivo, claseBotonSecundario, claseInput, claseLabel } from "./es
 const ESTADOS_VIGENTES = ["registrado", "en_evaluacion", "aprobado"];
 const MAX_TITULO = 300;
 const MAX_RESUMEN = 5000;
+// Compañeros además del responsable. Debe coincidir con MAX_INTEGRANTES - 1 del
+// backend (lib/equipo.js); el cliente aún no confirma el máximo de alumnos.
+const MAX_COMPANEROS = 3;
 
 function ordenarPorNombre(lista) {
   return [...lista].sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
@@ -30,6 +33,9 @@ export default function RegistroProtocolo({ onRegistrado }) {
   const [segundoDocente, setSegundoDocente] = useState("");
   const [segundoExterno, setSegundoExterno] = useState("");
   const [registrandoExterno, setRegistrandoExterno] = useState(false);
+  const [companeros, setCompaneros] = useState([]);
+  const [correoCompanero, setCorreoCompanero] = useState("");
+  const [validando, setValidando] = useState(false);
   const [enviando, setEnviando] = useState(false);
   const vistoBuenoRef = useRef(null);
 
@@ -80,6 +86,24 @@ export default function RegistroProtocolo({ onRegistrado }) {
     setRegistrandoExterno(false);
   }
 
+  async function agregarCompanero() {
+    const correo = correoCompanero.trim().toLowerCase();
+    if (!correo) return aviso.error("Escribe el correo institucional de tu compañero");
+    if (companeros.some((c) => c.correo.toLowerCase() === correo)) {
+      return aviso.error("Ese compañero ya está en la lista");
+    }
+    setValidando(true);
+    try {
+      const alumno = await api("/api/protocolos/companeros/validar", { method: "POST", body: { correo } });
+      setCompaneros((lista) => [...lista, alumno]);
+      setCorreoCompanero("");
+    } catch (err) {
+      aviso.error(err.message);
+    } finally {
+      setValidando(false);
+    }
+  }
+
   async function enviar(e) {
     e.preventDefault();
     const vistoBueno = vistoBuenoRef.current?.files?.[0];
@@ -96,6 +120,7 @@ export default function RegistroProtocolo({ onRegistrado }) {
     datos.append("directores", director);
     if (segundoTipo === "docente") datos.append("directores", segundoDocente);
     if (segundoTipo === "externo") datos.append("directores_externos", segundoExterno);
+    for (const c of companeros) datos.append("integrantes", c.correo);
     datos.append("visto_bueno", vistoBueno);
 
     setEnviando(true);
@@ -158,6 +183,70 @@ export default function RegistroProtocolo({ onRegistrado }) {
               className={claseInput}
             />
           </label>
+
+          <fieldset className="mt-4 min-w-0" disabled={enviando}>
+            <legend className={claseLabel}>Equipo</legend>
+            <p className="text-xs text-slate-500">
+              El TT puede desarrollarse en equipo (Art. 4 del Documento Rector). Tú serás el responsable: registras el
+              protocolo y envías las solicitudes. Agrega a tus compañeros por su correo; cada uno debe tener la
+              elegibilidad vigente y no estar en otro protocolo.
+            </p>
+            {companeros.length > 0 && (
+              <ul className="mt-3 space-y-2" aria-label="Compañeros de equipo">
+                {companeros.map((c) => (
+                  <li
+                    key={c.correo}
+                    className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm"
+                  >
+                    <span className="min-w-0 break-words text-slate-700">
+                      <span className="font-semibold text-slate-800">{c.nombre}</span>
+                      {c.carrera ? ` · ${c.carrera}` : ""} · {c.correo}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setCompaneros((lista) => lista.filter((x) => x.correo !== c.correo))}
+                      className={`${claseBotonSecundario} shrink-0`}
+                      aria-label={`Quitar a ${c.nombre}`}
+                    >
+                      Quitar
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {companeros.length < MAX_COMPANEROS ? (
+              <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                <label className="block min-w-0 flex-1">
+                  <span className="sr-only">Compañero de equipo (correo)</span>
+                  <input
+                    type="email"
+                    value={correoCompanero}
+                    onChange={(e) => setCorreoCompanero(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        agregarCompanero();
+                      }
+                    }}
+                    placeholder="correo.del.companero@alumno.ipn.mx"
+                    className={claseInput}
+                  />
+                </label>
+                <button
+                  type="button"
+                  onClick={agregarCompanero}
+                  disabled={validando}
+                  className={`${claseBotonSecundario} min-h-13 shrink-0`}
+                >
+                  {validando ? "Validando…" : "Agregar compañero"}
+                </button>
+              </div>
+            ) : (
+              <p className="mt-3 text-xs text-slate-500">
+                Llegaste al máximo de {MAX_COMPANEROS + 1} alumnos por equipo.
+              </p>
+            )}
+          </fieldset>
 
           <p className="mt-4 text-xs text-slate-500">
             Un protocolo lleva uno o dos directores y al menos uno debe ser docente de ESCOM (Art. 35 y 49 del Documento
