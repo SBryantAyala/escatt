@@ -70,9 +70,9 @@ Solo alumnos. **multipart/form-data**:
 | `director_saliente_id` | uno de los dos | docente que dirige el protocolo del alumno |
 | `director_saliente_externo_id` | uno de los dos | externo que dirige el protocolo del alumno |
 | `director_propuesto_id` | uno de los dos | docente activo que no dirija ya el protocolo ni sea su sinodal |
-| `director_propuesto_externo_id` | uno de los dos | externo que no dirija ya el protocolo y que haya registrado el propio alumno |
+| `director_propuesto_externo_id` | uno de los dos | externo del catálogo que no dirija ya el protocolo |
 | `motivo` | sí | máx. 2000 caracteres |
-| `constancia` | sí | PDF/JPG/PNG, máx. 10 MB |
+| `constancia` | sí | formato de cambio firmado por los alumnos, el director saliente y el propuesto (Art. 48); PDF/JPG/PNG, máx. 10 MB |
 
 De cada pareja (saliente, propuesto) se envía exactamente un campo; `400` si
 vienen los dos o ninguno.
@@ -104,6 +104,7 @@ Solo `catt_ejecutivo` y `catt_auxiliar`. Body JSON
 - Al aprobar se vuelve a validar dentro de la transacción: el protocolo sigue
   vigente, el saliente sigue siendo director y el propuesto sigue siendo un
   docente activo que no dirige ni evalúa el protocolo (`409` si algo cambió).
+- `409` si el cambio dejaría al protocolo sin ningún director docente de ESCOM (Art. 49). Se valida al solicitar (`400`) y otra vez al aprobar (`409`).
 - `403` si quien resuelve es el director saliente o el propuesto.
 
 ## Bitácora

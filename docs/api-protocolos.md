@@ -80,18 +80,19 @@ Solo alumnos. **multipart/form-data** (con `api()` de `lib/api.js`, pasa un `For
 |---|---|---|
 | `titulo` | sí | máx. 300 caracteres |
 | `resumen` | sí | resumen/objetivo, máx. 5000 |
-| `directores` | ver nota | ids de docente: campo repetido, `"[1,2]"` o `"1,2"` |
-| `directores_externos` | ver nota | ids de `directores_externos`, mismo formato |
+| `directores` | sí | 1 o 2 ids de docente: campo repetido, `"[1,2]"` o `"1,2"` |
+| `directores_externos` | no | 1 id de `directores_externos` como máximo, mismo formato |
 | `visto_bueno` | sí | constancia del visto bueno, PDF/JPG/PNG, máx. 10 MB |
 
-Nota: `directores` y `directores_externos` son opcionales por separado, pero
-entre los dos debe haber 1 o 2 en total. Un externo se registra antes con
-`POST /api/directores-externos`.
+Nota (Art. 35 y 49 del Documento Rector): entre `directores` y
+`directores_externos` suman 1 o 2, y al menos uno es docente de ESCOM; un
+externo solo puede ir como segundo director. Un externo se registra antes con
+`POST /api/directores-externos`, o se elige uno ya registrado.
 
 `201` con la ficha. Errores:
 - `409` si la elegibilidad del periodo más reciente del alumno no es `elegible`.
 - `409` si ya tiene un protocolo `registrado`, `en_evaluacion` o `aprobado`.
-- `400` si faltan campos, el total entre `directores` y `directores_externos` no es 1 o 2, algún docente no está activo, o algún externo no existe o no lo registró el propio alumno.
+- `400` si faltan campos, el total entre `directores` y `directores_externos` no es 1 o 2, no hay ningún docente, hay más de un externo, algún docente no está activo o el externo no existe.
 
 > Pendiente (HU-27): validar la ventana de registro con el Calendario de la CATT.
 
@@ -179,11 +180,14 @@ Sin ruta propia: se calcula al guardar cada evaluación (HU-21).
 
 ## Directores externos
 
-Un director que no es docente de ESCOM no tiene cuenta. Se registra aparte,
-con su cédula y un mini currículum, y después se elige igual que un docente
-al registrar el protocolo (`directores_externos`) o al pedir un cambio de
-director (ver `api-cambios-director.md`). Un externo no inicia sesión: no
-aparece en `GET /api/protocolos/dirigidos` ni en ninguna vista de docente.
+Un director que no es docente de ESCOM no tiene cuenta (Art. 49 del Documento
+Rector). Se registra una sola vez, con su currículum y copia de su cédula
+profesional de nivel superior; los externos recurrentes ya registrados se
+eligen sin volver a entregar documentos. Se elige al registrar el protocolo
+(`directores_externos`) o al pedir un cambio de director (ver
+`api-cambios-director.md`), y nunca va solo: el protocolo siempre conserva al
+menos un director docente de ESCOM. Un externo no inicia sesión: no aparece en
+`GET /api/protocolos/dirigidos` ni en ninguna vista de docente.
 
 ### `POST /api/directores-externos`
 Alumnos, `catt_ejecutivo` y `catt_auxiliar`. **multipart/form-data**:
@@ -205,9 +209,9 @@ Alumnos, `catt_ejecutivo` y `catt_auxiliar`. **multipart/form-data**:
 `400` si falta algo o el archivo no es válido.
 
 ### `GET /api/directores-externos`
-Alumnos: solo los que registraron ellos. Personal CATT y admin: todos. Misma
-forma que el `201`, más reciente primero. Es el selector de
-`directores_externos`.
+El catálogo completo, por nombre. Es el selector de `directores_externos`.
+Los alumnos reciben solo `id`, `nombre` e `institucion`; el personal CATT y el
+admin reciben la misma forma que el `201`.
 
 ### `GET /api/directores-externos/:id/cedula` y `/curriculum`
 Descargan el archivo. Los ve quien lo registró, el personal CATT y el
