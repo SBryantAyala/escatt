@@ -6,6 +6,7 @@ import { useAviso } from "../../components/ui/Avisos";
 import { IconoDocumento } from "../../components/iconos";
 import { api, descargarArchivo } from "../../lib/api";
 import { estadoDe } from "./estados";
+import Integrantes from "./Integrantes";
 
 // Pantalla: protocolos que evalúo como sinodal (HU-21). Consume
 // GET /api/protocolos/por-evaluar (ya filtra por la sesión y trae primero los
@@ -215,9 +216,7 @@ export default function VistaSinodal({ encabezado = true, onCargado }) {
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="font-semibold text-slate-800">{p.titulo}</p>
-                    <p className="mt-1 text-sm text-slate-600">
-                      {p.alumno.nombre} · {p.alumno.boleta} · {p.alumno.carrera}
-                    </p>
+                    <Integrantes protocolo={p} className="mt-1" />
                     <p className="mt-1 text-xs text-slate-500">
                       {p.academia?.nombre ?? "Sin academia"} · Registrado el {formatearFecha(p.creado_en)}
                       {p.directores.length > 0 &&

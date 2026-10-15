@@ -22,9 +22,9 @@ export default function ProtocoloPage({ actor }) {
   if (tieneRol(actor, "alumno")) {
     return (
       <div className="space-y-10">
-        <MiProtocolo />
+        <MiProtocolo actor={actor} />
         <VistaAlumno />
-        <CambioDirector />
+        <CambioDirector actor={actor} />
       </div>
     );
   }
