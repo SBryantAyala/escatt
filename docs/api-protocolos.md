@@ -46,7 +46,10 @@ puede reemplazar la fila con la respuesta tal cual.
   "creado_en": "2026-10-14T19:54:25.918Z",
   "tiene_visto_bueno": true,
   "alumno": { "id": 12, "nombre": "Jonathan Uriel Salazar Nava", "boleta": "2021630074", "carrera": "ISC" },
-  "directores": [{ "id": 30, "nombre": "Francisco Javier Cabañas Ortiz" }],
+  "directores": [
+    { "id": 30, "externo_id": null, "externo": false, "nombre": "Francisco Javier Cabañas Ortiz" },
+    { "id": null, "externo_id": 5, "externo": true, "nombre": "Mariana Soto Reyes", "institucion": "UNAM" }
+  ],
   "academia": { "id": 2, "nombre": "Academia de Ingeniería de Software", "color": "…", "icono": "…" },
   "academia_asignada_en": "2026-10-14T19:55:01.000Z",
   "sinodales": [{ "id": 28, "nombre": "Claudia Berenice Espinoza Tovar", "evaluo": false }]
@@ -56,6 +59,11 @@ puede reemplazar la fila con la respuesta tal cual.
 - `estado`: `registrado` → `en_evaluacion` → `aprobado` | `no_aprobado`.
 - `academia` es `null` hasta que se turna (HU-19).
 - `sinodales` es `[]` hasta que el Presidente los asigna (HU-20).
+- `directores` mezcla docentes y directores externos (ver "Directores
+  externos"). En un docente `id` es su id de usuario y `externo` es `false`;
+  en un externo `id` es `null`, `externo` es `true` y su identificador es
+  `externo_id`. Para saber si alguien es director de la persona en sesión
+  compara `id` solo cuando `externo` sea `false`.
 
 ## HU-18 — Registrar protocolo (alumno)
 
@@ -72,13 +80,18 @@ Solo alumnos. **multipart/form-data** (con `api()` de `lib/api.js`, pasa un `For
 |---|---|---|
 | `titulo` | sí | máx. 300 caracteres |
 | `resumen` | sí | resumen/objetivo, máx. 5000 |
-| `directores` | sí | 1 o 2 ids de docente: campo repetido, `"[1,2]"` o `"1,2"` |
+| `directores` | ver nota | ids de docente: campo repetido, `"[1,2]"` o `"1,2"` |
+| `directores_externos` | ver nota | ids de `directores_externos`, mismo formato |
 | `visto_bueno` | sí | constancia del visto bueno, PDF/JPG/PNG, máx. 10 MB |
+
+Nota: `directores` y `directores_externos` son opcionales por separado, pero
+entre los dos debe haber 1 o 2 en total. Un externo se registra antes con
+`POST /api/directores-externos`.
 
 `201` con la ficha. Errores:
 - `409` si la elegibilidad del periodo más reciente del alumno no es `elegible`.
 - `409` si ya tiene un protocolo `registrado`, `en_evaluacion` o `aprobado`.
-- `400` si faltan campos, hay 0 o más de 2 directores, o algún director no es docente activo.
+- `400` si faltan campos, el total entre `directores` y `directores_externos` no es 1 o 2, algún docente no está activo, o algún externo no existe o no lo registró el propio alumno.
 
 > Pendiente (HU-27): validar la ventana de registro con el Calendario de la CATT.
 
@@ -164,6 +177,44 @@ Sin ruta propia: se calcula al guardar cada evaluación (HU-21).
   una por sinodal que dejó texto. Es `[]` mientras el protocolo siga
   `en_evaluacion`, para no exponer evaluaciones parciales.
 
+## Directores externos
+
+Un director que no es docente de ESCOM no tiene cuenta. Se registra aparte,
+con su cédula y un mini currículum, y después se elige igual que un docente
+al registrar el protocolo (`directores_externos`) o al pedir un cambio de
+director (ver `api-cambios-director.md`). Un externo no inicia sesión: no
+aparece en `GET /api/protocolos/dirigidos` ni en ninguna vista de docente.
+
+### `POST /api/directores-externos`
+Alumnos, `catt_ejecutivo` y `catt_auxiliar`. **multipart/form-data**:
+
+| Campo | Obligatorio | Notas |
+|---|---|---|
+| `nombre` | sí | máx. 200 caracteres |
+| `institucion` | sí | máx. 200 caracteres |
+| `correo` | sí | correo válido |
+| `cedula_numero` | sí | máx. 30 caracteres |
+| `cedula` | sí | copia de la cédula, PDF/JPG/PNG, máx. 10 MB |
+| `curriculum` | sí | mini currículum, PDF/JPG/PNG, máx. 10 MB |
+
+`201` con
+```json
+{ "id": 5, "nombre": "Mariana Soto Reyes", "institucion": "UNAM", "correo": "msoto@unam.mx",
+  "cedula_numero": "12345678", "creado_en": "2026-10-15T16:40:00.000Z" }
+```
+`400` si falta algo o el archivo no es válido.
+
+### `GET /api/directores-externos`
+Alumnos: solo los que registraron ellos. Personal CATT y admin: todos. Misma
+forma que el `201`, más reciente primero. Es el selector de
+`directores_externos`.
+
+### `GET /api/directores-externos/:id/cedula` y `/curriculum`
+Descargan el archivo. Los ve quien lo registró, el personal CATT y el
+administrador; otros, `403`. Usa `descargarArchivo()` de `lib/api.js`.
+
+Bitácora: `registrar_director_externo` (entidad `directores_externos`).
+
 ## Consulta común
 
 ### `GET /api/protocolos/:id`
@@ -182,7 +233,11 @@ Protocolos donde la persona es director.
 protocolos            id, alumno_id, titulo, resumen, periodo, visto_bueno_archivo,
                       academia_id, academia_asignada_por, academia_asignada_en,
                       estado, creado_en
-protocolo_directores  (protocolo_id, docente_id)                 -- 1 o 2
+protocolo_directores  id, protocolo_id, docente_id (NULL), externo_id (NULL)
+                      -- 1 o 2 por protocolo; exactamente uno de docente_id / externo_id
+                      -- únicos (protocolo_id, docente_id) y (protocolo_id, externo_id)
+directores_externos   id, nombre, institucion, correo, cedula_numero,
+                      cedula_archivo, curriculum_archivo, registrado_por, creado_en
 protocolo_sinodales   (protocolo_id, docente_id), asignado_por, asignado_en,
                       dictamen ('aprobado'|'no_aprobado'|NULL), observaciones, evaluado_en
 ```

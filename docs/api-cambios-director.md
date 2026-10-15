@@ -9,8 +9,10 @@ existe, 409 regla de negocio).
 ## Flujo
 
 1. El alumno solicita sustituir a uno de los directores de su protocolo vigente
-   (`registrado`, `en_evaluacion` o `aprobado`) por otro docente, con el motivo
-   y la constancia firmada del acuerdo.
+   (`registrado`, `en_evaluacion` o `aprobado`) por otro docente o por un
+   director externo ya registrado (`api-protocolos.md`, "Directores
+   externos"), con el motivo y la constancia firmada del acuerdo. El saliente
+   también puede ser un director externo.
 2. El Secretario Ejecutivo o el Auxiliar de la CATT aprueba o rechaza.
 3. Al aprobar, el director saliente se reemplaza por el propuesto en
    `protocolo_directores`. Al rechazar, los directores no cambian.
@@ -23,11 +25,15 @@ puede enviar otra.
 ```
 solicitudes_cambio_director
   id, protocolo_id, solicitante_id,
-  director_saliente_id, director_propuesto_id,
+  director_saliente_id (NULL), director_saliente_externo_id (NULL),
+  director_propuesto_id (NULL), director_propuesto_externo_id (NULL),
   motivo, constancia_archivo,
   estado ('pendiente' | 'aprobada' | 'rechazada'),
   resuelta_por, resuelta_en, observaciones_resolucion, creado_en
 ```
+
+De cada pareja (saliente, propuesto) exactamente una columna está llena: o el
+docente o el externo.
 
 Las constancias se guardan en `backend/uploads/cambios-director/`.
 
@@ -44,10 +50,15 @@ Las constancias se guardan en `backend/uploads/cambios-director/`.
   "observaciones_resolucion": null,
   "protocolo": { "id": 3, "titulo": "…", "estado": "registrado" },
   "alumno": { "id": 8, "nombre": "…", "boleta": "…", "carrera": "ISC" },
-  "director_saliente": { "id": 30, "nombre": "…" },
-  "director_propuesto": { "id": 28, "nombre": "…" }
+  "director_saliente": { "id": 30, "externo_id": null, "externo": false, "nombre": "…" },
+  "director_propuesto": { "id": 28, "externo_id": null, "externo": false, "nombre": "…" }
 }
 ```
+
+Con un director externo, `id` es `null`, `externo` es `true` y se agregan
+`externo_id`, `institucion`, `correo` y `cedula_numero`; el personal CATT
+descarga su cédula y currículum con `GET /api/directores-externos/:id/cedula`
+y `/curriculum`. Es la misma forma que `directores` en la ficha del protocolo.
 
 ## Rutas
 
@@ -56,10 +67,15 @@ Solo alumnos. **multipart/form-data**:
 
 | Campo | Obligatorio | Notas |
 |---|---|---|
-| `director_saliente_id` | sí | debe dirigir el protocolo del alumno |
-| `director_propuesto_id` | sí | docente activo que no dirija ya el protocolo ni sea su sinodal |
+| `director_saliente_id` | uno de los dos | docente que dirige el protocolo del alumno |
+| `director_saliente_externo_id` | uno de los dos | externo que dirige el protocolo del alumno |
+| `director_propuesto_id` | uno de los dos | docente activo que no dirija ya el protocolo ni sea su sinodal |
+| `director_propuesto_externo_id` | uno de los dos | externo que no dirija ya el protocolo y que haya registrado el propio alumno |
 | `motivo` | sí | máx. 2000 caracteres |
 | `constancia` | sí | PDF/JPG/PNG, máx. 10 MB |
+
+De cada pareja (saliente, propuesto) se envía exactamente un campo; `400` si
+vienen los dos o ninguno.
 
 `201` con la solicitud. El protocolo se toma de la sesión: el alumno vigente
 más reciente. Errores: `400` datos o director inválido, `409` sin protocolo
