@@ -9,6 +9,15 @@ import multer from "multer";
 import { enTransaccion, pool } from "../db/index.js";
 import { autenticar, exigeCambioResuelto, requiereRol } from "../lib/auth.js";
 import { aplicarDictamen } from "../lib/dictamen.js";
+import {
+  ESTADOS_VIGENTES,
+  MAX_INTEGRANTES,
+  esIntegrante,
+  listaDeCorreos,
+  protocoloVigenteDe,
+  sqlIntegrantes,
+  validarCompanero,
+} from "../lib/equipo.js";
 import { ROLES_STAFF, tieneRol } from "../lib/roles.js";
 import { ruta } from "../lib/ruta.js";
 import { registrarBitacora } from "../lib/usuarios.js";
@@ -27,9 +36,9 @@ router.use(autenticar, exigeCambioResuelto);
 // y el administrador consultan la asignación de cualquier Academia").
 const ROLES_CONSULTA = ["admin_sistema", ...ROLES_STAFF];
 
-// Estados en los que el alumno ya tiene un protocolo vivo y no puede
-// registrar otro. Uno "no_aprobado" se corrige y reenvía (HU-23).
-const ESTADOS_VIGENTES = ["registrado", "en_evaluacion", "aprobado"];
+// Un alumno con un protocolo vigente (ESTADOS_VIGENTES, de lib/equipo.js) no
+// puede registrar otro ni sumarse a uno. Uno "no_aprobado" se corrige y
+// reenvía (HU-23).
 
 const SINODALES_POR_PROTOCOLO = 3;
 const MAX_DIRECTORES = 2;
@@ -121,7 +130,8 @@ const SELECT_FICHA = `
                    ORDER BY su.apellido_paterno, su.nombre)
             FROM protocolo_sinodales s
             JOIN usuarios su ON su.id = s.docente_id
-           WHERE s.protocolo_id = p.id) AS sinodales
+           WHERE s.protocolo_id = p.id) AS sinodales,
+         ${sqlIntegrantes("p")}
   FROM protocolos p
   JOIN alumnos a   ON a.usuario_id = p.alumno_id
   JOIN usuarios au ON au.id = p.alumno_id
@@ -137,6 +147,7 @@ function serializarFicha(r) {
     estado: r.estado,
     creado_en: r.creado_en,
     tiene_visto_bueno: r.tiene_visto_bueno,
+    integrantes: r.integrantes ?? [],
     alumno: {
       id: r.alumno_id,
       nombre: [r.nombre, r.apellido_paterno, r.apellido_materno].filter(Boolean).join(" "),
@@ -157,11 +168,11 @@ async function obtenerFila(id, client = pool) {
   return rows[0] ?? null;
 }
 
-// ¿Quién puede ver un protocolo? Personal CATT/admin, el alumno dueño, sus
+// ¿Quién puede ver un protocolo? Personal CATT/admin, los alumnos del equipo, sus
 // directores, sus sinodales y el Presidente de la Academia a la que se turnó.
 function puedeVerProtocolo(usuario, fila) {
   if (tieneRol(usuario, ...ROLES_CONSULTA)) return true;
-  if (usuario.id === fila.alumno_id) return true;
+  if (usuario.id === fila.alumno_id || esIntegrante(usuario.id, fila.integrantes)) return true;
   if (fila.academia_presidente_id === usuario.id) return true;
   return [...(fila.directores ?? []), ...(fila.sinodales ?? [])].some((p) => p.id === usuario.id);
 }
@@ -229,7 +240,8 @@ router.get(
                         ORDER BY du.apellido_paterno, du.nombre)
                  FROM protocolo_directores d
                  JOIN usuarios du ON du.id = d.docente_id
-                WHERE d.protocolo_id = p.id) AS directores
+                WHERE d.protocolo_id = p.id) AS directores,
+              ${sqlIntegrantes("p")}
          FROM protocolo_directores pd
          JOIN protocolos p ON p.id = pd.protocolo_id
          JOIN alumnos a    ON a.usuario_id = p.alumno_id
@@ -255,6 +267,7 @@ router.get(
           boleta: r.boleta,
           carrera: r.carrera,
         },
+        integrantes: r.integrantes ?? [],
         directores: r.directores ?? [],
         observaciones: observaciones.get(r.id) ?? [],
       })),
@@ -374,14 +387,16 @@ router.post(
 // HU-18: registrar protocolo
 // ---------------------------------------------------------------------------
 
-// GET /api/protocolos/mio -> protocolos propios del alumno, el más reciente
-// primero, para que vea su estado (HU-18, criterio 4).
+// GET /api/protocolos/mio -> protocolos de los que el alumno es integrante
+// (responsable o compañero), el más reciente primero, para que vea su estado (HU-18, criterio 4).
 router.get(
   "/mio",
   requiereRol("alumno"),
   ruta(async (req, res) => {
     const { rows } = await pool.query(
-      `${SELECT_FICHA} WHERE p.alumno_id = $1 ORDER BY p.creado_en DESC, p.id DESC`,
+      `${SELECT_FICHA}
+        WHERE EXISTS (SELECT 1 FROM protocolo_integrantes mi WHERE mi.protocolo_id = p.id AND mi.alumno_id = $1)
+        ORDER BY p.creado_en DESC, p.id DESC`,
       [req.usuario.id],
     );
     const observaciones = await observacionesPorProtocolo(
@@ -412,8 +427,31 @@ router.get(
   }),
 );
 
-// POST /api/protocolos (multipart: titulo, resumen, directores, visto_bueno)
-// -> registra el protocolo del alumno en estado "registrado" (HU-18).
+// POST /api/protocolos/companeros/validar { correo } -> comprueba, antes de
+// registrar, que un compañero puede entrar al equipo (alumno activo, elegible
+// y sin otro protocolo vigente) y devuelve solo su nombre y carrera para
+// confirmarlo en pantalla. 400/409 con el motivo si no puede.
+router.post(
+  "/companeros/validar",
+  requiereRol("alumno"),
+  ruta(async (req, res) => {
+    const correos = listaDeCorreos([texto(req.body?.correo)]);
+    if (!correos || correos.length !== 1) {
+      return res.status(400).json({ error: "Escribe el correo institucional de tu compañero" });
+    }
+    const v = await validarCompanero(pool, correos[0]);
+    if (v.error) return res.status(v.status).json({ error: v.error });
+    if (v.alumno.id === req.usuario.id) {
+      return res.status(400).json({ error: "Ese correo es el tuyo; ya eres parte del equipo" });
+    }
+    res.json({ correo: correos[0], nombre: v.alumno.nombre, carrera: v.alumno.carrera });
+  }),
+);
+
+// POST /api/protocolos (multipart: titulo, resumen, directores, visto_bueno,
+// integrantes?) -> registra el protocolo en estado "registrado" (HU-18). Quien
+// lo registra es el responsable del equipo; `integrantes` son los correos de
+// sus compañeros (opcional, máx. MAX_INTEGRANTES alumnos contándolo a él).
 //
 // Pendiente (HU-27): la ventana de registro (semana hábil posterior a la
 // primera evaluación ordinaria) depende del Calendario de Actividades de la
@@ -440,6 +478,13 @@ router.post(
     if (!directores || directores.length < 1 || directores.length > MAX_DIRECTORES) {
       return rechazar(400, "Elige uno o dos directores distintos");
     }
+    const correos = listaDeCorreos(req.body.integrantes);
+    if (!correos) {
+      return rechazar(400, "integrantes debe ser una lista de correos de tus compañeros de equipo");
+    }
+    if (1 + correos.length > MAX_INTEGRANTES) {
+      return rechazar(400, `El equipo puede tener hasta ${MAX_INTEGRANTES} alumnos, contándote a ti`);
+    }
     if (!req.file) {
       return rechazar(400, "Adjunta la constancia del visto bueno de tu director (PDF, JPG o PNG)");
     }
@@ -456,12 +501,16 @@ router.post(
       );
     }
 
-    const { rows: vigentes } = await pool.query(
-      "SELECT id, estado FROM protocolos WHERE alumno_id = $1 AND estado = ANY($2)",
-      [req.usuario.id, ESTADOS_VIGENTES],
-    );
-    if (vigentes.length > 0) {
-      return rechazar(409, "Ya tienes un protocolo registrado; no puedes registrar otro");
+    if (await protocoloVigenteDe(pool, req.usuario.id)) {
+      return rechazar(409, "Ya tienes un protocolo registrado o formas parte de uno; no puedes registrar otro");
+    }
+
+    const companeros = [];
+    for (const correo of correos) {
+      const v = await validarCompanero(pool, correo);
+      if (v.error) return rechazar(v.status, v.error);
+      if (v.alumno.id === req.usuario.id) return rechazar(400, "Tú ya eres parte del equipo; no te agregues otra vez");
+      companeros.push(v.alumno);
     }
 
     const { rows: docentes } = await pool.query(
@@ -475,13 +524,39 @@ router.post(
 
     let id;
     try {
-      id = await enTransaccion(async (client) => {
+      const resultado = await enTransaccion(async (client) => {
+        // Se bloquea a todo el equipo y se revisa de nuevo: otra persona pudo
+        // registrar un protocolo con alguno de ellos desde la validación.
+        const ids = [req.usuario.id, ...companeros.map((c) => c.id)].sort((a, b) => a - b);
+        await client.query("SELECT 1 FROM alumnos WHERE usuario_id = ANY($1) ORDER BY usuario_id FOR UPDATE", [ids]);
+        for (const alumnoId of ids) {
+          if (await protocoloVigenteDe(client, alumnoId)) {
+            return {
+              status: 409,
+              error:
+                alumnoId === req.usuario.id
+                  ? "Ya tienes un protocolo registrado o formas parte de uno; no puedes registrar otro"
+                  : `${companeros.find((c) => c.id === alumnoId).nombre} ya forma parte de un protocolo vigente`,
+            };
+          }
+        }
+
         const { rows } = await client.query(
           `INSERT INTO protocolos (alumno_id, titulo, resumen, periodo, visto_bueno_archivo)
            VALUES ($1, $2, $3, $4, $5) RETURNING id`,
           [req.usuario.id, titulo, resumen, eleg[0].periodo, req.file.filename],
         );
         const nuevoId = rows[0].id;
+        await client.query(
+          "INSERT INTO protocolo_integrantes (protocolo_id, alumno_id, es_responsable) VALUES ($1, $2, true)",
+          [nuevoId, req.usuario.id],
+        );
+        for (const c of companeros) {
+          await client.query(
+            "INSERT INTO protocolo_integrantes (protocolo_id, alumno_id) VALUES ($1, $2)",
+            [nuevoId, c.id],
+          );
+        }
         for (const docenteId of directores) {
           await client.query(
             "INSERT INTO protocolo_directores (protocolo_id, docente_id) VALUES ($1, $2)",
@@ -491,9 +566,12 @@ router.post(
         await registrarBitacora(client, req.usuario.id, "registrar_protocolo", "protocolos", nuevoId, {
           periodo: eleg[0].periodo,
           directores,
+          integrantes: companeros.map((c) => c.id),
         });
-        return nuevoId;
+        return { id: nuevoId };
       });
+      if (resultado.error) return rechazar(resultado.status, resultado.error);
+      id = resultado.id;
     } catch (err) {
       borrarArchivo(req.file.filename);
       throw err;

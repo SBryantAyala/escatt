@@ -32,7 +32,7 @@ El seed deja un protocolo en cada estado: dos `registrado` sin Academia, uno
 
 ## Ficha de protocolo
 
-Todas las rutas (salvo `/dirigidos` y `/candidatos-director`) responden con
+Todas las rutas (salvo `/candidatos-director` y `/companeros/validar`) responden con
 esta forma, o un arreglo de ella. Después de cualquier escritura, el frontend
 puede reemplazar la fila con la respuesta tal cual.
 
@@ -46,6 +46,10 @@ puede reemplazar la fila con la respuesta tal cual.
   "creado_en": "2026-10-14T19:54:25.918Z",
   "tiene_visto_bueno": true,
   "alumno": { "id": 12, "nombre": "Jonathan Uriel Salazar Nava", "boleta": "2021630074", "carrera": "ISC" },
+  "integrantes": [
+    { "id": 12, "nombre": "Jonathan Uriel Salazar Nava", "boleta": "2021630074", "carrera": "ISC", "es_responsable": true },
+    { "id": 15, "nombre": "Emmanuel Rodrigo Barrera Solís", "boleta": "2020630156", "carrera": "IIA", "es_responsable": false }
+  ],
   "directores": [{ "id": 30, "nombre": "Francisco Javier Cabañas Ortiz" }],
   "academia": { "id": 2, "nombre": "Academia de Ingeniería de Software", "color": "…", "icono": "…" },
   "academia_asignada_en": "2026-10-14T19:55:01.000Z",
@@ -54,6 +58,12 @@ puede reemplazar la fila con la respuesta tal cual.
 ```
 
 - `estado`: `registrado` → `en_evaluacion` → `aprobado` | `no_aprobado`.
+- **Equipo:** el TT lo desarrolla uno o más alumnos (Art. 4: "preferentemente en
+  equipo"). `integrantes` los lista a todos, con el **responsable primero**; las
+  pantallas deben mostrar a todos, no solo a `alumno`. `alumno` es el
+  responsable (quien registra el protocolo y envía las solicitudes de cambio)
+  y se conserva por compatibilidad. Un protocolo individual tiene un solo
+  integrante.
 - `academia` es `null` hasta que se turna (HU-19).
 - `sinodales` es `[]` hasta que el Presidente los asigna (HU-20).
 
@@ -74,16 +84,25 @@ Solo alumnos. **multipart/form-data** (con `api()` de `lib/api.js`, pasa un `For
 | `resumen` | sí | resumen/objetivo, máx. 5000 |
 | `directores` | sí | 1 o 2 ids de docente: campo repetido, `"[1,2]"` o `"1,2"` |
 | `visto_bueno` | sí | constancia del visto bueno, PDF/JPG/PNG, máx. 10 MB |
+| `integrantes` | no | correos de los compañeros de equipo: campo repetido, `"[\"a@…\"]"` o `"a@…,b@…"`. Quien registra es el responsable y no se incluye |
 
 `201` con la ficha. Errores:
 - `409` si la elegibilidad del periodo más reciente del alumno no es `elegible`.
-- `409` si ya tiene un protocolo `registrado`, `en_evaluacion` o `aprobado`.
+- `409` si ya tiene (o forma parte de) un protocolo `registrado`, `en_evaluacion` o `aprobado`.
 - `400` si faltan campos, hay 0 o más de 2 directores, o algún director no es docente activo.
+- Compañeros: `400` si hay más de `MAX_INTEGRANTES` alumnos contando al responsable (hoy 4, constante en `lib/equipo.js`; el cliente aún no confirma el máximo), un correo inválido, repetido o propio, o sin cuenta de alumno activa; `409` si algún compañero no tiene elegibilidad vigente (`elegible`, como el responsable) o ya está en un protocolo vigente. Se revisa otra vez dentro de la transacción.
 
 > Pendiente (HU-27): validar la ventana de registro con el Calendario de la CATT.
 
+### `POST /api/protocolos/companeros/validar`
+Solo alumnos. Body JSON `{ "correo": "…" }`. Comprueba, antes de registrar, que
+el compañero puede entrar al equipo (mismas reglas de arriba) y responde
+`{ "correo", "nombre", "carrera" }` para confirmarlo en pantalla (sin boleta).
+`400`/`409` con el motivo si no puede.
+
 ### `GET /api/protocolos/mio`
-Solo alumnos. Sus protocolos, el más reciente primero (para ver el estado).
+Solo alumnos. Los protocolos de los que es integrante (responsable o
+compañero), el más reciente primero (para ver el estado).
 
 ## HU-19 — Turnar a Academia (Secretario Ejecutivo)
 
@@ -167,14 +186,15 @@ Sin ruta propia: se calcula al guardar cada evaluación (HU-21).
 ## Consulta común
 
 ### `GET /api/protocolos/:id`
-Ficha. La ven: personal CATT y admin, el alumno dueño, sus directores, sus
-sinodales y el Presidente de la academia a la que se turnó. Otros, `403`.
+Ficha. La ven: personal CATT y admin, los alumnos del equipo, sus directores,
+sus sinodales y el Presidente de la academia a la que se turnó. Otros, `403`.
 
 ### `GET /api/protocolos/:id/visto-bueno`
 Descarga la constancia (mismos permisos). Usa `descargarArchivo()` de `lib/api.js`.
 
-### `GET /api/protocolos/dirigidos` (HU-25, sin cambios)
-Protocolos donde la persona es director.
+### `GET /api/protocolos/dirigidos` (HU-25)
+Protocolos donde la persona es director. Cada uno trae `alumno` (el
+responsable) e `integrantes` (todo el equipo).
 
 ## Esquema (para HU-21, HU-22, HU-24)
 
@@ -183,6 +203,9 @@ protocolos            id, alumno_id, titulo, resumen, periodo, visto_bueno_archi
                       academia_id, academia_asignada_por, academia_asignada_en,
                       estado, creado_en
 protocolo_directores  (protocolo_id, docente_id)                 -- 1 o 2
+protocolo_integrantes (protocolo_id, alumno_id), es_responsable, agregado_en
+                      -- un único responsable por protocolo (índice parcial);
+                      -- protocolos.alumno_id es ese responsable y siempre tiene su fila
 protocolo_sinodales   (protocolo_id, docente_id), asignado_por, asignado_en,
                       dictamen ('aprobado'|'no_aprobado'|NULL), observaciones, evaluado_en
 ```
