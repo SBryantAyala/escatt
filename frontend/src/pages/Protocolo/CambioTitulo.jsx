@@ -34,7 +34,7 @@ function formatearFecha(iso) {
   return new Date(iso).toLocaleDateString("es-MX", { dateStyle: "medium" });
 }
 
-export default function CambioTitulo() {
+export default function CambioTitulo({ actor }) {
   const aviso = useAviso();
   const [protocolo, setProtocolo] = useState(null);
   const [solicitudes, setSolicitudes] = useState([]);
@@ -73,6 +73,7 @@ export default function CambioTitulo() {
   if (!protocolo) return null;
 
   const pendiente = solicitudes.find((s) => s.estado === "pendiente");
+  const soyResponsable = protocolo.alumno.id === actor?.id;
   const puedeSolicitar = protocolo.estado !== "aprobado";
   // Con el protocolo aprobado el título ya no cambia (Art. 44); solo se
   // muestra la sección si hay historial que consultar.
@@ -131,11 +132,19 @@ export default function CambioTitulo() {
 
       {pendiente ? (
         <p className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-          Tu solicitud para cambiar el título a «{pendiente.titulo_propuesto}» está en revisión. No puedes enviar otra
+          {soyResponsable ? "Tu solicitud" : "La solicitud de tu equipo"} para cambiar el título a «{pendiente.titulo_propuesto}» está en revisión. No puedes enviar otra
           hasta que la CATT la resuelva.
         </p>
       ) : (
-        puedeSolicitar && (
+        puedeSolicitar &&
+        !soyResponsable && (
+          <p className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+            Solo el responsable del equipo ({protocolo.alumno.nombre}) puede solicitar el cambio de título. Aquí verás
+            el resultado.
+          </p>
+        )
+      )}
+      {!pendiente && puedeSolicitar && soyResponsable && (
           <form
             onSubmit={enviar}
             noValidate
@@ -202,7 +211,6 @@ export default function CambioTitulo() {
               {enviando ? "Enviando…" : "Enviar solicitud"}
             </button>
           </form>
-        )
       )}
 
       {solicitudes.length > 0 && (

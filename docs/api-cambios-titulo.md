@@ -28,14 +28,17 @@ aprobado el protocolo (Art. 44).
 
 Reglas:
 
-- Solo se puede pedir sobre el protocolo **más reciente** del alumno y solo si
+- Un protocolo lo desarrolla un **equipo** (ver `docs/api-protocolos.md`). Solo
+  el **responsable** del equipo puede pedir el cambio (`403` para los demás
+  integrantes); todos los integrantes ven las solicitudes y su resultado.
+- Solo se puede pedir sobre el protocolo **más reciente** del equipo y solo si
   está `registrado`, `en_evaluacion` o `no_aprobado`. Con `aprobado`: `409`.
 - Una sola solicitud pendiente por protocolo.
 - No hay ventana de calendario (depende del Calendario de Actividades, HU-27).
 - Quien dirige o es sinodal del protocolo no puede resolver la solicitud
   (`403`), aunque tenga rol de CATT.
-- Al aprobar un protocolo `no_aprobado` el alumno no puede tener otro
-  protocolo vigente (`409`).
+- Al aprobar un protocolo `no_aprobado` ningún integrante del equipo puede
+  tener otro protocolo vigente (`409`).
 
 ## Esquema
 
@@ -69,7 +72,11 @@ Los documentos se guardan en `backend/uploads/cambios-titulo/`.
   "resuelta_por": null,
   "observaciones_resolucion": null,
   "protocolo": { "id": 3, "titulo": "…", "estado": "registrado" },
-  "alumno": { "id": 8, "nombre": "…", "boleta": "…", "carrera": "ISC" }
+  "alumno": { "id": 8, "nombre": "…", "boleta": "…", "carrera": "ISC" },
+  "integrantes": [
+    { "id": 8, "nombre": "…", "boleta": "…", "carrera": "ISC", "es_responsable": true },
+    { "id": 9, "nombre": "…", "boleta": "…", "carrera": "ISC", "es_responsable": false }
+  ]
 }
 ```
 
@@ -97,7 +104,7 @@ agrupable por `solicitud_id`/`titulo`.
 ## Rutas
 
 ### `POST /api/cambios-titulo`
-Solo alumnos. **multipart/form-data**:
+Solo el alumno responsable del equipo. **multipart/form-data**:
 
 | Campo | Obligatorio | Notas |
 |---|---|---|
@@ -107,11 +114,12 @@ Solo alumnos. **multipart/form-data**:
 | `protocolo` | no | protocolo corregido con el título nuevo; mismos formatos |
 
 `201` con la solicitud. El protocolo se toma de la sesión: el más reciente del
-alumno. Errores: `400` datos inválidos o título igual al actual; `409` sin
-protocolo, protocolo aprobado o ya hay una solicitud pendiente.
+equipo del alumno. Errores: `400` datos inválidos o título igual al actual;
+`403` el alumno no es el responsable; `409` sin protocolo, protocolo aprobado o ya hay una solicitud pendiente.
 
 ### `GET /api/cambios-titulo/mias`
-Solo alumnos. Sus solicitudes, la más reciente primero.
+Solo alumnos. Las solicitudes de los protocolos de su equipo (las envíe él o
+un compañero), la más reciente primero.
 
 ### `GET /api/cambios-titulo?estado=pendiente|aprobada|rechazada`
 Personal CATT (Ejecutivo, Auxiliar, Consulta) y administrador. Primero las
@@ -119,8 +127,7 @@ pendientes (la más antigua primero), luego las resueltas (la más reciente
 primero). Incluye `evaluaciones_actuales` y `evaluaciones_previas`.
 
 ### `GET /api/cambios-titulo/:id/constancia` y `/:id/protocolo`
-Descarga el formato firmado / el protocolo corregido. Los ve el alumno que los
-envió, el personal CATT y el administrador. `404` si la solicitud no incluye
+Descarga el formato firmado / el protocolo corregido. Los ve cualquier integrante del equipo, el personal CATT y el administrador. `404` si la solicitud no incluye
 protocolo corregido. Usa `descargarArchivo()` de `lib/api.js`.
 
 ### `PATCH /api/cambios-titulo/:id`

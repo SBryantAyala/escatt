@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import DialogoConfirmacion from "../../components/ui/DialogoConfirmacion";
 import Esqueleto from "../../components/ui/Esqueleto";
 import Etiqueta from "../../components/ui/Etiqueta";
+import Integrantes from "./Integrantes";
 import { useAviso } from "../../components/ui/Avisos";
 import { IconoDocumento } from "../../components/iconos";
 import { api, descargarArchivo } from "../../lib/api";
@@ -50,7 +51,7 @@ function ListaEvaluaciones({ evaluaciones, conTitulo = false }) {
 
 // Lo que provoca aprobar el cambio, según el estado del protocolo.
 function efectoDeAprobar(solicitud) {
-  const base = `El título de ${solicitud.alumno.nombre} cambiará a «${solicitud.titulo_propuesto}».`;
+  const base = `El título del protocolo cambiará a «${solicitud.titulo_propuesto}».`;
   switch (solicitud.protocolo.estado) {
     case "no_aprobado":
       return `${base} El protocolo volverá a evaluación con los mismos sinodales y su dictamen anterior se archivará.`;
@@ -112,9 +113,7 @@ function Solicitud({ solicitud, puedeResolver, onResuelta, onDesactualizada }) {
         <div className="min-w-0">
           <p className="text-sm text-slate-500 line-through">{solicitud.titulo_anterior}</p>
           <p className="font-semibold text-slate-800">{solicitud.titulo_propuesto}</p>
-          <p className="mt-1 text-sm text-slate-600">
-            {solicitud.alumno.nombre} · {solicitud.alumno.boleta} · {solicitud.alumno.carrera}
-          </p>
+          <Integrantes protocolo={solicitud} className="mt-1" />
           <p className="mt-1 text-xs text-slate-500">
             Enviada el {formatearFecha(solicitud.creado_en)}
             {solicitud.resuelta_en &&

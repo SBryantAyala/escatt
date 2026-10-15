@@ -8,6 +8,7 @@ import multer from "multer";
 
 import { enTransaccion, pool } from "../db/index.js";
 import { autenticar, exigeCambioResuelto, requiereRol } from "../lib/auth.js";
+import { ESTADOS_VIGENTES, sqlIntegrantes } from "../lib/equipo.js";
 import { ROLES_STAFF, tieneRol } from "../lib/roles.js";
 import { ruta } from "../lib/ruta.js";
 import { registrarBitacora } from "../lib/usuarios.js";
@@ -23,7 +24,6 @@ const ROLES_CONSULTA = ["admin_sistema", ...ROLES_STAFF];
 const ROLES_RESUELVEN = ["catt_ejecutivo", "catt_auxiliar"];
 // Con dictamen "aprobado" el título ya no se puede cambiar (Art. 44).
 const ESTADOS_CAMBIABLES = ["registrado", "en_evaluacion", "no_aprobado"];
-const ESTADOS_VIGENTES = ["registrado", "en_evaluacion", "aprobado"];
 const ESTADOS_SOLICITUD = ["pendiente", "aprobada", "rechazada"];
 const DECISIONES = ["aprobada", "rechazada"];
 const MAX_TITULO = 300;
@@ -83,7 +83,8 @@ const SELECT_SOLICITUD = `
          p.titulo AS protocolo_titulo, p.estado AS protocolo_estado,
          a.boleta, a.carrera,
          concat_ws(' ', au.nombre, au.apellido_paterno, au.apellido_materno) AS alumno_nombre,
-         concat_ws(' ', ru.nombre, ru.apellido_paterno, ru.apellido_materno) AS resuelta_por_nombre
+         concat_ws(' ', ru.nombre, ru.apellido_paterno, ru.apellido_materno) AS resuelta_por_nombre,
+         ${sqlIntegrantes("p")}
     FROM solicitudes_cambio_titulo s
     JOIN protocolos p ON p.id = s.protocolo_id
     JOIN alumnos a    ON a.usuario_id = p.alumno_id
@@ -105,6 +106,7 @@ function serializar(r, evaluaciones) {
     observaciones_resolucion: r.observaciones_resolucion,
     protocolo: { id: r.protocolo_id, titulo: r.protocolo_titulo, estado: r.protocolo_estado },
     alumno: { id: r.solicitante_id, nombre: r.alumno_nombre, boleta: r.boleta, carrera: r.carrera },
+    integrantes: r.integrantes ?? [],
   };
   return evaluaciones ? { ...base, ...evaluaciones } : base;
 }
@@ -209,13 +211,17 @@ router.post(
     try {
       resultado = await enTransaccion(async (client) => {
         const { rows: prot } = await client.query(
-          `SELECT id, titulo, estado FROM protocolos
-            WHERE alumno_id = $1
-            ORDER BY creado_en DESC, id DESC LIMIT 1 FOR UPDATE`,
+          `SELECT p.id, p.alumno_id, p.titulo, p.estado
+             FROM protocolos p
+             JOIN protocolo_integrantes i ON i.protocolo_id = p.id AND i.alumno_id = $1
+            ORDER BY p.creado_en DESC, p.id DESC LIMIT 1 FOR UPDATE OF p`,
           [req.usuario.id],
         );
         const p = prot[0];
         if (!p) return { status: 409, error: "No tienes un protocolo registrado" };
+        if (p.alumno_id !== req.usuario.id) {
+          return { status: 403, error: "Solo el responsable del equipo puede solicitar el cambio de título" };
+        }
         if (p.estado === "aprobado") {
           return {
             status: 409,
@@ -268,7 +274,9 @@ router.get(
   requiereRol("alumno"),
   ruta(async (req, res) => {
     const { rows } = await pool.query(
-      `${SELECT_SOLICITUD} WHERE s.solicitante_id = $1 ORDER BY s.creado_en DESC, s.id DESC`,
+      `${SELECT_SOLICITUD}
+        WHERE EXISTS (SELECT 1 FROM protocolo_integrantes mi WHERE mi.protocolo_id = s.protocolo_id AND mi.alumno_id = $1)
+        ORDER BY s.creado_en DESC, s.id DESC`,
       [req.usuario.id],
     );
     res.json(rows.map((r) => serializar(r)));
@@ -307,11 +315,14 @@ router.get(
     if (!id) return res.status(400).json({ error: "El id debe ser un número entero positivo" });
     const columna = DOCUMENTOS[req.params.documento];
     const { rows } = await pool.query(
-      `SELECT solicitante_id, ${columna} AS archivo FROM solicitudes_cambio_titulo WHERE id = $1`,
-      [id],
+      `SELECT ${columna} AS archivo,
+              EXISTS (SELECT 1 FROM protocolo_integrantes mi
+                       WHERE mi.protocolo_id = s.protocolo_id AND mi.alumno_id = $2) AS del_equipo
+         FROM solicitudes_cambio_titulo s WHERE s.id = $1`,
+      [id, req.usuario.id],
     );
     if (!rows[0]) return res.status(404).json({ error: "No existe esa solicitud" });
-    if (rows[0].solicitante_id !== req.usuario.id && !tieneRol(req.usuario, ...ROLES_CONSULTA)) {
+    if (!rows[0].del_equipo && !tieneRol(req.usuario, ...ROLES_CONSULTA)) {
       return res.status(403).json({ error: "No tienes permiso para ver esta solicitud" });
     }
     const archivo = rows[0].archivo;
@@ -364,7 +375,7 @@ router.patch(
       let detalle = { protocolo_id: s.protocolo_id };
       if (decision === "aprobada") {
         const { rows: prot } = await client.query(
-          "SELECT alumno_id, titulo, estado FROM protocolos WHERE id = $1 FOR UPDATE",
+          "SELECT titulo, estado FROM protocolos WHERE id = $1 FOR UPDATE",
           [s.protocolo_id],
         );
         const p = prot[0];
@@ -376,13 +387,20 @@ router.patch(
           return { status: 409, error: "El protocolo ya no admite cambio de título" };
         }
         if (p.estado === "no_aprobado") {
-          // El protocolo vuelve a evaluación: el alumno no puede tener otro vivo.
+          // El protocolo vuelve a evaluación: ningún integrante puede tener otro vivo.
           const { rows: otro } = await client.query(
-            "SELECT 1 FROM protocolos WHERE alumno_id = $1 AND id <> $2 AND estado = ANY($3)",
-            [p.alumno_id, s.protocolo_id, ESTADOS_VIGENTES],
+            `SELECT 1 FROM protocolos o
+               JOIN protocolo_integrantes oi ON oi.protocolo_id = o.id
+              WHERE o.id <> $1 AND o.estado = ANY($2)
+                AND oi.alumno_id IN (SELECT alumno_id FROM protocolo_integrantes WHERE protocolo_id = $1)
+              LIMIT 1`,
+            [s.protocolo_id, ESTADOS_VIGENTES],
           );
           if (otro[0]) {
-            return { status: 409, error: "El alumno ya tiene otro protocolo vigente; este no puede volver a evaluación" };
+            return {
+              status: 409,
+              error: "Un integrante del equipo ya tiene otro protocolo vigente; este no puede volver a evaluación",
+            };
           }
         }
 
