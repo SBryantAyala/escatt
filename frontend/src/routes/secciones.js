@@ -1,6 +1,7 @@
 import {
   IconoAcademia,
   IconoAltaUsuario,
+  IconoCalendario,
   IconoCuenta,
   IconoDocumento,
   IconoFlujo,
@@ -135,6 +136,21 @@ export const SECCIONES = [
         roles: ["admin_sistema", "alumno", ...ACADEMICOS],
       },
       {
+        clave: "sesiones",
+        ruta: "/panel/sesiones",
+        etiqueta: "Sesiones CATT",
+        icono: IconoCalendario,
+        roles: [...ADMIN_Y_CATT, "presidente_academia"],
+      },
+      {
+        clave: "sesion-detalle",
+        ruta: "/panel/sesiones/:id",
+        etiqueta: "Sesión",
+        icono: IconoCalendario,
+        roles: [...ADMIN_Y_CATT, "presidente_academia"],
+        oculto: true,
+      },
+      {
         clave: "trabajo-terminal",
         ruta: "/panel/trabajo-terminal",
         etiqueta: "Trabajo Terminal",
@@ -181,6 +197,7 @@ export function seccionPorRuta(pathname) {
   if (pathname === "/panel/usuarios/nuevo") return seccionPorClave("alta");
   if (/^\/panel\/usuarios\/[^/]+$/.test(pathname)) return seccionPorClave("detalle");
   if (/^\/panel\/academias\/[^/]+$/.test(pathname)) return seccionPorClave("academia-ficha");
+  if (/^\/panel\/sesiones\/[^/]+$/.test(pathname)) return seccionPorClave("sesion-detalle");
   return TODAS_SECCIONES.find((s) => s.ruta === pathname);
 }
 
