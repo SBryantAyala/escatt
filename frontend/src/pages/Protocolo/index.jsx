@@ -2,9 +2,11 @@ import SeccionProximamente from "../Panel/SeccionProximamente";
 import { ADMIN_Y_CATT } from "../../routes/secciones";
 import { tieneRol } from "../../lib/roles";
 import CambioDirector from "./CambioDirector";
+import CambioTitulo from "./CambioTitulo";
 import MiProtocolo from "./MiProtocolo";
 import VistaAlumno from "./VistaAlumno";
 import VistaCambiosDirector from "./VistaCambiosDirector";
+import VistaCambiosTitulo from "./VistaCambiosTitulo";
 import VistaDirector from "./VistaDirector";
 import VistaDocente from "./VistaDocente";
 import VistaSinodal from "./VistaSinodal";
@@ -16,7 +18,7 @@ const DESCRIPCION_PROXIMAMENTE =
 // Pantalla "Protocolo" del panel: hoy cubre HU-12 (el alumno sube evidencia
 // de requisitos para TT), HU-13 (la CATT la valida), HU-21 (el sinodal
 // evalúa), HU-22 (alumno y director ven el dictamen), HU-24 (cambio de
-// director) y HU-25 (el director consulta los protocolos que dirige). El
+// director), el cambio de título y HU-25 (el director consulta los protocolos que dirige). El
 // resto del flujo de protocolo (registro, turnar, sinodales) sigue pendiente.
 export default function ProtocoloPage({ actor }) {
   if (tieneRol(actor, "alumno")) {
@@ -25,6 +27,7 @@ export default function ProtocoloPage({ actor }) {
         <MiProtocolo />
         <VistaAlumno />
         <CambioDirector />
+        <CambioTitulo />
       </div>
     );
   }
@@ -48,6 +51,7 @@ export default function ProtocoloPage({ actor }) {
     <div className="space-y-10">
       {esPersonal && <VistaValidacion actor={actor} />}
       {esPersonal && <VistaCambiosDirector actor={actor} />}
+      {esPersonal && <VistaCambiosTitulo actor={actor} />}
       {esDirector && <VistaSinodal />}
       {esDirector && <VistaDirector />}
     </div>
