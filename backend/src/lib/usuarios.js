@@ -122,7 +122,7 @@ export async function asignacionesVigentes(_client, _usuarioId) {
 export async function motivosHistorial(client, usuarioId) {
   const { rows } = await client.query(
     `SELECT
-       (SELECT count(*)::int FROM protocolos WHERE alumno_id = $1) AS protocolos_propios,
+       (SELECT count(*)::int FROM protocolo_integrantes WHERE alumno_id = $1) AS protocolos_propios,
        (SELECT count(*)::int FROM protocolo_directores WHERE docente_id = $1) AS protocolos_dirigidos,
        (SELECT count(*)::int FROM protocolo_sinodales WHERE docente_id = $1) AS protocolos_sinodal,
        (SELECT count(*)::int FROM solicitudes_cambio_director

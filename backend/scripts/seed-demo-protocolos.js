@@ -3,7 +3,8 @@
 //
 //   - registrado, sin Academia       -> HU-19 (el Secretario Ejecutivo turna)
 //   - registrado, turnado sin sinodales -> HU-20 (el Presidente asigna)
-//   - en_evaluacion con 3 sinodales  -> HU-21/HU-22
+//   - en_evaluacion con 3 sinodales  -> HU-21/HU-22 (el de Diego Torres es un
+//     equipo de 3 alumnos, para ver a todos los integrantes)
 //   - aprobado / no_aprobado         -> HU-22 (dictamen) y HU-25 (director)
 //
 // También deja un alumno elegible y SIN protocolo para probar el registro
@@ -57,6 +58,7 @@ const PROTOCOLOS = [
   },
   {
     alumno: "diego.torres@alumno.ipn.mx",
+    integrantes: ["luisfernando.aguilar@alumno.ipn.mx", "valeria.escamilla@alumno.ipn.mx"],
     titulo: "Clasificación de imágenes médicas con redes convolucionales",
     resumen: "Comparación de arquitecturas CNN para detectar neumonía en radiografías de tórax.",
     estado: "en_evaluacion",
@@ -102,7 +104,10 @@ const PROTOCOLOS = [
 
 // Alumnos elegibles en el periodo de la demo: todos los que tienen protocolo
 // (la elegibilidad es requisito para registrarlo) más uno sin protocolo.
-const ELEGIBLES = [...PROTOCOLOS.map((p) => p.alumno), "jonathan.salazar@alumno.ipn.mx"];
+const ELEGIBLES = [
+  ...PROTOCOLOS.flatMap((p) => [p.alumno, ...(p.integrantes ?? [])]),
+  "jonathan.salazar@alumno.ipn.mx",
+];
 
 async function idPorCorreo(client, correo) {
   const { rows } = await client.query("SELECT id FROM usuarios WHERE lower(correo) = lower($1)", [correo]);
@@ -151,6 +156,19 @@ await enTransaccion(async (client) => {
         [alumnoId, p.titulo, p.resumen, PERIODO, p.estado, academiaId],
       );
       id = nuevo.rows[0].id;
+    }
+
+    // `alumno` es el responsable del equipo; `integrantes`, sus compañeros.
+    await client.query("DELETE FROM protocolo_integrantes WHERE protocolo_id = $1", [id]);
+    await client.query(
+      "INSERT INTO protocolo_integrantes (protocolo_id, alumno_id, es_responsable) VALUES ($1, $2, true)",
+      [id, alumnoId],
+    );
+    for (const correo of p.integrantes ?? []) {
+      await client.query("INSERT INTO protocolo_integrantes (protocolo_id, alumno_id) VALUES ($1, $2)", [
+        id,
+        await idPorCorreo(client, correo),
+      ]);
     }
 
     await client.query("DELETE FROM protocolo_directores WHERE protocolo_id = $1", [id]);
