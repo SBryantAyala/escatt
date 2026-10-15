@@ -39,9 +39,19 @@ function inicialesDe(u) {
 // GET /:id y de toda escritura que afecte la academia (POST, PUT, presidente,
 // docentes), para que el frontend siempre pueda reemplazar su estado con la
 // respuesta tal cual.
+async function resumenPersona(id) {
+  if (id == null) return null;
+  const { rows } = await pool.query(
+    "SELECT id, nombre, apellido_paterno, apellido_materno FROM usuarios WHERE id = $1",
+    [id],
+  );
+  const u = rows[0];
+  return u ? { id: u.id, nombre_completo: nombreCompletoDe(u), iniciales: inicialesDe(u) } : null;
+}
+
 async function obtenerFichaAcademia(id) {
   const { rows } = await pool.query(
-    `SELECT ac.id, ac.nombre, ac.departamento, ac.activa, ac.color, ac.icono, ac.presidente_id,
+    `SELECT ac.id, ac.nombre, ac.departamento, ac.activa, ac.color, ac.icono, ac.presidente_id, ac.expresidente_id,
             (SELECT count(*)::int FROM docentes d WHERE d.academia_id = ac.id) AS total_docentes
      FROM academias ac WHERE ac.id = $1`,
     [id],
@@ -94,6 +104,7 @@ async function obtenerFichaAcademia(id) {
       total_docentes: fila.total_docentes,
     },
     presidente,
+    expresidente: await resumenPersona(fila.expresidente_id),
     integrantes,
   };
 }
@@ -106,11 +117,15 @@ router.get(
     const todas = req.query.todas === "1" && tieneRol(req.usuario, "catt_ejecutivo");
     const { rows } = await pool.query(
       `SELECT ac.id, ac.nombre, ac.departamento, ac.activa, ac.color, ac.icono, ac.presidente_id,
+              ac.expresidente_id,
               pu.nombre AS p_nombre, pu.apellido_paterno AS p_apellido_paterno,
               pu.apellido_materno AS p_apellido_materno,
+              eu.nombre AS e_nombre, eu.apellido_paterno AS e_apellido_paterno,
+              eu.apellido_materno AS e_apellido_materno,
               (SELECT count(*)::int FROM docentes d WHERE d.academia_id = ac.id) AS total_docentes
        FROM academias ac
        LEFT JOIN usuarios pu ON pu.id = ac.presidente_id
+       LEFT JOIN usuarios eu ON eu.id = ac.expresidente_id
        ${todas ? "" : "WHERE ac.activa"}
        ORDER BY ac.activa DESC, ac.nombre`,
     );
@@ -132,6 +147,17 @@ router.get(
                 apellido_materno: r.p_apellido_materno,
               }),
               iniciales: inicialesDe({ nombre: r.p_nombre, apellido_paterno: r.p_apellido_paterno }),
+            }
+          : null,
+        expresidente: r.expresidente_id
+          ? {
+              id: r.expresidente_id,
+              nombre_completo: nombreCompletoDe({
+                nombre: r.e_nombre,
+                apellido_paterno: r.e_apellido_paterno,
+                apellido_materno: r.e_apellido_materno,
+              }),
+              iniciales: inicialesDe({ nombre: r.e_nombre, apellido_paterno: r.e_apellido_paterno }),
             }
           : null,
       })),
@@ -264,7 +290,10 @@ router.put(
       return void res.status(400).json({ error: "docente_id debe ser un número entero positivo" });
     }
 
-    const { rows: acRows } = await pool.query("SELECT presidente_id FROM academias WHERE id = $1", [id]);
+    const { rows: acRows } = await pool.query(
+      "SELECT presidente_id, expresidente_id FROM academias WHERE id = $1",
+      [id],
+    );
     if (!acRows[0]) return void res.status(404).json({ error: "No existe esa academia" });
 
     const { rows: docRows } = await pool.query(
@@ -280,12 +309,61 @@ router.put(
     }
 
     const anterior = acRows[0].presidente_id;
+    let expresidente = acRows[0].expresidente_id;
+    if (anterior != null && anterior !== docenteId) expresidente = anterior;
+    else if (expresidente === docenteId) expresidente = null;
     await enTransaccion(async (client) => {
       if (anterior) await quitarRol(client, anterior, "presidente_academia");
-      await client.query("UPDATE academias SET presidente_id = $1 WHERE id = $2", [docenteId, id]);
+      await client.query("UPDATE academias SET presidente_id = $1, expresidente_id = $2 WHERE id = $3", [
+        docenteId,
+        expresidente,
+        id,
+      ]);
       await asignarRol(client, docenteId, "presidente_academia", req.usuario.id);
       await registrarBitacora(client, req.usuario.id, "cambiar_presidente", "academias", id, {
         anterior,
+        nuevo: docenteId,
+        expresidente,
+      });
+    });
+
+    res.json(await obtenerFichaAcademia(id));
+  }),
+);
+
+// PUT /api/academias/:id/expresidente { docente_id | null } -> corrige a mano
+// el expresidente inmediato (Art. 8 VI del Documento Rector). Se actualiza
+// solo al cambiar o quitar al presidente; esta ruta sirve para capturar el de
+// las academias que ya tenían un cambio de presidente antes de existir el campo.
+router.put(
+  "/:id/expresidente",
+  requiereRol("catt_ejecutivo"),
+  ruta(async (req, res) => {
+    const id = idDeParams(req);
+    if (!id) return void res.status(400).json({ error: "El id debe ser un número entero positivo" });
+    const docenteId = req.body?.docente_id == null ? null : Number(req.body.docente_id);
+    if (docenteId !== null && (!Number.isInteger(docenteId) || docenteId <= 0)) {
+      return void res.status(400).json({ error: "docente_id debe ser un número entero positivo o null" });
+    }
+
+    const { rows: acRows } = await pool.query(
+      "SELECT presidente_id, expresidente_id FROM academias WHERE id = $1",
+      [id],
+    );
+    if (!acRows[0]) return void res.status(404).json({ error: "No existe esa academia" });
+
+    if (docenteId !== null) {
+      const { rows: docRows } = await pool.query("SELECT 1 FROM docentes WHERE usuario_id = $1", [docenteId]);
+      if (!docRows[0]) return void res.status(400).json({ error: "Ese docente no existe" });
+      if (docenteId === acRows[0].presidente_id) {
+        return void res.status(409).json({ error: "El presidente actual no puede ser el expresidente" });
+      }
+    }
+
+    await enTransaccion(async (client) => {
+      await client.query("UPDATE academias SET expresidente_id = $1 WHERE id = $2", [docenteId, id]);
+      await registrarBitacora(client, req.usuario.id, "definir_expresidente", "academias", id, {
+        anterior: acRows[0].expresidente_id,
         nuevo: docenteId,
       });
     });
@@ -309,7 +387,10 @@ router.delete(
     if (anterior) {
       await enTransaccion(async (client) => {
         await quitarRol(client, anterior, "presidente_academia");
-        await client.query("UPDATE academias SET presidente_id = NULL WHERE id = $1", [id]);
+        await client.query("UPDATE academias SET presidente_id = NULL, expresidente_id = $1 WHERE id = $2", [
+          anterior,
+          id,
+        ]);
         await registrarBitacora(client, req.usuario.id, "quitar_presidente", "academias", id, { anterior });
       });
     }

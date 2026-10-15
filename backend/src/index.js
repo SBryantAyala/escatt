@@ -12,6 +12,7 @@ import bitacoraRouter from "./routes/bitacora.js";
 import elegibilidadRouter from "./routes/elegibilidad.js";
 import protocolosRouter from "./routes/protocolos.js";
 import cambiosDirectorRouter from "./routes/cambios-director.js";
+import sesionesRouter from "./routes/sesiones.js";
 
 const app = express();
 
@@ -38,6 +39,7 @@ app.use("/api/bitacora", bitacoraRouter);
 app.use("/api/elegibilidad", elegibilidadRouter);
 app.use("/api/protocolos", protocolosRouter);
 app.use("/api/cambios-director", cambiosDirectorRouter);
+app.use("/api/sesiones", sesionesRouter);
 
 // Punto único para registrar las rutas de cada pantalla.
 // Cada integrante agrega aquí SU router desde su rama feature/*:
