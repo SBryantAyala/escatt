@@ -3,6 +3,7 @@ import Esqueleto from "../../components/ui/Esqueleto";
 import Etiqueta from "../../components/ui/Etiqueta";
 import { IconoDocumento } from "../../components/iconos";
 import { api } from "../../lib/api";
+import { nombreDirector } from "../../lib/directores";
 import { estadoDe } from "./estados";
 
 // Pantalla: protocolos que dirijo y su estado (HU-25). Solo lectura: el
@@ -69,7 +70,7 @@ export default function VistaDirector({ encabezado = true, onCargado }) {
         <ul className="mt-6 space-y-3">
           {protocolos.map((p) => {
             const estado = estadoDe(p.estado);
-            const otros = p.directores.length > 1 ? p.directores.map((d) => d.nombre).join(" · ") : null;
+            const otros = p.directores.length > 1 ? p.directores.map(nombreDirector).join(" · ") : null;
             return (
               <li key={p.id} className="rounded-2xl border border-slate-200 bg-white p-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">

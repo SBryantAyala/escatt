@@ -1,8 +1,10 @@
+import { useState } from "react";
 import SeccionProximamente from "../Panel/SeccionProximamente";
 import { ADMIN_Y_CATT } from "../../routes/secciones";
 import { tieneRol } from "../../lib/roles";
 import CambioDirector from "./CambioDirector";
 import MiProtocolo from "./MiProtocolo";
+import RegistroProtocolo from "./RegistroProtocolo";
 import VistaAlumno from "./VistaAlumno";
 import VistaCambiosDirector from "./VistaCambiosDirector";
 import VistaDirector from "./VistaDirector";
@@ -17,14 +19,18 @@ const DESCRIPCION_PROXIMAMENTE =
 // de requisitos para TT), HU-13 (la CATT la valida), HU-21 (el sinodal
 // evalúa), HU-22 (alumno y director ven el dictamen), HU-24 (cambio de
 // director) y HU-25 (el director consulta los protocolos que dirige). El
-// resto del flujo de protocolo (registro, turnar, sinodales) sigue pendiente.
+// alumno también registra su protocolo (HU-18), con directores docentes o un
+// director externo.
 export default function ProtocoloPage({ actor }) {
+  const [version, setVersion] = useState(0);
+
   if (tieneRol(actor, "alumno")) {
     return (
       <div className="space-y-10">
-        <MiProtocolo />
+        <MiProtocolo key={`mi-${version}`} />
         <VistaAlumno />
-        <CambioDirector />
+        <RegistroProtocolo key={`registro-${version}`} onRegistrado={() => setVersion((v) => v + 1)} />
+        <CambioDirector key={`cambio-${version}`} />
       </div>
     );
   }
