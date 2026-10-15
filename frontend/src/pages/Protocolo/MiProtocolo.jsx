@@ -3,6 +3,7 @@ import Esqueleto from "../../components/ui/Esqueleto";
 import Etiqueta from "../../components/ui/Etiqueta";
 import { IconoDocumento } from "../../components/iconos";
 import { api } from "../../lib/api";
+import { nombreDirector } from "../../lib/directores";
 import { integrantesDe } from "../../lib/integrantes";
 import Integrantes from "./Integrantes";
 
@@ -85,7 +86,7 @@ export default function MiProtocolo({ actor }) {
             <p className="font-semibold text-slate-800">{actual.titulo}</p>
             <p className="mt-1 text-xs text-slate-500">
               {actual.academia ? actual.academia.nombre : "Aún sin Academia asignada"}
-              {actual.directores.length > 0 ? ` · Director: ${actual.directores.map((d) => d.nombre).join(" · ")}` : ""}
+              {actual.directores.length > 0 ? ` · Director: ${actual.directores.map(nombreDirector).join(" · ")}` : ""}
             </p>
           </div>
           <Etiqueta variante={estado.variante}>{estado.etiqueta}</Etiqueta>

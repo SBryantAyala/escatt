@@ -4,6 +4,9 @@ import Etiqueta from "../../components/ui/Etiqueta";
 import { useAviso } from "../../components/ui/Avisos";
 import { IconoDocumento } from "../../components/iconos";
 import { api, descargarArchivo } from "../../lib/api";
+import { claveDirector, nombreDirector, separarClave } from "../../lib/directores";
+import FormDirectorExterno from "./FormDirectorExterno";
+import { claseArchivo, claseBotonSecundario, claseInput, claseLabel } from "./estilos";
 
 const ESTADOS_VIGENTES = ["registrado", "en_evaluacion", "aprobado"];
 
@@ -15,12 +18,12 @@ const ESTADOS = {
 
 const MAX_MOTIVO = 2000;
 
-const claseInput =
-  "min-h-13 w-full min-w-0 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-800 outline-none transition duration-200 placeholder:font-normal placeholder:text-slate-500 hover:border-blue-300 focus:border-blue-600 focus:ring-4 focus:ring-blue-100";
-const claseLabel = "mb-2 block text-sm font-semibold text-slate-800";
-
 function formatearFecha(iso) {
   return new Date(iso).toLocaleDateString("es-MX", { dateStyle: "medium" });
+}
+
+function ordenarPorNombre(lista) {
+  return [...lista].sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
 }
 
 export default function CambioDirector({ actor }) {
@@ -28,11 +31,13 @@ export default function CambioDirector({ actor }) {
   const [protocolo, setProtocolo] = useState(null);
   const [solicitudes, setSolicitudes] = useState([]);
   const [candidatos, setCandidatos] = useState([]);
+  const [externos, setExternos] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [errorCarga, setErrorCarga] = useState(null);
   const [saliente, setSaliente] = useState("");
   const [propuesto, setPropuesto] = useState("");
   const [motivo, setMotivo] = useState("");
+  const [registrandoExterno, setRegistrandoExterno] = useState(false);
   const [enviando, setEnviando] = useState(false);
   const archivoRef = useRef(null);
 
@@ -42,15 +47,17 @@ export default function CambioDirector({ actor }) {
       api("/api/protocolos/mio"),
       api("/api/cambios-director/mias"),
       api("/api/protocolos/candidatos-director"),
+      api("/api/directores-externos"),
     ])
-      .then(([protocolos, mias, docentes]) => {
+      .then(([protocolos, mias, docentes, catalogo]) => {
         const vigente = (Array.isArray(protocolos) ? protocolos : []).find((p) =>
           ESTADOS_VIGENTES.includes(p.estado),
         );
         setProtocolo(vigente ?? null);
         setSolicitudes(Array.isArray(mias) ? mias : []);
         setCandidatos(Array.isArray(docentes) ? docentes : []);
-        if (vigente?.directores.length === 1) setSaliente(String(vigente.directores[0].id));
+        setExternos(Array.isArray(catalogo) ? ordenarPorNombre(catalogo) : []);
+        if (vigente?.directores.length === 1) setSaliente(claveDirector(vigente.directores[0]));
       })
       .catch((e) => setErrorCarga(e.message))
       .finally(() => setCargando(false));
@@ -72,8 +79,18 @@ export default function CambioDirector({ actor }) {
 
   const pendiente = solicitudes.find((s) => s.estado === "pendiente");
   const soyResponsable = protocolo.alumno.id === actor?.id;
-  const excluidos = new Set([...protocolo.directores, ...protocolo.sinodales].map((p) => p.id));
-  const opciones = candidatos.filter((c) => !excluidos.has(c.id));
+  const docentesExcluidos = new Set(
+    [...protocolo.directores.filter((d) => !d.externo), ...protocolo.sinodales].map((p) => p.id),
+  );
+  const externosExcluidos = new Set(protocolo.directores.filter((d) => d.externo).map((d) => d.externo_id));
+  const opcionesDocentes = candidatos.filter((c) => !docentesExcluidos.has(c.id));
+  const opcionesExternos = externos.filter((x) => !externosExcluidos.has(x.id));
+
+  function externoRegistrado(creado) {
+    setExternos((lista) => ordenarPorNombre([...lista, creado]));
+    setPropuesto(`e:${creado.id}`);
+    setRegistrandoExterno(false);
+  }
 
   async function enviar(e) {
     e.preventDefault();
@@ -83,9 +100,19 @@ export default function CambioDirector({ actor }) {
     if (!motivo.trim()) return aviso.error("Explica el motivo del cambio");
     if (!archivo) return aviso.error("Adjunta la constancia firmada del acuerdo (PDF, JPG o PNG)");
 
+    const salida = separarClave(saliente);
+    const entrada = separarClave(propuesto);
+    const restantes = protocolo.directores.filter((d) => claveDirector(d) !== saliente);
+    if (entrada.externo && restantes.some((d) => d.externo)) {
+      return aviso.error("Un protocolo solo puede tener un director externo");
+    }
+    if (entrada.externo && !restantes.some((d) => !d.externo)) {
+      return aviso.error("El protocolo debe conservar al menos un director docente de ESCOM");
+    }
+
     const datos = new FormData();
-    datos.append("director_saliente_id", saliente);
-    datos.append("director_propuesto_id", propuesto);
+    datos.append(salida.externo ? "director_saliente_externo_id" : "director_saliente_id", salida.id);
+    datos.append(entrada.externo ? "director_propuesto_externo_id" : "director_propuesto_id", entrada.id);
     datos.append("motivo", motivo.trim());
     datos.append("constancia", archivo);
 
@@ -95,6 +122,7 @@ export default function CambioDirector({ actor }) {
       aviso.exito("Solicitud enviada. La CATT la revisará.");
       setPropuesto("");
       setMotivo("");
+      setRegistrandoExterno(false);
       if (archivoRef.current) archivoRef.current.value = "";
       cargar();
     } catch (err) {
@@ -124,8 +152,9 @@ export default function CambioDirector({ actor }) {
 
       {pendiente ? (
         <p className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-          {soyResponsable ? "Tu solicitud" : "La solicitud de tu equipo"} para sustituir a {pendiente.director_saliente.nombre} por {pendiente.director_propuesto.nombre}{" "}
-          está en revisión. No se puede enviar otra hasta que la CATT la resuelva.
+          {soyResponsable ? "Tu solicitud" : "La solicitud de tu equipo"} para sustituir a{" "}
+          {nombreDirector(pendiente.director_saliente)} por {nombreDirector(pendiente.director_propuesto)} está en
+          revisión. No se puede enviar otra hasta que la CATT la resuelva.
         </p>
       ) : !soyResponsable ? (
         <p className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
@@ -148,8 +177,8 @@ export default function CambioDirector({ actor }) {
               >
                 <option value="">Elige un director</option>
                 {protocolo.directores.map((d) => (
-                  <option key={d.id} value={d.id}>
-                    {d.nombre}
+                  <option key={claveDirector(d)} value={claveDirector(d)}>
+                    {nombreDirector(d)}
                   </option>
                 ))}
               </select>
@@ -162,15 +191,40 @@ export default function CambioDirector({ actor }) {
                 disabled={enviando}
                 className={claseInput}
               >
-                <option value="">Elige un docente</option>
-                {opciones.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.nombre} · {c.academia}
-                  </option>
-                ))}
+                <option value="">Elige un director</option>
+                <optgroup label="Docentes de ESCOM">
+                  {opcionesDocentes.map((c) => (
+                    <option key={`d:${c.id}`} value={`d:${c.id}`}>
+                      {c.nombre} · {c.academia}
+                    </option>
+                  ))}
+                </optgroup>
+                {opcionesExternos.length > 0 && (
+                  <optgroup label="Directores externos">
+                    {opcionesExternos.map((x) => (
+                      <option key={`e:${x.id}`} value={`e:${x.id}`}>
+                        {x.nombre} · {x.institucion}
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
               </select>
             </label>
           </div>
+
+          {!registrandoExterno && (
+            <button
+              type="button"
+              onClick={() => setRegistrandoExterno(true)}
+              disabled={enviando}
+              className={`mt-3 ${claseBotonSecundario}`}
+            >
+              Mi director externo no está en la lista
+            </button>
+          )}
+          {registrandoExterno && (
+            <FormDirectorExterno onRegistrado={externoRegistrado} onCancelar={() => setRegistrandoExterno(false)} />
+          )}
 
           <label className="mt-4 block">
             <span className={claseLabel}>Motivo del cambio</span>
@@ -186,13 +240,7 @@ export default function CambioDirector({ actor }) {
 
           <label className="mt-4 block min-w-0">
             <span className={claseLabel}>Constancia firmada del acuerdo (PDF, JPG o PNG, máx. 10 MB)</span>
-            <input
-              ref={archivoRef}
-              type="file"
-              accept=".pdf,.jpg,.jpeg,.png"
-              disabled={enviando}
-              className={`${claseInput} px-3 py-2.5 file:mr-3 file:rounded-full file:border-0 file:bg-blue-100 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-blue-700`}
-            />
+            <input ref={archivoRef} type="file" accept=".pdf,.jpg,.jpeg,.png" disabled={enviando} className={claseArchivo} />
           </label>
 
           <button
@@ -216,7 +264,7 @@ export default function CambioDirector({ actor }) {
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="min-w-0">
                       <p className="font-semibold text-slate-800">
-                        {s.director_saliente.nombre} → {s.director_propuesto.nombre}
+                        {nombreDirector(s.director_saliente)} → {nombreDirector(s.director_propuesto)}
                       </p>
                       <p className="mt-1 text-xs text-slate-500">
                         Enviada el {formatearFecha(s.creado_en)}
@@ -232,11 +280,7 @@ export default function CambioDirector({ actor }) {
                       {s.observaciones_resolucion}
                     </p>
                   )}
-                  <button
-                    type="button"
-                    onClick={() => verConstancia(s)}
-                    className="mt-3 min-h-10 rounded-full border border-slate-200 px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
-                  >
+                  <button type="button" onClick={() => verConstancia(s)} className={`mt-3 ${claseBotonSecundario}`}>
                     Ver constancia
                   </button>
                 </li>

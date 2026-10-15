@@ -5,6 +5,7 @@ import Etiqueta from "../../components/ui/Etiqueta";
 import { useAviso } from "../../components/ui/Avisos";
 import { IconoDocumento } from "../../components/iconos";
 import { api, descargarArchivo } from "../../lib/api";
+import { nombreDirector } from "../../lib/directores";
 import { tieneRol } from "../../lib/roles";
 import Integrantes from "./Integrantes";
 
@@ -18,6 +19,45 @@ const MAX_OBSERVACIONES = 2000;
 
 function formatearFecha(iso) {
   return new Date(iso).toLocaleDateString("es-MX", { dateStyle: "medium" });
+}
+
+function DetalleExterno({ director, etiqueta }) {
+  const aviso = useAviso();
+
+  function descargar(documento) {
+    descargarArchivo(
+      `/api/directores-externos/${director.externo_id}/${documento}`,
+      `${documento}-director-externo-${director.externo_id}`,
+    ).catch((e) => aviso.error(e.message));
+  }
+
+  return (
+    <div className="mt-3 rounded-xl border border-sky-100 bg-sky-50/60 p-3">
+      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{etiqueta} · director externo</p>
+      <p className="mt-1 text-sm font-semibold text-slate-800">{director.nombre}</p>
+      <p className="text-sm text-slate-600">
+        {director.institucion}
+        {director.correo && ` · ${director.correo}`}
+        {director.cedula_numero && ` · Cédula ${director.cedula_numero}`}
+      </p>
+      <div className="mt-2 flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={() => descargar("cedula")}
+          className="min-h-10 rounded-full border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+        >
+          Ver cédula
+        </button>
+        <button
+          type="button"
+          onClick={() => descargar("curriculum")}
+          className="min-h-10 rounded-full border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+        >
+          Ver currículum
+        </button>
+      </div>
+    </div>
+  );
 }
 
 function Solicitud({ solicitud, puedeResolver, onResuelta, onDesactualizada }) {
@@ -69,7 +109,7 @@ function Solicitud({ solicitud, puedeResolver, onResuelta, onDesactualizada }) {
           <p className="font-semibold text-slate-800">{solicitud.protocolo.titulo}</p>
           <Integrantes protocolo={solicitud} className="mt-1" />
           <p className="mt-1 text-sm text-slate-700">
-            {solicitud.director_saliente.nombre} → {solicitud.director_propuesto.nombre}
+            {nombreDirector(solicitud.director_saliente)} → {nombreDirector(solicitud.director_propuesto)}
           </p>
           <p className="mt-1 text-xs text-slate-500">
             Enviada el {formatearFecha(solicitud.creado_en)}
@@ -79,6 +119,11 @@ function Solicitud({ solicitud, puedeResolver, onResuelta, onDesactualizada }) {
         </div>
         <Etiqueta variante={estado.variante}>{estado.etiqueta}</Etiqueta>
       </div>
+
+      {solicitud.director_saliente.externo && <DetalleExterno director={solicitud.director_saliente} etiqueta="Saliente" />}
+      {solicitud.director_propuesto.externo && (
+        <DetalleExterno director={solicitud.director_propuesto} etiqueta="Propuesto" />
+      )}
 
       <p className="mt-3 whitespace-pre-line text-sm text-slate-700">{solicitud.motivo}</p>
       {solicitud.observaciones_resolucion && (
@@ -149,7 +194,7 @@ function Solicitud({ solicitud, puedeResolver, onResuelta, onDesactualizada }) {
       <DialogoConfirmacion
         abierto={aprobando}
         titulo="¿Aprobar el cambio de director?"
-        descripcion={`${solicitud.director_propuesto.nombre} sustituirá a ${solicitud.director_saliente.nombre} como director de «${solicitud.protocolo.titulo}».`}
+        descripcion={`${nombreDirector(solicitud.director_propuesto)} sustituirá a ${nombreDirector(solicitud.director_saliente)} como director de «${solicitud.protocolo.titulo}».`}
         etiquetaConfirmar="Aprobar"
         cargando={enviando}
         onConfirmar={() => resolver("aprobada")}
