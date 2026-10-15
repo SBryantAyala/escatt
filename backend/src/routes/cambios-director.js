@@ -64,21 +64,45 @@ const SELECT_SOLICITUD = `
          p.titulo AS protocolo_titulo, p.estado AS protocolo_estado,
          a.boleta, a.carrera,
          concat_ws(' ', au.nombre, au.apellido_paterno, au.apellido_materno) AS alumno_nombre,
-         s.director_saliente_id,
-         concat_ws(' ', su.nombre, su.apellido_paterno, su.apellido_materno) AS saliente_nombre,
-         s.director_propuesto_id,
-         concat_ws(' ', pu.nombre, pu.apellido_paterno, pu.apellido_materno) AS propuesto_nombre,
+         s.director_saliente_id, s.director_saliente_externo_id,
+         COALESCE(NULLIF(concat_ws(' ', su.nombre, su.apellido_paterno, su.apellido_materno), ''), se.nombre) AS saliente_nombre,
+         se.institucion AS saliente_institucion, se.correo AS saliente_correo, se.cedula_numero AS saliente_cedula,
+         s.director_propuesto_id, s.director_propuesto_externo_id,
+         COALESCE(NULLIF(concat_ws(' ', pu.nombre, pu.apellido_paterno, pu.apellido_materno), ''), pe.nombre) AS propuesto_nombre,
+         pe.institucion AS propuesto_institucion, pe.correo AS propuesto_correo, pe.cedula_numero AS propuesto_cedula,
          concat_ws(' ', ru.nombre, ru.apellido_paterno, ru.apellido_materno) AS resuelta_por_nombre
     FROM solicitudes_cambio_director s
     JOIN protocolos p ON p.id = s.protocolo_id
     JOIN alumnos a    ON a.usuario_id = p.alumno_id
     JOIN usuarios au  ON au.id = p.alumno_id
-    JOIN usuarios su  ON su.id = s.director_saliente_id
-    JOIN usuarios pu  ON pu.id = s.director_propuesto_id
+    LEFT JOIN usuarios su ON su.id = s.director_saliente_id
+    LEFT JOIN directores_externos se ON se.id = s.director_saliente_externo_id
+    LEFT JOIN usuarios pu ON pu.id = s.director_propuesto_id
+    LEFT JOIN directores_externos pe ON pe.id = s.director_propuesto_externo_id
     LEFT JOIN usuarios ru ON ru.id = s.resuelta_por
 `;
 
-function serializar(r) {
+function serializarDirector(r, lado, verDatosExterno) {
+  const externoId = r[`director_${lado}_externo_id`];
+  const nombre = r[`${lado}_nombre`];
+  if (!externoId) {
+    return { id: r[`director_${lado}_id`], externo_id: null, externo: false, nombre };
+  }
+  const director = {
+    id: null,
+    externo_id: externoId,
+    externo: true,
+    nombre,
+    institucion: r[`${lado}_institucion`],
+  };
+  if (verDatosExterno) {
+    director.correo = r[`${lado}_correo`];
+    director.cedula_numero = r[`${lado}_cedula`];
+  }
+  return director;
+}
+
+function serializar(r, verDatosExterno = false) {
   return {
     id: r.id,
     estado: r.estado,
@@ -89,8 +113,8 @@ function serializar(r) {
     observaciones_resolucion: r.observaciones_resolucion,
     protocolo: { id: r.protocolo_id, titulo: r.protocolo_titulo, estado: r.protocolo_estado },
     alumno: { id: r.solicitante_id, nombre: r.alumno_nombre, boleta: r.boleta, carrera: r.carrera },
-    director_saliente: { id: r.director_saliente_id, nombre: r.saliente_nombre },
-    director_propuesto: { id: r.director_propuesto_id, nombre: r.propuesto_nombre },
+    director_saliente: serializarDirector(r, "saliente", verDatosExterno),
+    director_propuesto: serializarDirector(r, "propuesto", verDatosExterno),
   };
 }
 
@@ -99,7 +123,29 @@ async function obtenerSolicitud(id, client = pool) {
   return rows[0] ?? null;
 }
 
-async function validarDirectorPropuesto(client, protocoloId, propuestoId) {
+async function dirigeElProtocolo(client, protocoloId, docenteId, externoId) {
+  const { rows } = await client.query(
+    `SELECT 1 FROM protocolo_directores
+      WHERE protocolo_id = $1
+        AND docente_id IS NOT DISTINCT FROM $2::int
+        AND externo_id IS NOT DISTINCT FROM $3::int`,
+    [protocoloId, docenteId, externoId],
+  );
+  return rows.length > 0;
+}
+
+async function validarDirectorPropuesto(client, protocoloId, propuestoId, propuestoExternoId) {
+  if (propuestoExternoId) {
+    const { rows: externo } = await client.query("SELECT 1 FROM directores_externos WHERE id = $1", [
+      propuestoExternoId,
+    ]);
+    if (!externo[0]) return "El director externo propuesto no existe";
+    if (await dirigeElProtocolo(client, protocoloId, null, propuestoExternoId)) {
+      return "El director propuesto ya dirige este protocolo";
+    }
+    return null;
+  }
+
   const { rows: docente } = await client.query(
     `SELECT 1 FROM docentes d JOIN usuarios u ON u.id = d.usuario_id
       WHERE d.usuario_id = $1 AND u.estado = 'activa'`,
@@ -107,11 +153,9 @@ async function validarDirectorPropuesto(client, protocoloId, propuestoId) {
   );
   if (!docente[0]) return "El director propuesto debe ser un docente con cuenta activa";
 
-  const { rows: yaDirige } = await client.query(
-    "SELECT 1 FROM protocolo_directores WHERE protocolo_id = $1 AND docente_id = $2",
-    [protocoloId, propuestoId],
-  );
-  if (yaDirige[0]) return "El director propuesto ya dirige este protocolo";
+  if (await dirigeElProtocolo(client, protocoloId, propuestoId, null)) {
+    return "El director propuesto ya dirige este protocolo";
+  }
 
   const { rows: esSinodal } = await client.query(
     "SELECT 1 FROM protocolo_sinodales WHERE protocolo_id = $1 AND docente_id = $2",
@@ -119,6 +163,22 @@ async function validarDirectorPropuesto(client, protocoloId, propuestoId) {
   );
   if (esSinodal[0]) return "El director propuesto es sinodal de este protocolo";
 
+  return null;
+}
+
+async function validarComposicion(client, protocoloId, salienteId, salienteExternoId, propuestoId, propuestoExternoId) {
+  const { rows } = await client.query(
+    `SELECT count(*) FILTER (WHERE docente_id IS NOT NULL)::int AS docentes,
+            count(*) FILTER (WHERE externo_id IS NOT NULL)::int AS externos
+       FROM protocolo_directores
+      WHERE protocolo_id = $1
+        AND NOT (docente_id IS NOT DISTINCT FROM $2::int AND externo_id IS NOT DISTINCT FROM $3::int)`,
+    [protocoloId, salienteId, salienteExternoId],
+  );
+  const docentes = rows[0].docentes + (propuestoId ? 1 : 0);
+  const externos = rows[0].externos + (propuestoExternoId ? 1 : 0);
+  if (docentes < 1) return "El protocolo debe conservar al menos un director docente de ESCOM";
+  if (externos > 1) return "Un protocolo solo puede tener un director externo";
   return null;
 }
 
@@ -133,11 +193,20 @@ router.post(
     };
 
     const salienteId = entero(req.body.director_saliente_id);
+    const salienteExternoId = entero(req.body.director_saliente_externo_id);
     const propuestoId = entero(req.body.director_propuesto_id);
+    const propuestoExternoId = entero(req.body.director_propuesto_externo_id);
     const motivo = texto(req.body.motivo);
-    if (!salienteId) return rechazar(400, "Elige el director que se va a sustituir");
-    if (!propuestoId) return rechazar(400, "Elige al director propuesto");
-    if (salienteId === propuestoId) {
+    if ((salienteId === null) === (salienteExternoId === null)) {
+      return rechazar(400, "Elige el director que se va a sustituir (un docente o un externo, no ambos)");
+    }
+    if ((propuestoId === null) === (propuestoExternoId === null)) {
+      return rechazar(400, "Elige al director propuesto (un docente o un externo, no ambos)");
+    }
+    if (
+      (salienteId !== null && salienteId === propuestoId) ||
+      (salienteExternoId !== null && salienteExternoId === propuestoExternoId)
+    ) {
       return rechazar(400, "El director propuesto debe ser distinto del actual");
     }
     if (!motivo || motivo.length > MAX_MOTIVO) {
@@ -159,11 +228,14 @@ router.post(
         if (!prot[0]) return { status: 409, error: "No tienes un protocolo vigente para solicitar el cambio" };
         const protocoloId = prot[0].id;
 
-        const { rows: dirige } = await client.query(
-          "SELECT 1 FROM protocolo_directores WHERE protocolo_id = $1 AND docente_id = $2",
-          [protocoloId, salienteId],
-        );
-        if (!dirige[0]) return { status: 400, error: "Ese docente no es director de tu protocolo" };
+        if (!(await dirigeElProtocolo(client, protocoloId, salienteId, salienteExternoId))) {
+          return {
+            status: 400,
+            error: salienteId
+              ? "Ese docente no es director de tu protocolo"
+              : "Ese director externo no dirige tu protocolo",
+          };
+        }
 
         const { rows: pendiente } = await client.query(
           "SELECT 1 FROM solicitudes_cambio_director WHERE protocolo_id = $1 AND estado = 'pendiente'",
@@ -173,19 +245,41 @@ router.post(
           return { status: 409, error: "Ya tienes una solicitud de cambio de director pendiente" };
         }
 
-        const invalido = await validarDirectorPropuesto(client, protocoloId, propuestoId);
+        const invalido = await validarDirectorPropuesto(client, protocoloId, propuestoId, propuestoExternoId);
         if (invalido) return { status: 400, error: invalido };
+
+        const composicion = await validarComposicion(
+          client,
+          protocoloId,
+          salienteId,
+          salienteExternoId,
+          propuestoId,
+          propuestoExternoId,
+        );
+        if (composicion) return { status: 400, error: composicion };
 
         const { rows } = await client.query(
           `INSERT INTO solicitudes_cambio_director
-             (protocolo_id, solicitante_id, director_saliente_id, director_propuesto_id, motivo, constancia_archivo)
-           VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
-          [protocoloId, req.usuario.id, salienteId, propuestoId, motivo, req.file.filename],
+             (protocolo_id, solicitante_id, director_saliente_id, director_saliente_externo_id,
+              director_propuesto_id, director_propuesto_externo_id, motivo, constancia_archivo)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
+          [
+            protocoloId,
+            req.usuario.id,
+            salienteId,
+            salienteExternoId,
+            propuestoId,
+            propuestoExternoId,
+            motivo,
+            req.file.filename,
+          ],
         );
         await registrarBitacora(client, req.usuario.id, "solicitar_cambio_director", "solicitudes_cambio_director", rows[0].id, {
           protocolo_id: protocoloId,
           director_saliente_id: salienteId,
+          director_saliente_externo_id: salienteExternoId,
           director_propuesto_id: propuestoId,
+          director_propuesto_externo_id: propuestoExternoId,
         });
         return { id: rows[0].id };
       });
@@ -211,7 +305,7 @@ router.get(
       `${SELECT_SOLICITUD} WHERE s.solicitante_id = $1 ORDER BY s.creado_en DESC, s.id DESC`,
       [req.usuario.id],
     );
-    res.json(rows.map(serializar));
+    res.json(rows.map((r) => serializar(r)));
   }),
 );
 
@@ -236,7 +330,7 @@ router.get(
                  s.resuelta_en DESC NULLS LAST, s.id DESC`,
       valores,
     );
-    res.json(rows.map(serializar));
+    res.json(rows.map((r) => serializar(r, true)));
   }),
 );
 
@@ -278,7 +372,8 @@ router.patch(
 
     const resultado = await enTransaccion(async (client) => {
       const { rows: sol } = await client.query(
-        `SELECT protocolo_id, estado, director_saliente_id, director_propuesto_id
+        `SELECT protocolo_id, estado, director_saliente_id, director_saliente_externo_id,
+                director_propuesto_id, director_propuesto_externo_id
            FROM solicitudes_cambio_director WHERE id = $1 FOR UPDATE`,
         [id],
       );
@@ -297,23 +392,43 @@ router.patch(
         if (!ESTADOS_PROTOCOLO_VIGENTE.includes(prot[0]?.estado)) {
           return { status: 409, error: "El protocolo ya no está vigente; no se puede aprobar el cambio" };
         }
-        const { rows: dirige } = await client.query(
-          "SELECT 1 FROM protocolo_directores WHERE protocolo_id = $1 AND docente_id = $2",
-          [s.protocolo_id, s.director_saliente_id],
-        );
-        if (!dirige[0]) {
+        if (
+          !(await dirigeElProtocolo(
+            client,
+            s.protocolo_id,
+            s.director_saliente_id,
+            s.director_saliente_externo_id,
+          ))
+        ) {
           return { status: 409, error: "El director a sustituir ya no dirige este protocolo" };
         }
-        const invalido = await validarDirectorPropuesto(client, s.protocolo_id, s.director_propuesto_id);
+        const invalido = await validarDirectorPropuesto(
+          client,
+          s.protocolo_id,
+          s.director_propuesto_id,
+          s.director_propuesto_externo_id,
+        );
         if (invalido) return { status: 409, error: invalido };
+        const composicion = await validarComposicion(
+          client,
+          s.protocolo_id,
+          s.director_saliente_id,
+          s.director_saliente_externo_id,
+          s.director_propuesto_id,
+          s.director_propuesto_externo_id,
+        );
+        if (composicion) return { status: 409, error: composicion };
 
         await client.query(
-          "DELETE FROM protocolo_directores WHERE protocolo_id = $1 AND docente_id = $2",
-          [s.protocolo_id, s.director_saliente_id],
+          `DELETE FROM protocolo_directores
+            WHERE protocolo_id = $1
+              AND docente_id IS NOT DISTINCT FROM $2::int
+              AND externo_id IS NOT DISTINCT FROM $3::int`,
+          [s.protocolo_id, s.director_saliente_id, s.director_saliente_externo_id],
         );
         await client.query(
-          "INSERT INTO protocolo_directores (protocolo_id, docente_id) VALUES ($1, $2)",
-          [s.protocolo_id, s.director_propuesto_id],
+          "INSERT INTO protocolo_directores (protocolo_id, docente_id, externo_id) VALUES ($1, $2, $3)",
+          [s.protocolo_id, s.director_propuesto_id, s.director_propuesto_externo_id],
         );
       }
 
@@ -332,14 +447,16 @@ router.patch(
         {
           protocolo_id: s.protocolo_id,
           director_saliente_id: s.director_saliente_id,
+          director_saliente_externo_id: s.director_saliente_externo_id,
           director_propuesto_id: s.director_propuesto_id,
+          director_propuesto_externo_id: s.director_propuesto_externo_id,
         },
       );
       return null;
     });
     if (resultado) return res.status(resultado.status).json({ error: resultado.error });
 
-    res.json(serializar(await obtenerSolicitud(id)));
+    res.json(serializar(await obtenerSolicitud(id), true));
   }),
 );
 
