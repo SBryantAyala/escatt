@@ -61,6 +61,8 @@ export async function enTransaccion(fn) {
 //   protocolos            protocolos de TT (Módulo 2)
 //   protocolo_directores  1 o 2 directores por protocolo
 //   protocolo_sinodales   3 sinodales por protocolo + su evaluación
+//   solicitudes_cambio_titulo     el alumno pide cambiar el título de su protocolo
+//   protocolo_evaluaciones_historial  evaluaciones archivadas al reiniciar la evaluación
 //   bitacora       historial de acciones sensibles
 //   credenciales   contraseña (scrypt) de cada usuario
 //   sesiones       tokens Bearer activos
@@ -512,6 +514,55 @@ async function migrarProtocolos(client) {
   }
 }
 
+// Cambio de título (Art. 7 III): el alumno pide cambiar el título de su
+// protocolo; la CATT valida con el formato firmado. Al aprobar, la evaluación
+// se reinicia y las evaluaciones anteriores se archivan en el historial.
+// Idempotente.
+async function migrarCambioTitulo(client) {
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS solicitudes_cambio_titulo (
+      id                       SERIAL      PRIMARY KEY,
+      protocolo_id             INTEGER     NOT NULL REFERENCES protocolos(id) ON DELETE CASCADE,
+      solicitante_id           INTEGER     NOT NULL REFERENCES usuarios(id),
+      titulo_anterior          TEXT        NOT NULL,
+      titulo_propuesto         TEXT        NOT NULL,
+      motivo                   TEXT        NOT NULL,
+      constancia_archivo       TEXT        NOT NULL,
+      protocolo_archivo        TEXT,
+      estado                   TEXT        NOT NULL DEFAULT 'pendiente'
+                               CHECK (estado IN ('pendiente', 'aprobada', 'rechazada')),
+      resuelta_por             INTEGER     REFERENCES usuarios(id) ON DELETE SET NULL,
+      resuelta_en              TIMESTAMPTZ,
+      observaciones_resolucion TEXT,
+      creado_en                TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+
+    CREATE UNIQUE INDEX IF NOT EXISTS solicitudes_cambio_titulo_pendiente_uq
+      ON solicitudes_cambio_titulo (protocolo_id) WHERE estado = 'pendiente';
+
+    CREATE INDEX IF NOT EXISTS solicitudes_cambio_titulo_estado_idx
+      ON solicitudes_cambio_titulo (estado, creado_en);
+
+    -- Evaluaciones de sinodales que se archivaron cuando la CATT aprobó un
+    -- cambio de título y la evaluación volvió a empezar. titulo es el título
+    -- que se evaluó; solicitud_id, la solicitud que provocó el reinicio.
+    CREATE TABLE IF NOT EXISTS protocolo_evaluaciones_historial (
+      id            SERIAL      PRIMARY KEY,
+      protocolo_id  INTEGER     NOT NULL REFERENCES protocolos(id) ON DELETE CASCADE,
+      docente_id    INTEGER     NOT NULL REFERENCES docentes(usuario_id),
+      dictamen      TEXT        NOT NULL CHECK (dictamen IN ('aprobado', 'no_aprobado')),
+      observaciones TEXT,
+      evaluado_en   TIMESTAMPTZ,
+      titulo        TEXT        NOT NULL,
+      solicitud_id  INTEGER     REFERENCES solicitudes_cambio_titulo(id) ON DELETE SET NULL,
+      archivada_en  TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+
+    CREATE INDEX IF NOT EXISTS protocolo_evaluaciones_historial_protocolo_idx
+      ON protocolo_evaluaciones_historial (protocolo_id);
+  `);
+}
+
 async function initDb() {
   const client = await pool.connect();
   try {
@@ -523,6 +574,7 @@ async function initDb() {
     if (esquemaAnterior) await migrarEsquemaAnterior(client);
     await migrarAcademiasPresidenteColorIcono(client);
     await migrarProtocolos(client);
+    await migrarCambioTitulo(client);
     // creado_en se agregó después del CREATE TABLE original de elegibilidad.
     await client.query(
       "ALTER TABLE elegibilidad ADD COLUMN IF NOT EXISTS creado_en TIMESTAMPTZ NOT NULL DEFAULT now()",
