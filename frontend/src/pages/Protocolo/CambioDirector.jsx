@@ -70,7 +70,9 @@ export default function CambioDirector({ actor }) {
   }
   if (!protocolo) return null;
 
-  const pendiente = solicitudes.find((s) => s.estado === "pendiente");
+  // /mias trae las solicitudes de todos los equipos en los que ha estado el
+  // alumno; solo cuenta la del protocolo vigente.
+  const pendiente = solicitudes.find((s) => s.estado === "pendiente" && s.protocolo.id === protocolo.id);
   const soyResponsable = protocolo.alumno.id === actor?.id;
   const excluidos = new Set([...protocolo.directores, ...protocolo.sinodales].map((p) => p.id));
   const opciones = candidatos.filter((c) => !excluidos.has(c.id));

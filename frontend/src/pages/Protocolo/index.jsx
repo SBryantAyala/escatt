@@ -1,3 +1,4 @@
+import { useState } from "react";
 import SeccionProximamente from "../Panel/SeccionProximamente";
 import { ADMIN_Y_CATT } from "../../routes/secciones";
 import { tieneRol } from "../../lib/roles";
@@ -19,12 +20,16 @@ const DESCRIPCION_PROXIMAMENTE =
 // director) y HU-25 (el director consulta los protocolos que dirige). El
 // resto del flujo de protocolo (registro, turnar, sinodales) sigue pendiente.
 export default function ProtocoloPage({ actor }) {
+  // Cambia cuando el alumno se sale de su equipo, para recargar las secciones
+  // que dependen de su protocolo.
+  const [version, setVersion] = useState(0);
+
   if (tieneRol(actor, "alumno")) {
     return (
       <div className="space-y-10">
-        <MiProtocolo actor={actor} />
+        <MiProtocolo actor={actor} onSalir={() => setVersion((v) => v + 1)} />
         <VistaAlumno />
-        <CambioDirector actor={actor} />
+        <CambioDirector key={version} actor={actor} />
       </div>
     );
   }
