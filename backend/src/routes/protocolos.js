@@ -14,9 +14,11 @@ import {
   MAX_INTEGRANTES,
   esIntegrante,
   listaDeCorreos,
+  parsearLista,
+  periodoElegibleDe,
   protocoloVigenteDe,
   sqlIntegrantes,
-  validarCompanero,
+  validarEquipo,
 } from "../lib/equipo.js";
 import { ROLES_STAFF, tieneRol } from "../lib/roles.js";
 import { ruta } from "../lib/ruta.js";
@@ -83,25 +85,11 @@ function borrarArchivo(nombreArchivo) {
 // Lista de ids enteros positivos sin repetir. Acepta un arreglo JSON (body
 // JSON) o, en multipart, el campo repetido, "[1,2]" o "1,2". null si algún
 // valor no es un id válido.
-function listaDeIds(valor) {
-  let crudo = valor;
-  if (typeof crudo === "string") {
-    const t = crudo.trim();
-    if (t.startsWith("[")) {
-      try {
-        crudo = JSON.parse(t);
-      } catch {
-        return null;
-      }
-    } else {
-      crudo = t ? t.split(",") : [];
-    }
-  }
-  if (!Array.isArray(crudo)) return null;
-  const ids = crudo.map((v) => Number(typeof v === "string" ? v.trim() : v));
-  if (!ids.every((n) => Number.isInteger(n) && n > 0)) return null;
-  return [...new Set(ids)];
-}
+const listaDeIds = (valor) =>
+  parsearLista(valor, (v) => {
+    const n = Number(v);
+    return Number.isInteger(n) && n > 0 ? n : null;
+  });
 
 // Ficha de protocolo: lo mismo para la lista y para el detalle, así el
 // frontend puede reemplazar una fila con la respuesta de cualquier escritura.
@@ -439,8 +427,10 @@ router.get(
 
 // POST /api/protocolos/companeros/validar { correo } -> comprueba, antes de
 // registrar, que un compañero puede entrar al equipo (alumno activo, elegible
-// y sin otro protocolo vigente) y devuelve solo su nombre y carrera para
-// confirmarlo en pantalla. 400/409 con el motivo si no puede.
+// en el periodo de quien registra y sin otro protocolo vigente) y devuelve
+// solo su nombre y carrera para confirmarlo en pantalla. Si no puede, un 409
+// con el mismo mensaje para cualquier motivo (no revela la elegibilidad ni
+// los protocolos de otro alumno). Solo lo usa quien puede registrar.
 router.post(
   "/companeros/validar",
   requiereRol("alumno"),
@@ -449,12 +439,17 @@ router.post(
     if (!correos || correos.length !== 1) {
       return res.status(400).json({ error: "Escribe el correo institucional de tu compañero" });
     }
-    const v = await validarCompanero(pool, correos[0]);
-    if (v.error) return res.status(v.status).json({ error: v.error });
-    if (v.alumno.id === req.usuario.id) {
+    if (correos[0] === req.usuario.correo.toLowerCase()) {
       return res.status(400).json({ error: "Ese correo es el tuyo; ya eres parte del equipo" });
     }
-    res.json({ correo: correos[0], nombre: v.alumno.nombre, carrera: v.alumno.carrera });
+    const periodo = await periodoElegibleDe(pool, req.usuario.id);
+    if (!periodo || (await protocoloVigenteDe(pool, req.usuario.id))) {
+      return res.status(409).json({ error: "Solo puedes armar un equipo si puedes registrar un protocolo" });
+    }
+    const v = await validarEquipo(pool, correos, { periodo });
+    if (v.error) return res.status(v.status).json({ error: v.error });
+    const [c] = v.companeros;
+    res.json({ correo: c.correo, nombre: c.nombre, carrera: c.carrera });
   }),
 );
 
@@ -502,6 +497,9 @@ router.post(
     if (!correos) {
       return rechazar(400, "integrantes debe ser una lista de correos de tus compañeros de equipo");
     }
+    if (correos.includes(req.usuario.correo.toLowerCase())) {
+      return rechazar(400, "Tú ya eres parte del equipo; no te agregues otra vez");
+    }
     if (1 + correos.length > MAX_INTEGRANTES) {
       return rechazar(400, `El equipo puede tener hasta ${MAX_INTEGRANTES} alumnos, contándote a ti`);
     }
@@ -509,12 +507,10 @@ router.post(
       return rechazar(400, "Adjunta la constancia del visto bueno de tu director (PDF, JPG o PNG)");
     }
 
-    // Elegibilidad vigente = el registro del periodo más reciente del alumno.
-    const { rows: eleg } = await pool.query(
-      "SELECT periodo, estado FROM elegibilidad WHERE alumno_id = $1 ORDER BY periodo DESC LIMIT 1",
-      [req.usuario.id],
-    );
-    if (eleg[0]?.estado !== "elegible") {
+    // El protocolo es del periodo de la elegibilidad más reciente de quien lo
+    // registra; sus compañeros deben ser elegibles en ese mismo periodo.
+    const periodo = await periodoElegibleDe(pool, req.usuario.id);
+    if (!periodo) {
       return rechazar(
         409,
         "Para registrar tu protocolo, la CATT debe haber validado tu elegibilidad para TT en el periodo actual",
@@ -523,14 +519,6 @@ router.post(
 
     if (await protocoloVigenteDe(pool, req.usuario.id)) {
       return rechazar(409, "Ya tienes un protocolo registrado o formas parte de uno; no puedes registrar otro");
-    }
-
-    const companeros = [];
-    for (const correo of correos) {
-      const v = await validarCompanero(pool, correo);
-      if (v.error) return rechazar(v.status, v.error);
-      if (v.alumno.id === req.usuario.id) return rechazar(400, "Tú ya eres parte del equipo; no te agregues otra vez");
-      companeros.push(v.alumno);
     }
 
     const { rows: docentes } = await pool.query(
@@ -555,38 +543,32 @@ router.post(
     let id;
     try {
       const resultado = await enTransaccion(async (client) => {
-        // Se bloquea a todo el equipo y se revisa de nuevo: otra persona pudo
-        // registrar un protocolo con alguno de ellos desde la validación.
-        const ids = [req.usuario.id, ...companeros.map((c) => c.id)].sort((a, b) => a - b);
-        await client.query("SELECT 1 FROM alumnos WHERE usuario_id = ANY($1) ORDER BY usuario_id FOR UPDATE", [ids]);
-        for (const alumnoId of ids) {
-          if (await protocoloVigenteDe(client, alumnoId)) {
-            return {
-              status: 409,
-              error:
-                alumnoId === req.usuario.id
-                  ? "Ya tienes un protocolo registrado o formas parte de uno; no puedes registrar otro"
-                  : `${companeros.find((c) => c.id === alumnoId).nombre} ya forma parte de un protocolo vigente`,
-            };
-          }
+        // Se bloquea a todo el equipo (en orden de id, para no trabarse con
+        // otro registro) y se valida ya bloqueado: así nadie lo suma a otro
+        // protocolo ni cambia su cuenta o elegibilidad antes del commit.
+        await client.query(
+          `SELECT 1 FROM alumnos a JOIN usuarios u ON u.id = a.usuario_id
+            WHERE a.usuario_id = $1 OR lower(u.correo) = ANY($2)
+            ORDER BY a.usuario_id FOR UPDATE OF a`,
+          [req.usuario.id, correos],
+        );
+        if (await protocoloVigenteDe(client, req.usuario.id)) {
+          return { status: 409, error: "Ya tienes un protocolo registrado o formas parte de uno; no puedes registrar otro" };
         }
+        const v = await validarEquipo(client, correos, { periodo, bloquear: true });
+        if (v.error) return v;
+        const { companeros } = v;
 
         const { rows } = await client.query(
           `INSERT INTO protocolos (alumno_id, titulo, resumen, periodo, visto_bueno_archivo)
            VALUES ($1, $2, $3, $4, $5) RETURNING id`,
-          [req.usuario.id, titulo, resumen, eleg[0].periodo, req.file.filename],
+          [req.usuario.id, titulo, resumen, periodo, req.file.filename],
         );
         const nuevoId = rows[0].id;
         await client.query(
-          "INSERT INTO protocolo_integrantes (protocolo_id, alumno_id, es_responsable) VALUES ($1, $2, true)",
-          [nuevoId, req.usuario.id],
+          "INSERT INTO protocolo_integrantes (protocolo_id, alumno_id) SELECT $1, unnest($2::int[])",
+          [nuevoId, [req.usuario.id, ...companeros.map((c) => c.id)]],
         );
-        for (const c of companeros) {
-          await client.query(
-            "INSERT INTO protocolo_integrantes (protocolo_id, alumno_id) VALUES ($1, $2)",
-            [nuevoId, c.id],
-          );
-        }
         for (const docenteId of directores) {
           await client.query(
             "INSERT INTO protocolo_directores (protocolo_id, docente_id) VALUES ($1, $2)",
@@ -600,7 +582,7 @@ router.post(
           );
         }
         await registrarBitacora(client, req.usuario.id, "registrar_protocolo", "protocolos", nuevoId, {
-          periodo: eleg[0].periodo,
+          periodo,
           directores,
           integrantes: companeros.map((c) => c.id),
           directores_externos: externos,
@@ -615,6 +597,46 @@ router.post(
     }
 
     res.status(201).json(serializarFicha(await obtenerFila(id)));
+  }),
+);
+
+// DELETE /api/protocolos/:id/integrantes/yo -> un compañero se sale del
+// equipo. Al registrar, el responsable agrega a sus compañeros sin que ellos
+// confirmen; así quien no quería estar puede salirse y registrar el suyo.
+// Solo mientras el protocolo siga "registrado" (antes de la evaluación). El
+// responsable no puede salirse: es quien registró el protocolo.
+router.delete(
+  "/:id/integrantes/yo",
+  requiereRol("alumno"),
+  ruta(async (req, res) => {
+    const id = idDeParams(req);
+    if (!id) return res.status(400).json({ error: "El id debe ser un número entero positivo" });
+
+    const resultado = await enTransaccion(async (client) => {
+      const { rows: prot } = await client.query("SELECT alumno_id, estado FROM protocolos WHERE id = $1 FOR UPDATE", [
+        id,
+      ]);
+      if (!prot[0]) return { status: 404, error: "No existe ese protocolo" };
+      if (prot[0].alumno_id === req.usuario.id) {
+        return { status: 409, error: "Eres el responsable del equipo; no puedes salirte del protocolo" };
+      }
+      const { rows: miembro } = await client.query(
+        "SELECT 1 FROM protocolo_integrantes WHERE protocolo_id = $1 AND alumno_id = $2",
+        [id, req.usuario.id],
+      );
+      if (!miembro[0]) return { status: 404, error: "No formas parte del equipo de ese protocolo" };
+      if (prot[0].estado !== "registrado") {
+        return { status: 409, error: "El protocolo ya está en evaluación; ya no puedes salirte del equipo" };
+      }
+      await client.query("DELETE FROM protocolo_integrantes WHERE protocolo_id = $1 AND alumno_id = $2", [
+        id,
+        req.usuario.id,
+      ]);
+      await registrarBitacora(client, req.usuario.id, "salir_equipo_protocolo", "protocolos", id, {});
+      return null;
+    });
+    if (resultado) return res.status(resultado.status).json({ error: resultado.error });
+    res.status(204).end();
   }),
 );
 
