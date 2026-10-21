@@ -11,6 +11,8 @@ const ESTADOS = {
   rechazada: { etiqueta: "Rechazada", variante: "peligro" },
 };
 
+// Estados en los que el título se puede cambiar (como en el backend).
+const ESTADOS_CAMBIABLES = ["registrado", "en_evaluacion", "no_aprobado"];
 const MAX_TITULO = 300;
 const MAX_MOTIVO = 2000;
 
@@ -50,13 +52,16 @@ export default function CambioTitulo({ actor }) {
     setErrorCarga(null);
     Promise.all([api("/api/protocolos/mio"), api("/api/cambios-titulo/mias")])
       .then(([protocolos, mias]) => {
-        // /mio viene del más reciente al más antiguo: el cambio aplica al primero.
-        setProtocolo((Array.isArray(protocolos) ? protocolos : [])[0] ?? null);
+        // Igual que el backend: el más reciente del que es responsable y que
+        // admite el cambio; si no hay, el más reciente (/mio ya viene así).
+        const lista = Array.isArray(protocolos) ? protocolos : [];
+        const propio = lista.find((p) => p.alumno.id === actor?.id && ESTADOS_CAMBIABLES.includes(p.estado));
+        setProtocolo(propio ?? lista[0] ?? null);
         setSolicitudes(Array.isArray(mias) ? mias : []);
       })
       .catch((e) => setErrorCarga(e.message))
       .finally(() => setCargando(false));
-  }, []);
+  }, [actor?.id]);
 
   useEffect(() => {
     cargar();

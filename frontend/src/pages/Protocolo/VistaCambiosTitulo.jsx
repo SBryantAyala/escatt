@@ -231,6 +231,7 @@ export default function VistaCambiosTitulo({ actor }) {
   const puedeResolver = tieneRol(actor, "catt_ejecutivo", "catt_auxiliar");
 
   const cargar = useCallback(() => {
+    setErrorCarga(null);
     api("/api/cambios-titulo")
       .then((data) => setSolicitudes(Array.isArray(data) ? data : []))
       .catch((e) => setErrorCarga(e.message));
@@ -240,9 +241,6 @@ export default function VistaCambiosTitulo({ actor }) {
     cargar();
   }, [cargar]);
 
-  function reemplazar(actualizada) {
-    setSolicitudes((lista) => lista.map((s) => (s.id === actualizada.id ? actualizada : s)));
-  }
 
   const pendientes = solicitudes?.filter((s) => s.estado === "pendiente").length ?? 0;
 
@@ -280,6 +278,8 @@ export default function VistaCambiosTitulo({ actor }) {
         <p className="mt-6 text-sm text-slate-400">No hay solicitudes de cambio de título.</p>
       )}
 
+      {/* Resolver una solicitud cambia el título, el estado y las evaluaciones
+          del protocolo, y eso se ve en todas sus filas: se recarga la lista. */}
       {solicitudes && solicitudes.length > 0 && (
         <ul className="mt-6 space-y-3">
           {solicitudes.map((s) => (
@@ -287,7 +287,7 @@ export default function VistaCambiosTitulo({ actor }) {
               key={s.id}
               solicitud={s}
               puedeResolver={puedeResolver}
-              onResuelta={reemplazar}
+              onResuelta={cargar}
               onDesactualizada={cargar}
             />
           ))}

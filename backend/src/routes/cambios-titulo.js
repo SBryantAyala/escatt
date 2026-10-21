@@ -8,7 +8,7 @@ import multer from "multer";
 
 import { enTransaccion, pool } from "../db/index.js";
 import { autenticar, exigeCambioResuelto, requiereRol } from "../lib/auth.js";
-import { ESTADOS_VIGENTES, sqlIntegrantes } from "../lib/equipo.js";
+import { sqlIntegrantes, validarReingreso } from "../lib/equipo.js";
 import { ROLES_STAFF, tieneRol } from "../lib/roles.js";
 import { ruta } from "../lib/ruta.js";
 import { registrarBitacora } from "../lib/usuarios.js";
@@ -29,6 +29,8 @@ const DECISIONES = ["aprobada", "rechazada"];
 const MAX_TITULO = 300;
 const MAX_MOTIVO = 2000;
 const MAX_OBSERVACIONES = 2000;
+// Resueltas que devuelve GET / (las pendientes van todas).
+const MAX_RESUELTAS = 100;
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DIR_DOCUMENTOS = path.join(__dirname, "..", "..", "uploads", "cambios-titulo");
@@ -210,12 +212,16 @@ router.post(
     let resultado;
     try {
       resultado = await enTransaccion(async (client) => {
+        // Aplica al protocolo más reciente del que es responsable y que admite
+        // el cambio; si no hay, al más reciente del que es integrante, para
+        // responder por qué no puede (no es el responsable o ya está aprobado).
         const { rows: prot } = await client.query(
           `SELECT p.id, p.alumno_id, p.titulo, p.estado
              FROM protocolos p
              JOIN protocolo_integrantes i ON i.protocolo_id = p.id AND i.alumno_id = $1
-            ORDER BY p.creado_en DESC, p.id DESC LIMIT 1 FOR UPDATE OF p`,
-          [req.usuario.id],
+            ORDER BY (p.alumno_id = $1 AND p.estado = ANY($2)) DESC, p.creado_en DESC, p.id DESC
+            LIMIT 1 FOR UPDATE OF p`,
+          [req.usuario.id, ESTADOS_CAMBIABLES],
         );
         const p = prot[0];
         if (!p) return { status: 409, error: "No tienes un protocolo registrado" };
@@ -233,6 +239,16 @@ router.post(
         }
         if (normalizar(p.titulo) === normalizar(tituloPropuesto)) {
           return { status: 400, error: "El nuevo título es igual al actual" };
+        }
+        // Al aprobarse, uno no aprobado vuelve a evaluación: se avisa desde
+        // ahora si el equipo no podría (se revisa otra vez al aprobar). Sin
+        // detalles de cuál integrante ni por qué.
+        if (p.estado === "no_aprobado" && (await validarReingreso(client, p.id))) {
+          return {
+            status: 409,
+            error:
+              "Tu protocolo no puede volver a evaluación: todo el equipo debe tener la cuenta activa, la elegibilidad del periodo y ningún otro protocolo vigente",
+          };
         }
 
         const { rows: pendiente } = await client.query(
@@ -288,14 +304,17 @@ router.get(
   requiereRol(...ROLES_CONSULTA),
   ruta(async (req, res) => {
     const estado = texto(req.query.estado);
-    const valores = [];
-    let where = "";
+    if (estado && !ESTADOS_SOLICITUD.includes(estado)) {
+      return res.status(400).json({ error: `estado inválido: usa ${ESTADOS_SOLICITUD.join(", ")}` });
+    }
+    // Todas las pendientes y solo las MAX_RESUELTAS resueltas más recientes.
+    const valores = [MAX_RESUELTAS];
+    let where = `WHERE (s.estado = 'pendiente' OR s.id IN (
+                   SELECT id FROM solicitudes_cambio_titulo WHERE estado <> 'pendiente'
+                    ORDER BY resuelta_en DESC NULLS LAST, id DESC LIMIT $1))`;
     if (estado) {
-      if (!ESTADOS_SOLICITUD.includes(estado)) {
-        return res.status(400).json({ error: `estado inválido: usa ${ESTADOS_SOLICITUD.join(", ")}` });
-      }
       valores.push(estado);
-      where = "WHERE s.estado = $1";
+      where += " AND s.estado = $2";
     }
     const { rows } = await pool.query(
       `${SELECT_SOLICITUD} ${where}
@@ -308,28 +327,47 @@ router.get(
   }),
 );
 
+// GET /:id/constancia|protocolo -> descarga un documento de la solicitud.
+// La constancia la ven el equipo y el personal CATT. El protocolo corregido,
+// además, quienes lo evalúan o dirigen (sinodales, directores docentes y el
+// Presidente de la academia), porque al aprobarse el cambio la evaluación
+// vuelve a empezar con ese documento.
 router.get(
   "/:id/:documento(constancia|protocolo)",
-  ruta(async (req, res) => {
+  ruta(async (req, res, next) => {
     const id = entero(req.params.id);
     if (!id) return res.status(400).json({ error: "El id debe ser un número entero positivo" });
     const columna = DOCUMENTOS[req.params.documento];
     const { rows } = await pool.query(
-      `SELECT ${columna} AS archivo,
+      `SELECT s.${columna} AS archivo,
               EXISTS (SELECT 1 FROM protocolo_integrantes mi
-                       WHERE mi.protocolo_id = s.protocolo_id AND mi.alumno_id = $2) AS del_equipo
+                       WHERE mi.protocolo_id = s.protocolo_id AND mi.alumno_id = $2) AS del_equipo,
+              (EXISTS (SELECT 1 FROM protocolo_sinodales ps WHERE ps.protocolo_id = s.protocolo_id AND ps.docente_id = $2)
+               OR EXISTS (SELECT 1 FROM protocolo_directores pd WHERE pd.protocolo_id = s.protocolo_id AND pd.docente_id = $2)
+               OR EXISTS (SELECT 1 FROM protocolos p JOIN academias ac ON ac.id = p.academia_id
+                           WHERE p.id = s.protocolo_id AND ac.presidente_id = $2)) AS evalua
          FROM solicitudes_cambio_titulo s WHERE s.id = $1`,
       [id, req.usuario.id],
     );
-    if (!rows[0]) return res.status(404).json({ error: "No existe esa solicitud" });
-    if (!rows[0].del_equipo && !tieneRol(req.usuario, ...ROLES_CONSULTA)) {
-      return res.status(403).json({ error: "No tienes permiso para ver esta solicitud" });
-    }
-    const archivo = rows[0].archivo;
-    if (!archivo) return res.status(404).json({ error: "La solicitud no incluye ese documento" });
+    const fila = rows[0];
+    if (!fila) return res.status(404).json({ error: "No existe esa solicitud" });
+    const puede =
+      fila.del_equipo ||
+      tieneRol(req.usuario, ...ROLES_CONSULTA) ||
+      (req.params.documento === "protocolo" && fila.evalua);
+    if (!puede) return res.status(403).json({ error: "No tienes permiso para ver esta solicitud" });
+    if (!fila.archivo) return res.status(404).json({ error: "La solicitud no incluye ese documento" });
     res.download(
-      path.join(DIR_DOCUMENTOS, archivo),
-      `${req.params.documento}-cambio-titulo-${id}${path.extname(archivo)}`,
+      path.join(DIR_DOCUMENTOS, fila.archivo),
+      `${req.params.documento}-cambio-titulo-${id}${path.extname(fila.archivo)}`,
+      (err) => {
+        // Sin el callback, si el archivo ya no está, el error llega al
+        // manejador global con la ruta del servidor en el mensaje.
+        if (!err) return;
+        if (res.headersSent) return void res.end();
+        if (err.code === "ENOENT") return void res.status(404).json({ error: "El documento ya no está disponible" });
+        next(err);
+      },
     );
   }),
 );
@@ -387,19 +425,13 @@ router.patch(
           return { status: 409, error: "El protocolo ya no admite cambio de título" };
         }
         if (p.estado === "no_aprobado") {
-          // El protocolo vuelve a evaluación: ningún integrante puede tener otro vivo.
-          const { rows: otro } = await client.query(
-            `SELECT 1 FROM protocolos o
-               JOIN protocolo_integrantes oi ON oi.protocolo_id = o.id
-              WHERE o.id <> $1 AND o.estado = ANY($2)
-                AND oi.alumno_id IN (SELECT alumno_id FROM protocolo_integrantes WHERE protocolo_id = $1)
-              LIMIT 1`,
-            [s.protocolo_id, ESTADOS_VIGENTES],
-          );
-          if (otro[0]) {
+          // Vuelve a evaluación: el equipo debe cumplir lo mismo que al
+          // registrarse. Bloquea a sus alumnos para no cruzarse con un registro.
+          const falla = await validarReingreso(client, s.protocolo_id, { bloquear: true });
+          if (falla) {
             return {
               status: 409,
-              error: "Un integrante del equipo ya tiene otro protocolo vigente; este no puede volver a evaluación",
+              error: `${falla.alumno.nombre} ${falla.motivo}; el protocolo no puede volver a evaluación`,
             };
           }
         }

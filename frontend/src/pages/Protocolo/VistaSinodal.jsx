@@ -159,6 +159,13 @@ export default function VistaSinodal({ encabezado = true, onCargado }) {
     setProtocolos((lista) => lista.map((p) => (p.id === actualizado.id ? actualizado : p)));
   }
 
+  function verProtocoloCorregido(p) {
+    const id = p.protocolo_corregido_solicitud_id;
+    descargarArchivo(`/api/cambios-titulo/${id}/protocolo`, `protocolo-corregido-${p.id}`).catch((e) =>
+      aviso.error(e.message),
+    );
+  }
+
   function verVistoBueno(p) {
     descargarArchivo(`/api/protocolos/${p.id}/visto-bueno`, `visto-bueno-protocolo-${p.id}`).catch((e) =>
       aviso.error(e.message),
@@ -244,6 +251,16 @@ export default function VistaSinodal({ encabezado = true, onCargado }) {
                     className="mt-2 min-h-10 rounded-full border border-slate-200 px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
                   >
                     Ver visto bueno del director
+                  </button>
+                )}
+
+                {p.protocolo_corregido_solicitud_id && (
+                  <button
+                    type="button"
+                    onClick={() => verProtocoloCorregido(p)}
+                    className="mt-2 ml-2 min-h-10 rounded-full border border-slate-200 px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                  >
+                    Ver protocolo corregido
                   </button>
                 )}
 
