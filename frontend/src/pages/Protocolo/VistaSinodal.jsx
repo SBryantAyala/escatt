@@ -5,6 +5,7 @@ import Etiqueta from "../../components/ui/Etiqueta";
 import { useAviso } from "../../components/ui/Avisos";
 import { IconoDocumento } from "../../components/iconos";
 import { api, descargarArchivo } from "../../lib/api";
+import { nombreDirector } from "../../lib/directores";
 import { estadoDe } from "./estados";
 import Integrantes from "./Integrantes";
 
@@ -221,7 +222,7 @@ export default function VistaSinodal({ encabezado = true, onCargado }) {
                       {p.academia?.nombre ?? "Sin academia"} · Registrado el {formatearFecha(p.creado_en)}
                       {p.directores.length > 0 &&
                         ` · ${p.directores.length > 1 ? "Directores" : "Director"}: ${p.directores
-                          .map((d) => d.nombre)
+                          .map(nombreDirector)
                           .join(" · ")}`}
                     </p>
                   </div>

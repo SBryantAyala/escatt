@@ -5,6 +5,7 @@ import { useAviso } from "../../components/ui/Avisos";
 import { IconoDocumento } from "../../components/iconos";
 import { api, descargarArchivo } from "../../lib/api";
 import { AZUL_MEDIO } from "../../lib/theme";
+import { claseInput, claseLabel } from "./estilos";
 
 // Pantalla: elegibilidad del alumno para TT (HU-12). Sube evidencia
 // (kárdex/boleta) por periodo y ve el estado de cada envío.
@@ -15,15 +16,15 @@ const ESTADOS = {
   no_elegible: { etiqueta: "No elegible", variante: "peligro" },
 };
 
-const claseInput =
-  "min-h-13 w-full min-w-0 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-800 outline-none transition duration-200 placeholder:font-normal placeholder:text-slate-500 hover:border-blue-300 focus:border-blue-600 focus:ring-4 focus:ring-blue-100";
-const claseLabel = "mb-2 block text-sm font-semibold text-slate-800";
 
 function formatearFecha(iso) {
   return new Date(iso).toLocaleDateString("es-MX", { dateStyle: "medium" });
 }
 
-export default function VistaAlumno() {
+// `onEnviado` avisa a la pantalla cuando el alumno sube evidencia nueva: su
+// elegibilidad vigente pasa a "en revisión" y el registro de protocolo debe
+// recargarse.
+export default function VistaAlumno({ onEnviado }) {
   const aviso = useAviso();
   const [historial, setHistorial] = useState(null);
   const [cargando, setCargando] = useState(true);
@@ -59,6 +60,7 @@ export default function VistaAlumno() {
     try {
       await api("/api/elegibilidad", { method: "POST", body: datos });
       aviso.exito("Evidencia enviada. La CATT revisará tu elegibilidad.");
+      onEnviado?.();
       setPeriodo("");
       if (inputArchivoRef.current) inputArchivoRef.current.value = "";
       cargarHistorial();
