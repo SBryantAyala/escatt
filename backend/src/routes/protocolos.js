@@ -93,29 +93,22 @@ const listaDeIds = (valor) =>
 
 // Ficha de protocolo: lo mismo para la lista y para el detalle, así el
 // frontend puede reemplazar una fila con la respuesta de cualquier escritura.
-const SQL_DIRECTORES = `(SELECT json_agg(x.director ORDER BY x.es_externo, x.orden_a, x.orden_b)
-     FROM (
-       SELECT json_build_object(
-                'id', d.docente_id,
-                'externo_id', NULL::int,
-                'externo', false,
-                'nombre', concat_ws(' ', du.nombre, du.apellido_paterno, du.apellido_materno)) AS director,
-              false AS es_externo, du.apellido_paterno AS orden_a, du.nombre AS orden_b
-         FROM protocolo_directores d
-         JOIN usuarios du ON du.id = d.docente_id
-        WHERE d.protocolo_id = p.id
-       UNION ALL
-       SELECT json_build_object(
-                'id', NULL::int,
-                'externo_id', e.id,
-                'externo', true,
-                'nombre', e.nombre,
-                'institucion', e.institucion) AS director,
-              true AS es_externo, e.nombre AS orden_a, e.nombre AS orden_b
-         FROM protocolo_directores d
-         JOIN directores_externos e ON e.id = d.externo_id
-        WHERE d.protocolo_id = p.id
-     ) x)`;
+// Directores del protocolo: los docentes primero (por apellido) y el externo,
+// si hay, al final. Así el externo nunca aparece como primer director.
+const SQL_DIRECTORES = `(SELECT json_agg(
+            CASE WHEN d.externo_id IS NULL
+              THEN json_build_object(
+                     'id', d.docente_id, 'externo_id', NULL::int, 'externo', false,
+                     'nombre', concat_ws(' ', du.nombre, du.apellido_paterno, du.apellido_materno))
+              ELSE json_build_object(
+                     'id', NULL::int, 'externo_id', e.id, 'externo', true,
+                     'nombre', e.nombre, 'institucion', e.institucion)
+            END
+            ORDER BY d.externo_id IS NOT NULL, COALESCE(du.apellido_paterno, e.nombre), COALESCE(du.nombre, e.nombre))
+     FROM protocolo_directores d
+     LEFT JOIN usuarios du ON du.id = d.docente_id
+     LEFT JOIN directores_externos e ON e.id = d.externo_id
+    WHERE d.protocolo_id = p.id)`;
 
 const SELECT_FICHA = `
   SELECT p.id, p.titulo, p.resumen, p.periodo, p.estado, p.creado_en,
@@ -483,7 +476,7 @@ router.post(
     if (!directores) {
       return rechazar(400, "Elige uno o dos directores distintos");
     }
-    const externos = req.body.directores_externos === undefined ? [] : listaDeIds(req.body.directores_externos);
+    const externos = listaDeIds(req.body.directores_externos);
     if (!externos) {
       return rechazar(400, "directores_externos debe ser una lista de ids válidos");
     }

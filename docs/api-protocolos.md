@@ -96,9 +96,11 @@ Solo alumnos. **multipart/form-data** (con `api()` de `lib/api.js`, pasa un `For
 | `integrantes` | no | correos de los compañeros de equipo: campo repetido, `"[\"a@…\"]"` o `"a@…,b@…"`. Quien registra es el responsable y no se incluye |
 
 Nota (Art. 35 y 49 del Documento Rector): entre `directores` y
-`directores_externos` suman 1 o 2, y al menos uno es docente de ESCOM; un
-externo solo puede ir como segundo director. Un externo se registra antes con
-`POST /api/directores-externos`, o se elige uno ya registrado.
+`directores_externos` suman 1 o 2, al menos uno es docente de ESCOM y hay a
+lo más un externo. La tabla no guarda un orden: en `directores` el externo
+siempre va **después** de los docentes, así que nunca se muestra como primer
+director. Un externo se registra antes con `POST /api/directores-externos`, o
+se elige uno ya registrado.
 
 `201` con la ficha. Errores:
 - `409` si la elegibilidad del periodo más reciente del alumno no es `elegible`.
@@ -209,7 +211,7 @@ Sin ruta propia: se calcula al guardar cada evaluación (HU-21).
 ## Directores externos
 
 Un director que no es docente de ESCOM no tiene cuenta (Art. 49 del Documento
-Rector). Se registra una sola vez, con su currículum y copia de su cédula
+Rector). Se registra una sola vez (su correo es único; ver el `409` abajo), con su currículum y copia de su cédula
 profesional de nivel superior; los externos recurrentes ya registrados se
 eligen sin volver a entregar documentos. Se elige al registrar el protocolo
 (`directores_externos`) o al pedir un cambio de director (ver
@@ -243,8 +245,17 @@ Los alumnos reciben solo `id`, `nombre` e `institucion`; el personal CATT y el
 admin reciben la misma forma que el `201`.
 
 ### `GET /api/directores-externos/:id/cedula` y `/curriculum`
-Descargan el archivo. Los ve quien lo registró, el personal CATT y el
-administrador; otros, `403`. Usa `descargarArchivo()` de `lib/api.js`.
+Descargan el archivo. Los ven el personal CATT y el administrador, quien lo
+registró y quien participa en un protocolo que ese externo dirige (el equipo
+de alumnos, los otros directores, los sinodales y el Presidente de la academia
+a la que se turnó); otros, `403`. `404` si el archivo ya no está en el
+servidor. Usa `descargarArchivo()` de `lib/api.js`.
+
+No hay ruta para borrar un externo. Las llaves foráneas de
+`protocolo_directores` y `solicitudes_cambio_director` no tienen `ON DELETE`,
+así que la base de datos impide borrar uno que aparezca en un protocolo o en
+una solicitud. Una cuenta que registró externos tampoco se puede eliminar,
+solo revocar.
 
 Bitácora: `registrar_director_externo` (entidad `directores_externos`).
 
@@ -270,8 +281,11 @@ protocolos            id, alumno_id, titulo, resumen, periodo, visto_bueno_archi
 protocolo_directores  id, protocolo_id, docente_id (NULL), externo_id (NULL)
                       -- 1 o 2 por protocolo; exactamente uno de docente_id / externo_id
                       -- únicos (protocolo_id, docente_id) y (protocolo_id, externo_id)
-directores_externos   id, nombre, institucion, correo, cedula_numero,
-                      cedula_archivo, curriculum_archivo, registrado_por, creado_en
+                      -- migración: antes la llave era (protocolo_id, docente_id); al
+                      -- arrancar se cambia a `id` y docente_id deja de ser NOT NULL
+directores_externos   id, nombre, institucion, correo (único, sin distinguir
+                      mayúsculas), cedula_numero, cedula_archivo, curriculum_archivo,
+                      registrado_por, creado_en
 protocolo_integrantes (protocolo_id, alumno_id), agregado_en
                       -- el responsable es protocolos.alumno_id y siempre tiene su fila:
                       -- FK diferida protocolos (id, alumno_id) -> protocolo_integrantes

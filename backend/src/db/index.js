@@ -538,9 +538,13 @@ async function migrarDirectoresExternos(client) {
     "CREATE UNIQUE INDEX IF NOT EXISTS directores_externos_correo_uq ON directores_externos (lower(correo))",
   );
 
+  // `id SERIAL` solo si falta: ADD COLUMN IF NOT EXISTS con SERIAL crea la
+  // secuencia aunque la columna ya exista.
+  if (!(await columnaExiste(client, "protocolo_directores", "id"))) {
+    await client.query("ALTER TABLE protocolo_directores ADD COLUMN id SERIAL");
+  }
   await client.query(`
     ALTER TABLE protocolo_directores
-      ADD COLUMN IF NOT EXISTS id SERIAL,
       ADD COLUMN IF NOT EXISTS externo_id INTEGER REFERENCES directores_externos(id)
   `);
   const { rows: pkViejo } = await client.query(`
@@ -568,6 +572,11 @@ async function migrarDirectoresExternos(client) {
   `);
   await client.query(
     "CREATE INDEX IF NOT EXISTS protocolo_directores_externo_idx ON protocolo_directores (externo_id)",
+  );
+  // La llave anterior (protocolo_id, docente_id) servía de índice por
+  // protocolo; los únicos de arriba son parciales y no lo reemplazan.
+  await client.query(
+    "CREATE INDEX IF NOT EXISTS protocolo_directores_protocolo_idx ON protocolo_directores (protocolo_id)",
   );
 
   await client.query(`

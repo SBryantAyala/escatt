@@ -33,7 +33,10 @@ solicitudes_cambio_director
 ```
 
 De cada pareja (saliente, propuesto) exactamente una columna está llena: o el
-docente o el externo.
+docente o el externo (restricciones `CHECK`). Saliente y propuesto son
+distintos también cuando los dos son externos. Las columnas `*_externo_id` se
+agregan al arrancar y `director_saliente_id`/`director_propuesto_id` dejan de
+ser NOT NULL.
 
 Las constancias se guardan en `backend/uploads/cambios-director/`.
 
@@ -82,11 +85,16 @@ vienen los dos o ninguno.
 `201` con la solicitud. El protocolo se toma de la sesión: el protocolo vigente
 más reciente del alumno. Solo lo solicita el **responsable del equipo**
 (`403` si es un compañero); la solicitud trae `integrantes` y la ven todos los
-integrantes en `GET /mias` y al descargar la constancia. Errores: `400` datos o
-director inválido, `403` no es el responsable, `409` sin protocolo vigente o ya
-hay una solicitud pendiente.
+integrantes en `GET /mias` y al descargar la constancia. Errores:
+- `400` datos o director inválido: el saliente no dirige el protocolo, el
+  propuesto ya lo dirige (o es su sinodal), el externo propuesto no existe, el
+  cambio dejaría al protocolo **sin ningún director docente de ESCOM** o con
+  **dos externos** (Art. 49).
+- `403` no es el responsable.
+- `409` sin protocolo vigente o ya hay una solicitud pendiente.
 
-El selector del formulario usa `GET /api/protocolos/candidatos-director`.
+El selector del formulario usa `GET /api/protocolos/candidatos-director` para
+los docentes y `GET /api/directores-externos` para los externos.
 
 ### `GET /api/cambios-director/mias`
 Solo alumnos. Las solicitudes de los protocolos de los que es integrante, la más reciente primero.
@@ -97,7 +105,7 @@ pendientes (la más antigua primero), luego las resueltas (la más reciente
 primero).
 
 ### `GET /api/cambios-director/:id/constancia`
-Descarga la constancia. La ven el alumno que la envió, el personal CATT y el
+Descarga la constancia. La ven los integrantes del equipo, el personal CATT y el
 administrador. Usa `descargarArchivo()` de `lib/api.js`.
 
 ### `PATCH /api/cambios-director/:id`
@@ -106,10 +114,12 @@ Solo `catt_ejecutivo` y `catt_auxiliar`. Body JSON
 
 - `observaciones` es obligatoria al rechazar (máx. 2000).
 - `409` si la solicitud ya fue resuelta.
-- Al aprobar se vuelve a validar dentro de la transacción: el protocolo sigue
-  vigente, el saliente sigue siendo director y el propuesto sigue siendo un
-  docente activo que no dirige ni evalúa el protocolo (`409` si algo cambió).
-- `409` si el cambio dejaría al protocolo sin ningún director docente de ESCOM (Art. 49). Se valida al solicitar (`400`) y otra vez al aprobar (`409`).
+- Al aprobar se vuelve a validar todo dentro de la transacción (`409` si algo
+  cambió desde la solicitud): el protocolo sigue vigente, el saliente sigue
+  siendo director, el propuesto docente sigue activo y no dirige ni evalúa el
+  protocolo, el propuesto externo sigue existiendo y no dirige ya el
+  protocolo, y el protocolo conserva al menos un docente de ESCOM y a lo más
+  un externo.
 - `403` si quien resuelve es el director saliente o el propuesto.
 
 ## Bitácora
@@ -123,3 +133,6 @@ Entidad `solicitudes_cambio_director`: `solicitar_cambio_director`,
   cambio: el director anterior deja de verlo y el nuevo lo ve.
 - Un docente que aparece en una solicitud no se puede eliminar (solo
   revocar), igual que con protocolos y evaluaciones.
+- Un director externo que aparece en una solicitud o en un protocolo tampoco
+  se puede borrar: las llaves foráneas no tienen `ON DELETE` y no hay ruta
+  para hacerlo.

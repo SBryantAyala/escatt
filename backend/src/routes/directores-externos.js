@@ -8,6 +8,7 @@ import multer from "multer";
 
 import { pool } from "../db/index.js";
 import { autenticar, exigeCambioResuelto, requiereRol } from "../lib/auth.js";
+import { CORREO_VALIDO } from "../lib/equipo.js";
 import { ROLES_GESTION, ROLES_STAFF, tieneRol } from "../lib/roles.js";
 import { ruta } from "../lib/ruta.js";
 import { registrarBitacora } from "../lib/usuarios.js";
@@ -20,7 +21,6 @@ const MAX_NOMBRE = 200;
 const MAX_INSTITUCION = 200;
 const MAX_CORREO = 200;
 const MAX_CEDULA = 30;
-const CORREO_VALIDO = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const DOCUMENTOS = { cedula: "cedula_archivo", curriculum: "curriculum_archivo" };
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -138,26 +138,50 @@ router.get(
   }),
 );
 
+// GET /api/directores-externos/:id/cedula|curriculum -> descarga un documento
+// del externo. Lo ven el personal CATT y admin, quien lo registró y quien
+// participa en un protocolo que ese externo dirige: el equipo de alumnos, los
+// otros directores, los sinodales y el Presidente de la academia a la que se
+// turnó (los mismos que pueden ver el protocolo).
 router.get(
   "/:id/:documento(cedula|curriculum)",
-  ruta(async (req, res) => {
+  ruta(async (req, res, next) => {
     const id = Number(req.params.id);
     if (!Number.isInteger(id) || id <= 0) {
       return res.status(400).json({ error: "El id debe ser un número entero positivo" });
     }
     const columna = DOCUMENTOS[req.params.documento];
     const { rows } = await pool.query(
-      `SELECT registrado_por, ${columna} AS archivo FROM directores_externos WHERE id = $1`,
-      [id],
+      `SELECT e.registrado_por, e.${columna} AS archivo,
+              EXISTS (
+                SELECT 1 FROM protocolo_directores pe
+                  JOIN protocolos p ON p.id = pe.protocolo_id
+                  LEFT JOIN academias ac ON ac.id = p.academia_id
+                 WHERE pe.externo_id = e.id
+                   AND (ac.presidente_id = $2
+                        OR EXISTS (SELECT 1 FROM protocolo_integrantes i WHERE i.protocolo_id = p.id AND i.alumno_id = $2)
+                        OR EXISTS (SELECT 1 FROM protocolo_directores d WHERE d.protocolo_id = p.id AND d.docente_id = $2)
+                        OR EXISTS (SELECT 1 FROM protocolo_sinodales s WHERE s.protocolo_id = p.id AND s.docente_id = $2))
+              ) AS participa
+         FROM directores_externos e WHERE e.id = $1`,
+      [id, req.usuario.id],
     );
     const fila = rows[0];
     if (!fila) return res.status(404).json({ error: "No existe ese director externo" });
-    if (fila.registrado_por !== req.usuario.id && !tieneRol(req.usuario, ...ROLES_CONSULTA)) {
+    if (fila.registrado_por !== req.usuario.id && !fila.participa && !tieneRol(req.usuario, ...ROLES_CONSULTA)) {
       return res.status(403).json({ error: "No tienes permiso para ver este documento" });
     }
     res.download(
       path.join(DIR_DOCUMENTOS, fila.archivo),
       `${req.params.documento}-director-externo-${id}${path.extname(fila.archivo)}`,
+      (err) => {
+        // Sin el callback, si el archivo ya no está, el error llega al
+        // manejador global con la ruta del servidor en el mensaje.
+        if (!err) return;
+        if (res.headersSent) return void res.end();
+        if (err.code === "ENOENT") return void res.status(404).json({ error: "El documento ya no está disponible" });
+        next(err);
+      },
     );
   }),
 );
