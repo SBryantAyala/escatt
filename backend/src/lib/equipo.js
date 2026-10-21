@@ -31,9 +31,9 @@ export const esIntegrante = (usuarioId, integrantes) => (integrantes ?? []).some
 // Protocolo vigente más reciente del que la persona es integrante (o null).
 // `alumno_id` es el responsable.
 //
-// Uno "no_aprobado" no cuenta: el equipo puede registrar otro. Cuando exista
-// el reenvío de un protocolo corregido (HU-23), ese endpoint debe comprobar
-// con esta función que ningún integrante tenga ya otro protocolo vigente.
+// Uno "no_aprobado" no cuenta: el equipo puede registrar otro. Si vuelve a
+// evaluación (cambio de título aprobado), validarReingreso comprueba que
+// ningún integrante tenga ya otro protocolo vigente.
 export async function protocoloVigenteDe(client, usuarioId, { bloquear = false } = {}) {
   const { rows } = await client.query(
     `SELECT p.id, p.alumno_id, p.titulo, p.estado
@@ -125,4 +125,38 @@ export async function periodoElegibleDe(client, alumnoId) {
     [alumnoId],
   );
   return rows[0]?.estado === "elegible" ? rows[0].periodo : null;
+}
+
+// Un protocolo "no_aprobado" que vuelve a evaluación (al aprobar un cambio de
+// título) debe cumplir lo mismo que al registrarse: cada integrante con
+// cuenta activa, elegible en el periodo del protocolo y sin otro protocolo
+// vigente. Con `bloquear` (en la transacción que lo regresa) bloquea las
+// filas de alumnos del equipo en orden de id, igual que el registro, para que
+// nadie del equipo se registre en otro protocolo antes del commit.
+// Devuelve null o { alumno, motivo } con el primer integrante que no cumple.
+export async function validarReingreso(client, protocoloId, { bloquear = false } = {}) {
+  const { rows: equipo } = await client.query(
+    `SELECT a.usuario_id AS id, p.periodo, u.estado,
+            concat_ws(' ', u.nombre, u.apellido_paterno, u.apellido_materno) AS nombre
+       FROM protocolo_integrantes i
+       JOIN protocolos p ON p.id = i.protocolo_id
+       JOIN alumnos a    ON a.usuario_id = i.alumno_id
+       JOIN usuarios u   ON u.id = a.usuario_id
+      WHERE i.protocolo_id = $1
+      ORDER BY a.usuario_id${bloquear ? " FOR UPDATE OF a" : ""}`,
+    [protocoloId],
+  );
+  for (const alumno of equipo) {
+    if (alumno.estado !== "activa") return { alumno, motivo: "ya no tiene la cuenta activa" };
+    if (alumno.periodo) {
+      const { rows } = await client.query(
+        "SELECT 1 FROM elegibilidad WHERE alumno_id = $1 AND periodo = $2 AND estado = 'elegible'",
+        [alumno.id, alumno.periodo],
+      );
+      if (!rows[0]) return { alumno, motivo: `ya no es elegible en el periodo ${alumno.periodo}` };
+    }
+    const otro = await protocoloVigenteDe(client, alumno.id);
+    if (otro && otro.id !== protocoloId) return { alumno, motivo: "ya tiene otro protocolo vigente" };
+  }
+  return null;
 }

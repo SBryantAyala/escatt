@@ -132,6 +132,8 @@ export async function motivosHistorial(client, usuarioId) {
        (SELECT count(*)::int FROM protocolo_sinodales WHERE docente_id = $1) AS protocolos_sinodal,
        (SELECT count(*)::int FROM solicitudes_cambio_director
          WHERE director_saliente_id = $1 OR director_propuesto_id = $1) AS solicitudes_cambio,
+       (SELECT count(*)::int FROM solicitudes_cambio_titulo WHERE solicitante_id = $1) AS solicitudes_titulo,
+       (SELECT count(*)::int FROM protocolo_evaluaciones_historial WHERE docente_id = $1) AS evaluaciones_archivadas,
        (SELECT count(*)::int FROM usuarios WHERE creado_por = $1) AS cuentas_creadas,
        (SELECT count(*)::int FROM usuario_roles
          WHERE asignado_por = $1 AND usuario_id <> $1) AS roles_asignados,
@@ -150,6 +152,12 @@ export async function motivosHistorial(client, usuarioId) {
   if (n.protocolos_sinodal > 0) motivos.push(`es sinodal de ${n.protocolos_sinodal} protocolo(s)`);
   if (n.solicitudes_cambio > 0) {
     motivos.push(`aparece en ${n.solicitudes_cambio} solicitud(es) de cambio de director`);
+  }
+  if (n.solicitudes_titulo > 0) {
+    motivos.push(`envió ${n.solicitudes_titulo} solicitud(es) de cambio de título`);
+  }
+  if (n.evaluaciones_archivadas > 0) {
+    motivos.push(`tiene ${n.evaluaciones_archivadas} evaluación(es) archivada(s) de protocolos`);
   }
   if (n.cuentas_creadas > 0) motivos.push(`dio de alta ${n.cuentas_creadas} cuenta(s)`);
   if (n.roles_asignados > 0) motivos.push(`asignó ${n.roles_asignados} rol(es) a otras cuentas`);

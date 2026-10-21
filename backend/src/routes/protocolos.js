@@ -119,6 +119,11 @@ const SELECT_FICHA = `
          ac.id AS academia_id, ac.nombre AS academia_nombre,
          ac.color AS academia_color, ac.icono AS academia_icono,
          ac.presidente_id AS academia_presidente_id,
+         -- Solicitud de cambio de título aprobada más reciente que trae el
+         -- protocolo corregido: es el documento que se vuelve a evaluar.
+         (SELECT ct.id FROM solicitudes_cambio_titulo ct
+           WHERE ct.protocolo_id = p.id AND ct.estado = 'aprobada' AND ct.protocolo_archivo IS NOT NULL
+           ORDER BY ct.resuelta_en DESC, ct.id DESC LIMIT 1) AS protocolo_corregido_solicitud_id,
          ${SQL_DIRECTORES} AS directores,
          (SELECT json_agg(
                    json_build_object(
@@ -145,6 +150,9 @@ function serializarFicha(r) {
     estado: r.estado,
     creado_en: r.creado_en,
     tiene_visto_bueno: r.tiene_visto_bueno,
+    // id de la solicitud de cambio de título con el protocolo corregido
+    // (GET /api/cambios-titulo/:id/protocolo), o null.
+    protocolo_corregido_solicitud_id: r.protocolo_corregido_solicitud_id ?? null,
     integrantes: r.integrantes ?? [],
     alumno: {
       id: r.alumno_id,

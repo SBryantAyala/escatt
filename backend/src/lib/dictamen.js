@@ -31,5 +31,27 @@ export async function aplicarDictamen(client, protocoloId) {
     dictamen: final,
     sinodales: rows.map((r) => ({ docente_id: r.docente_id, dictamen: r.dictamen })),
   });
+
+  // Con el protocolo aprobado el título ya no puede cambiar (Art. 44): una
+  // solicitud de cambio de título que siguiera pendiente se cierra sola, así
+  // no queda "en revisión" sin que la CATT pueda aprobarla.
+  if (final === "aprobado") {
+    const { rows: cerradas } = await client.query(
+      `UPDATE solicitudes_cambio_titulo
+          SET estado = 'rechazada', resuelta_en = now(), observaciones_resolucion = $2
+        WHERE protocolo_id = $1 AND estado = 'pendiente'
+        RETURNING id`,
+      [
+        protocoloId,
+        "Se cerró sola: el protocolo fue aprobado antes de resolverla y después de la aprobación el título ya no se puede cambiar (Art. 44).",
+      ],
+    );
+    for (const c of cerradas) {
+      await registrarBitacora(client, null, "rechazar_cambio_titulo", "solicitudes_cambio_titulo", c.id, {
+        protocolo_id: protocoloId,
+        automatica: true,
+      });
+    }
+  }
   return { estado: final, cambio: true };
 }
