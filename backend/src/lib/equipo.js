@@ -8,7 +8,7 @@ export const MAX_INTEGRANTES = 4;
 
 export const ESTADOS_VIGENTES = ["registrado", "en_evaluacion", "aprobado"];
 
-const CORREO_VALIDO = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+export const CORREO_VALIDO = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 // Columna `integrantes` de una consulta que tenga la tabla protocolos con el
 // alias dado: arreglo JSON con el responsable primero.

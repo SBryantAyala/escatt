@@ -93,6 +93,23 @@ const listaDeIds = (valor) =>
 
 // Ficha de protocolo: lo mismo para la lista y para el detalle, así el
 // frontend puede reemplazar una fila con la respuesta de cualquier escritura.
+// Directores del protocolo: los docentes primero (por apellido) y el externo,
+// si hay, al final. Así el externo nunca aparece como primer director.
+const SQL_DIRECTORES = `(SELECT json_agg(
+            CASE WHEN d.externo_id IS NULL
+              THEN json_build_object(
+                     'id', d.docente_id, 'externo_id', NULL::int, 'externo', false,
+                     'nombre', concat_ws(' ', du.nombre, du.apellido_paterno, du.apellido_materno))
+              ELSE json_build_object(
+                     'id', NULL::int, 'externo_id', e.id, 'externo', true,
+                     'nombre', e.nombre, 'institucion', e.institucion)
+            END
+            ORDER BY d.externo_id IS NOT NULL, COALESCE(du.apellido_paterno, e.nombre), COALESCE(du.nombre, e.nombre))
+     FROM protocolo_directores d
+     LEFT JOIN usuarios du ON du.id = d.docente_id
+     LEFT JOIN directores_externos e ON e.id = d.externo_id
+    WHERE d.protocolo_id = p.id)`;
+
 const SELECT_FICHA = `
   SELECT p.id, p.titulo, p.resumen, p.periodo, p.estado, p.creado_en,
          (p.visto_bueno_archivo IS NOT NULL) AS tiene_visto_bueno,
@@ -107,14 +124,7 @@ const SELECT_FICHA = `
          (SELECT ct.id FROM solicitudes_cambio_titulo ct
            WHERE ct.protocolo_id = p.id AND ct.estado = 'aprobada' AND ct.protocolo_archivo IS NOT NULL
            ORDER BY ct.resuelta_en DESC, ct.id DESC LIMIT 1) AS protocolo_corregido_solicitud_id,
-         (SELECT json_agg(
-                   json_build_object(
-                     'id', d.docente_id,
-                     'nombre', concat_ws(' ', du.nombre, du.apellido_paterno, du.apellido_materno))
-                   ORDER BY du.apellido_paterno, du.nombre)
-            FROM protocolo_directores d
-            JOIN usuarios du ON du.id = d.docente_id
-           WHERE d.protocolo_id = p.id) AS directores,
+         ${SQL_DIRECTORES} AS directores,
          (SELECT json_agg(
                    json_build_object(
                      'id', s.docente_id,
@@ -229,14 +239,7 @@ router.get(
       `SELECT p.id, p.titulo, p.estado, p.creado_en,
               a.boleta, a.carrera,
               u.nombre, u.apellido_paterno, u.apellido_materno,
-              (SELECT json_agg(
-                        json_build_object(
-                          'id', d.docente_id,
-                          'nombre', concat_ws(' ', du.nombre, du.apellido_paterno, du.apellido_materno))
-                        ORDER BY du.apellido_paterno, du.nombre)
-                 FROM protocolo_directores d
-                 JOIN usuarios du ON du.id = d.docente_id
-                WHERE d.protocolo_id = p.id) AS directores,
+              ${SQL_DIRECTORES} AS directores,
               ${sqlIntegrantes("p")}
          FROM protocolo_directores pd
          JOIN protocolos p ON p.id = pd.protocolo_id
@@ -478,8 +481,18 @@ router.post(
       return rechazar(400, `El resumen/objetivo es obligatorio (máx. ${MAX_RESUMEN} caracteres)`);
     }
     const directores = listaDeIds(req.body.directores);
-    if (!directores || directores.length < 1 || directores.length > MAX_DIRECTORES) {
+    if (!directores) {
       return rechazar(400, "Elige uno o dos directores distintos");
+    }
+    const externos = listaDeIds(req.body.directores_externos);
+    if (!externos) {
+      return rechazar(400, "directores_externos debe ser una lista de ids válidos");
+    }
+    if (directores.length < 1) {
+      return rechazar(400, "Elige al menos un director docente de ESCOM");
+    }
+    if (externos.length > 1 || directores.length + externos.length > MAX_DIRECTORES) {
+      return rechazar(400, "Elige uno o dos directores distintos; solo uno puede ser externo");
     }
     const correos = listaDeCorreos(req.body.integrantes);
     if (!correos) {
@@ -518,6 +531,16 @@ router.post(
       return rechazar(400, "Cada director debe ser un docente con cuenta activa");
     }
 
+    if (externos.length > 0) {
+      const { rows: encontrados } = await pool.query(
+        "SELECT id FROM directores_externos WHERE id = ANY($1)",
+        [externos],
+      );
+      if (encontrados.length !== externos.length) {
+        return rechazar(400, "El director externo elegido no existe");
+      }
+    }
+
     let id;
     try {
       const resultado = await enTransaccion(async (client) => {
@@ -553,10 +576,17 @@ router.post(
             [nuevoId, docenteId],
           );
         }
+        for (const externoId of externos) {
+          await client.query(
+            "INSERT INTO protocolo_directores (protocolo_id, externo_id) VALUES ($1, $2)",
+            [nuevoId, externoId],
+          );
+        }
         await registrarBitacora(client, req.usuario.id, "registrar_protocolo", "protocolos", nuevoId, {
           periodo,
           directores,
           integrantes: companeros.map((c) => c.id),
+          directores_externos: externos,
         });
         return { id: nuevoId };
       });

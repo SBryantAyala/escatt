@@ -139,6 +139,7 @@ export async function motivosHistorial(client, usuarioId) {
          WHERE asignado_por = $1 AND usuario_id <> $1) AS roles_asignados,
        (SELECT count(*)::int FROM elegibilidad WHERE alumno_id = $1) AS elegibilidad_propia,
        (SELECT count(*)::int FROM elegibilidad WHERE validado_por = $1) AS elegibilidad_validada,
+       (SELECT count(*)::int FROM directores_externos WHERE registrado_por = $1) AS externos_registrados,
        (SELECT count(*)::int FROM bitacora
          WHERE usuario_id = $1
            AND NOT (entidad = 'usuarios' AND entidad_id IS NOT DISTINCT FROM $1)) AS acciones`,
@@ -165,6 +166,9 @@ export async function motivosHistorial(client, usuarioId) {
   }
   if (n.elegibilidad_validada > 0) {
     motivos.push(`validó ${n.elegibilidad_validada} registro(s) de elegibilidad`);
+  }
+  if (n.externos_registrados > 0) {
+    motivos.push(`registró ${n.externos_registrados} director(es) externo(s)`);
   }
   if (n.acciones > 0) motivos.push(`tiene ${n.acciones} acción(es) registradas en la bitácora`);
   return motivos;

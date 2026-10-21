@@ -5,6 +5,7 @@ import { tieneRol } from "../../lib/roles";
 import CambioDirector from "./CambioDirector";
 import CambioTitulo from "./CambioTitulo";
 import MiProtocolo from "./MiProtocolo";
+import RegistroProtocolo from "./RegistroProtocolo";
 import VistaAlumno from "./VistaAlumno";
 import VistaCambiosDirector from "./VistaCambiosDirector";
 import VistaCambiosTitulo from "./VistaCambiosTitulo";
@@ -19,19 +20,21 @@ const DESCRIPCION_PROXIMAMENTE =
 // Pantalla "Protocolo" del panel: hoy cubre HU-12 (el alumno sube evidencia
 // de requisitos para TT), HU-13 (la CATT la valida), HU-21 (el sinodal
 // evalúa), HU-22 (alumno y director ven el dictamen), HU-24 (cambio de
-// director), el cambio de título y HU-25 (el director consulta los protocolos que dirige). El
-// resto del flujo de protocolo (registro, turnar, sinodales) sigue pendiente.
+// director), el cambio de título y HU-25 (el director consulta los protocolos que
+// dirige). El alumno también registra su protocolo (HU-18), con directores
+// docentes o un director externo.
 export default function ProtocoloPage({ actor }) {
-  // Cambia cuando el alumno se sale de su equipo, para recargar las secciones
-  // que dependen de su protocolo.
+  // Cambia cuando el alumno registra su protocolo, se sale de su equipo o sube
+  // evidencia de elegibilidad, para recargar las secciones que dependen de eso.
   const [version, setVersion] = useState(0);
 
   if (tieneRol(actor, "alumno")) {
     return (
       <div className="space-y-10">
-        <MiProtocolo actor={actor} onSalir={() => setVersion((v) => v + 1)} />
-        <VistaAlumno />
-        <CambioDirector key={`director-${version}`} actor={actor} />
+        <MiProtocolo key={`mi-${version}`} actor={actor} onSalir={() => setVersion((v) => v + 1)} />
+        <VistaAlumno onEnviado={() => setVersion((v) => v + 1)} />
+        <RegistroProtocolo key={`registro-${version}`} onRegistrado={() => setVersion((v) => v + 1)} />
+        <CambioDirector key={`cambio-${version}`} actor={actor} />
         <CambioTitulo key={`titulo-${version}`} actor={actor} />
       </div>
     );

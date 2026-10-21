@@ -50,7 +50,10 @@ puede reemplazar la fila con la respuesta tal cual.
     { "id": 12, "nombre": "Jonathan Uriel Salazar Nava", "boleta": "2021630074", "carrera": "ISC", "es_responsable": true },
     { "id": 15, "nombre": "Emmanuel Rodrigo Barrera Solís", "boleta": "2020630156", "carrera": "IIA", "es_responsable": false }
   ],
-  "directores": [{ "id": 30, "nombre": "Francisco Javier Cabañas Ortiz" }],
+  "directores": [
+    { "id": 30, "externo_id": null, "externo": false, "nombre": "Francisco Javier Cabañas Ortiz" },
+    { "id": null, "externo_id": 5, "externo": true, "nombre": "Mariana Soto Reyes", "institucion": "UNAM" }
+  ],
   "academia": { "id": 2, "nombre": "Academia de Ingeniería de Software", "color": "…", "icono": "…" },
   "academia_asignada_en": "2026-10-14T19:55:01.000Z",
   "sinodales": [{ "id": 28, "nombre": "Claudia Berenice Espinoza Tovar", "evaluo": false }]
@@ -66,6 +69,11 @@ puede reemplazar la fila con la respuesta tal cual.
   protocolo individual tiene un solo integrante.
 - `academia` es `null` hasta que se turna (HU-19).
 - `sinodales` es `[]` hasta que el Presidente los asigna (HU-20).
+- `directores` mezcla docentes y directores externos (ver "Directores
+  externos"). En un docente `id` es su id de usuario y `externo` es `false`;
+  en un externo `id` es `null`, `externo` es `true` y su identificador es
+  `externo_id`. Para saber si alguien es director de la persona en sesión
+  compara `id` solo cuando `externo` sea `false`.
 
 ## HU-18 — Registrar protocolo (alumno)
 
@@ -83,13 +91,21 @@ Solo alumnos. **multipart/form-data** (con `api()` de `lib/api.js`, pasa un `For
 | `titulo` | sí | máx. 300 caracteres |
 | `resumen` | sí | resumen/objetivo, máx. 5000 |
 | `directores` | sí | 1 o 2 ids de docente: campo repetido, `"[1,2]"` o `"1,2"` |
+| `directores_externos` | no | 1 id de `directores_externos` como máximo, mismo formato |
 | `visto_bueno` | sí | constancia del visto bueno, PDF/JPG/PNG, máx. 10 MB |
 | `integrantes` | no | correos de los compañeros de equipo: campo repetido, `"[\"a@…\"]"` o `"a@…,b@…"`. Quien registra es el responsable y no se incluye |
+
+Nota (Art. 35 y 49 del Documento Rector): entre `directores` y
+`directores_externos` suman 1 o 2, al menos uno es docente de ESCOM y hay a
+lo más un externo. La tabla no guarda un orden: en `directores` el externo
+siempre va **después** de los docentes, así que nunca se muestra como primer
+director. Un externo se registra antes con `POST /api/directores-externos`, o
+se elige uno ya registrado.
 
 `201` con la ficha. Errores:
 - `409` si la elegibilidad del periodo más reciente del alumno no es `elegible`.
 - `409` si ya tiene (o forma parte de) un protocolo `registrado`, `en_evaluacion` o `aprobado`.
-- `400` si faltan campos, hay 0 o más de 2 directores, o algún director no es docente activo.
+- `400` si faltan campos, el total entre `directores` y `directores_externos` no es 1 o 2, no hay ningún docente, hay más de un externo, algún docente no está activo o el externo no existe.
 - Compañeros: `400` si un correo es inválido o es el propio, o si hay más de `MAX_INTEGRANTES` alumnos contando al responsable (hoy 4, constante en `lib/equipo.js`; el cliente aún no confirma el máximo). `409` si algún compañero no tiene cuenta de alumno activa, no es `elegible` en el **periodo del protocolo** (el de la elegibilidad del responsable) o ya está en un protocolo vigente. El mensaje es el mismo para los tres motivos, para no revelar la elegibilidad ni los protocolos de otro alumno. Se valida dentro de la transacción con las filas del equipo bloqueadas.
 - Los compañeros quedan en el equipo sin confirmar; pueden salirse con `DELETE /api/protocolos/:id/integrantes/yo` mientras el protocolo siga `registrado`.
 
@@ -192,6 +208,57 @@ Sin ruta propia: se calcula al guardar cada evaluación (HU-21).
   una por sinodal que dejó texto. Es `[]` mientras el protocolo siga
   `en_evaluacion`, para no exponer evaluaciones parciales.
 
+## Directores externos
+
+Un director que no es docente de ESCOM no tiene cuenta (Art. 49 del Documento
+Rector). Se registra una sola vez (su correo es único; ver el `409` abajo), con su currículum y copia de su cédula
+profesional de nivel superior; los externos recurrentes ya registrados se
+eligen sin volver a entregar documentos. Se elige al registrar el protocolo
+(`directores_externos`) o al pedir un cambio de director (ver
+`api-cambios-director.md`), y nunca va solo: el protocolo siempre conserva al
+menos un director docente de ESCOM. Un externo no inicia sesión: no aparece en
+`GET /api/protocolos/dirigidos` ni en ninguna vista de docente.
+
+### `POST /api/directores-externos`
+Alumnos, `catt_ejecutivo` y `catt_auxiliar`. **multipart/form-data**:
+
+| Campo | Obligatorio | Notas |
+|---|---|---|
+| `nombre` | sí | máx. 200 caracteres |
+| `institucion` | sí | máx. 200 caracteres |
+| `correo` | sí | correo válido |
+| `cedula_numero` | sí | máx. 30 caracteres |
+| `cedula` | sí | copia de la cédula, PDF/JPG/PNG, máx. 10 MB |
+| `curriculum` | sí | mini currículum, PDF/JPG/PNG, máx. 10 MB |
+
+`201` con
+```json
+{ "id": 5, "nombre": "Mariana Soto Reyes", "institucion": "UNAM", "correo": "msoto@unam.mx",
+  "cedula_numero": "12345678", "creado_en": "2026-10-15T16:40:00.000Z" }
+```
+`400` si falta algo o el archivo no es válido. `409` si ya existe un externo con ese
+correo: se elige de la lista en lugar de registrarlo otra vez.
+
+### `GET /api/directores-externos`
+El catálogo completo, por nombre. Es el selector de `directores_externos`.
+Los alumnos reciben solo `id`, `nombre` e `institucion`; el personal CATT y el
+admin reciben la misma forma que el `201`.
+
+### `GET /api/directores-externos/:id/cedula` y `/curriculum`
+Descargan el archivo. Los ven el personal CATT y el administrador, quien lo
+registró y quien participa en un protocolo que ese externo dirige (el equipo
+de alumnos, los otros directores, los sinodales y el Presidente de la academia
+a la que se turnó); otros, `403`. `404` si el archivo ya no está en el
+servidor. Usa `descargarArchivo()` de `lib/api.js`.
+
+No hay ruta para borrar un externo. Las llaves foráneas de
+`protocolo_directores` y `solicitudes_cambio_director` no tienen `ON DELETE`,
+así que la base de datos impide borrar uno que aparezca en un protocolo o en
+una solicitud. Una cuenta que registró externos tampoco se puede eliminar,
+solo revocar.
+
+Bitácora: `registrar_director_externo` (entidad `directores_externos`).
+
 ## Consulta común
 
 ### `GET /api/protocolos/:id`
@@ -211,7 +278,14 @@ responsable) e `integrantes` (todo el equipo).
 protocolos            id, alumno_id, titulo, resumen, periodo, visto_bueno_archivo,
                       academia_id, academia_asignada_por, academia_asignada_en,
                       estado, creado_en
-protocolo_directores  (protocolo_id, docente_id)                 -- 1 o 2
+protocolo_directores  id, protocolo_id, docente_id (NULL), externo_id (NULL)
+                      -- 1 o 2 por protocolo; exactamente uno de docente_id / externo_id
+                      -- únicos (protocolo_id, docente_id) y (protocolo_id, externo_id)
+                      -- migración: antes la llave era (protocolo_id, docente_id); al
+                      -- arrancar se cambia a `id` y docente_id deja de ser NOT NULL
+directores_externos   id, nombre, institucion, correo (único, sin distinguir
+                      mayúsculas), cedula_numero, cedula_archivo, curriculum_archivo,
+                      registrado_por, creado_en
 protocolo_integrantes (protocolo_id, alumno_id), agregado_en
                       -- el responsable es protocolos.alumno_id y siempre tiene su fila:
                       -- FK diferida protocolos (id, alumno_id) -> protocolo_integrantes
