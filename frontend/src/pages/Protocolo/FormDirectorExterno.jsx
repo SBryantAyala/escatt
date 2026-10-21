@@ -5,8 +5,14 @@ import { claseArchivo, claseBotonSecundario, claseInput, claseLabel } from "./es
 
 const CORREO_VALIDO = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-export default function FormDirectorExterno({ onRegistrado, onCancelar }) {
+// Botón "Mi director externo no está en la lista" y, al abrirlo, los campos
+// para registrarlo. Va dentro del formulario de registro de protocolo y del de
+// cambio de director, así que no es un <form>: Enter en sus campos registra al
+// externo en lugar de enviar el formulario de afuera. `deshabilitado` es
+// true mientras ese formulario se envía.
+export default function FormDirectorExterno({ onRegistrado, deshabilitado = false }) {
   const aviso = useAviso();
+  const [abierto, setAbierto] = useState(false);
   const [nombre, setNombre] = useState("");
   const [institucion, setInstitucion] = useState("");
   const [correo, setCorreo] = useState("");
@@ -37,6 +43,7 @@ export default function FormDirectorExterno({ onRegistrado, onCancelar }) {
     try {
       const creado = await api("/api/directores-externos", { method: "POST", body: datos });
       aviso.exito("Director externo registrado.");
+      setAbierto(false);
       onRegistrado(creado);
     } catch (err) {
       aviso.error(err.message);
@@ -45,11 +52,28 @@ export default function FormDirectorExterno({ onRegistrado, onCancelar }) {
     }
   }
 
+  const bloqueado = enviando || deshabilitado;
+
+  function alPresionarTecla(e) {
+    if (e.key !== "Enter" || e.target.tagName !== "INPUT") return;
+    e.preventDefault();
+    if (!bloqueado) registrar();
+  }
+
+  if (!abierto) {
+    return (
+      <button type="button" onClick={() => setAbierto(true)} disabled={deshabilitado} className={`mt-3 ${claseBotonSecundario}`}>
+        Mi director externo no está en la lista
+      </button>
+    );
+  }
+
   return (
     <div
       role="group"
       aria-label="Registrar director externo"
-      className={`mt-4 rounded-2xl border border-sky-100 bg-sky-50/60 p-4 sm:p-5 ${enviando ? "opacity-70" : ""}`}
+      onKeyDown={alPresionarTecla}
+      className={`mt-4 rounded-2xl border border-sky-100 bg-sky-50/60 p-4 sm:p-5 ${bloqueado ? "opacity-70" : ""}`}
     >
       <p className="text-sm font-semibold text-slate-800">Registrar director externo</p>
       <p className="mt-1 text-xs text-slate-600">
@@ -64,7 +88,7 @@ export default function FormDirectorExterno({ onRegistrado, onCancelar }) {
             value={nombre}
             onChange={(e) => setNombre(e.target.value)}
             maxLength={200}
-            disabled={enviando}
+            disabled={bloqueado}
             className={claseInput}
           />
         </label>
@@ -75,7 +99,7 @@ export default function FormDirectorExterno({ onRegistrado, onCancelar }) {
             value={institucion}
             onChange={(e) => setInstitucion(e.target.value)}
             maxLength={200}
-            disabled={enviando}
+            disabled={bloqueado}
             className={claseInput}
           />
         </label>
@@ -86,7 +110,7 @@ export default function FormDirectorExterno({ onRegistrado, onCancelar }) {
             value={correo}
             onChange={(e) => setCorreo(e.target.value)}
             maxLength={200}
-            disabled={enviando}
+            disabled={bloqueado}
             className={claseInput}
           />
         </label>
@@ -97,13 +121,13 @@ export default function FormDirectorExterno({ onRegistrado, onCancelar }) {
             value={cedulaNumero}
             onChange={(e) => setCedulaNumero(e.target.value)}
             maxLength={30}
-            disabled={enviando}
+            disabled={bloqueado}
             className={claseInput}
           />
         </label>
         <label className="block min-w-0">
           <span className={claseLabel}>Copia de la cédula (PDF, JPG o PNG)</span>
-          <input ref={cedulaRef} type="file" accept=".pdf,.jpg,.jpeg,.png" disabled={enviando} className={claseArchivo} />
+          <input ref={cedulaRef} type="file" accept=".pdf,.jpg,.jpeg,.png" disabled={bloqueado} className={claseArchivo} />
         </label>
         <label className="block min-w-0">
           <span className={claseLabel}>Mini currículum (PDF, JPG o PNG)</span>
@@ -111,7 +135,7 @@ export default function FormDirectorExterno({ onRegistrado, onCancelar }) {
             ref={curriculumRef}
             type="file"
             accept=".pdf,.jpg,.jpeg,.png"
-            disabled={enviando}
+            disabled={bloqueado}
             className={claseArchivo}
           />
         </label>
@@ -120,12 +144,12 @@ export default function FormDirectorExterno({ onRegistrado, onCancelar }) {
         <button
           type="button"
           onClick={registrar}
-          disabled={enviando}
+          disabled={bloqueado}
           className="min-h-10 rounded-full bg-[#1878B6] px-5 text-sm font-semibold text-white transition hover:bg-[#0F5C8C] disabled:opacity-60"
         >
           {enviando ? "Registrando…" : "Registrar director externo"}
         </button>
-        <button type="button" onClick={onCancelar} disabled={enviando} className={claseBotonSecundario}>
+        <button type="button" onClick={() => setAbierto(false)} disabled={bloqueado} className={claseBotonSecundario}>
           Cancelar
         </button>
       </div>

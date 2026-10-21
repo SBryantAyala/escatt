@@ -1,3 +1,7 @@
+export function ordenarPorNombre(lista) {
+  return [...lista].sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
+}
+
 export function nombreDirector(director) {
   return director.externo && director.institucion ? `${director.nombre} (${director.institucion})` : director.nombre;
 }

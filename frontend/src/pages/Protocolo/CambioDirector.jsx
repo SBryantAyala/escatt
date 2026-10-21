@@ -4,7 +4,7 @@ import Etiqueta from "../../components/ui/Etiqueta";
 import { useAviso } from "../../components/ui/Avisos";
 import { IconoDocumento } from "../../components/iconos";
 import { api, descargarArchivo } from "../../lib/api";
-import { claveDirector, nombreDirector, separarClave } from "../../lib/directores";
+import { claveDirector, nombreDirector, ordenarPorNombre, separarClave } from "../../lib/directores";
 import FormDirectorExterno from "./FormDirectorExterno";
 import { claseArchivo, claseBotonSecundario, claseInput, claseLabel } from "./estilos";
 
@@ -22,10 +22,6 @@ function formatearFecha(iso) {
   return new Date(iso).toLocaleDateString("es-MX", { dateStyle: "medium" });
 }
 
-function ordenarPorNombre(lista) {
-  return [...lista].sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
-}
-
 export default function CambioDirector({ actor }) {
   const aviso = useAviso();
   const [protocolo, setProtocolo] = useState(null);
@@ -37,7 +33,6 @@ export default function CambioDirector({ actor }) {
   const [saliente, setSaliente] = useState("");
   const [propuesto, setPropuesto] = useState("");
   const [motivo, setMotivo] = useState("");
-  const [registrandoExterno, setRegistrandoExterno] = useState(false);
   const [enviando, setEnviando] = useState(false);
   const archivoRef = useRef(null);
 
@@ -91,7 +86,6 @@ export default function CambioDirector({ actor }) {
   function externoRegistrado(creado) {
     setExternos((lista) => ordenarPorNombre([...lista, creado]));
     setPropuesto(`e:${creado.id}`);
-    setRegistrandoExterno(false);
   }
 
   async function enviar(e) {
@@ -124,7 +118,6 @@ export default function CambioDirector({ actor }) {
       aviso.exito("Solicitud enviada. La CATT la revisará.");
       setPropuesto("");
       setMotivo("");
-      setRegistrandoExterno(false);
       if (archivoRef.current) archivoRef.current.value = "";
       cargar();
     } catch (err) {
@@ -214,19 +207,7 @@ export default function CambioDirector({ actor }) {
             </label>
           </div>
 
-          {!registrandoExterno && (
-            <button
-              type="button"
-              onClick={() => setRegistrandoExterno(true)}
-              disabled={enviando}
-              className={`mt-3 ${claseBotonSecundario}`}
-            >
-              Mi director externo no está en la lista
-            </button>
-          )}
-          {registrandoExterno && (
-            <FormDirectorExterno onRegistrado={externoRegistrado} onCancelar={() => setRegistrandoExterno(false)} />
-          )}
+          <FormDirectorExterno onRegistrado={externoRegistrado} deshabilitado={enviando} />
 
           <label className="mt-4 block">
             <span className={claseLabel}>Motivo del cambio</span>

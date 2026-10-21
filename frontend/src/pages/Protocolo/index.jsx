@@ -22,15 +22,15 @@ const DESCRIPCION_PROXIMAMENTE =
 // alumno también registra su protocolo (HU-18), con directores docentes o un
 // director externo.
 export default function ProtocoloPage({ actor }) {
-  // Cambia cuando el alumno registra su protocolo o se sale de su equipo,
-  // para recargar las secciones que dependen de su protocolo.
+  // Cambia cuando el alumno registra su protocolo, se sale de su equipo o sube
+  // evidencia de elegibilidad, para recargar las secciones que dependen de eso.
   const [version, setVersion] = useState(0);
 
   if (tieneRol(actor, "alumno")) {
     return (
       <div className="space-y-10">
         <MiProtocolo key={`mi-${version}`} actor={actor} onSalir={() => setVersion((v) => v + 1)} />
-        <VistaAlumno />
+        <VistaAlumno onEnviado={() => setVersion((v) => v + 1)} />
         <RegistroProtocolo key={`registro-${version}`} onRegistrado={() => setVersion((v) => v + 1)} />
         <CambioDirector key={`cambio-${version}`} actor={actor} />
       </div>

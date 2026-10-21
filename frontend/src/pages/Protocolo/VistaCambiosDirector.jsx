@@ -8,6 +8,7 @@ import { api, descargarArchivo } from "../../lib/api";
 import { nombreDirector } from "../../lib/directores";
 import { tieneRol } from "../../lib/roles";
 import Integrantes from "./Integrantes";
+import { claseBotonSecundario } from "./estilos";
 
 const ESTADOS = {
   pendiente: { etiqueta: "Pendiente", variante: "alerta" },
@@ -44,14 +45,14 @@ function DetalleExterno({ director, etiqueta }) {
         <button
           type="button"
           onClick={() => descargar("cedula")}
-          className="min-h-10 rounded-full border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+          className={`${claseBotonSecundario} bg-white`}
         >
           Ver cédula
         </button>
         <button
           type="button"
           onClick={() => descargar("curriculum")}
-          className="min-h-10 rounded-full border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+          className={`${claseBotonSecundario} bg-white`}
         >
           Ver currículum
         </button>
@@ -134,7 +135,7 @@ function Solicitud({ solicitud, puedeResolver, onResuelta, onDesactualizada }) {
         <button
           type="button"
           onClick={verConstancia}
-          className="min-h-10 rounded-full border border-slate-200 px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+          className={claseBotonSecundario}
         >
           Ver constancia
         </button>

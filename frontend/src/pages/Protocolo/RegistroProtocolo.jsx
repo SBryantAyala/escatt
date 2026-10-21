@@ -3,6 +3,7 @@ import Esqueleto from "../../components/ui/Esqueleto";
 import { useAviso } from "../../components/ui/Avisos";
 import { IconoDocumento } from "../../components/iconos";
 import { api } from "../../lib/api";
+import { ordenarPorNombre } from "../../lib/directores";
 import { AZUL_MEDIO } from "../../lib/theme";
 import FormDirectorExterno from "./FormDirectorExterno";
 import { claseArchivo, claseBotonSecundario, claseInput, claseLabel } from "./estilos";
@@ -13,10 +14,6 @@ const MAX_RESUMEN = 5000;
 // Compañeros además del responsable. Debe coincidir con MAX_INTEGRANTES - 1 del
 // backend (lib/equipo.js); el cliente aún no confirma el máximo de alumnos.
 const MAX_COMPANEROS = 3;
-
-function ordenarPorNombre(lista) {
-  return [...lista].sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
-}
 
 export default function RegistroProtocolo({ onRegistrado }) {
   const aviso = useAviso();
@@ -32,30 +29,35 @@ export default function RegistroProtocolo({ onRegistrado }) {
   const [segundoTipo, setSegundoTipo] = useState("ninguno");
   const [segundoDocente, setSegundoDocente] = useState("");
   const [segundoExterno, setSegundoExterno] = useState("");
-  const [registrandoExterno, setRegistrandoExterno] = useState(false);
   const [companeros, setCompaneros] = useState([]);
   const [correoCompanero, setCorreoCompanero] = useState("");
   const [validando, setValidando] = useState(false);
   const [enviando, setEnviando] = useState(false);
   const vistoBuenoRef = useRef(null);
 
-  const cargar = useCallback(() => {
+  // Los catálogos de directores solo hacen falta si el alumno puede registrar
+  // (es elegible y no tiene un protocolo vigente), que es el caso menos común.
+  const cargar = useCallback(async () => {
     setErrorCarga(null);
-    Promise.all([
-      api("/api/protocolos/mio"),
-      api("/api/elegibilidad/mi"),
-      api("/api/protocolos/candidatos-director"),
-      api("/api/directores-externos"),
-    ])
-      .then(([protocolos, elegibilidad, candidatos, catalogo]) => {
-        const lista = Array.isArray(protocolos) ? protocolos : [];
-        setVigente(lista.some((p) => ESTADOS_VIGENTES.includes(p.estado)));
-        setElegible(Array.isArray(elegibilidad) && elegibilidad[0]?.estado === "elegible");
+    try {
+      const [protocolos, elegibilidad] = await Promise.all([api("/api/protocolos/mio"), api("/api/elegibilidad/mi")]);
+      const tieneVigente = (Array.isArray(protocolos) ? protocolos : []).some((p) => ESTADOS_VIGENTES.includes(p.estado));
+      const esElegible = Array.isArray(elegibilidad) && elegibilidad[0]?.estado === "elegible";
+      setVigente(tieneVigente);
+      setElegible(esElegible);
+      if (!tieneVigente && esElegible) {
+        const [candidatos, catalogo] = await Promise.all([
+          api("/api/protocolos/candidatos-director"),
+          api("/api/directores-externos"),
+        ]);
         setDocentes(Array.isArray(candidatos) ? candidatos : []);
         setExternos(Array.isArray(catalogo) ? ordenarPorNombre(catalogo) : []);
-      })
-      .catch((e) => setErrorCarga(e.message))
-      .finally(() => setCargando(false));
+      }
+    } catch (e) {
+      setErrorCarga(e.message);
+    } finally {
+      setCargando(false);
+    }
   }, []);
 
   useEffect(() => {
@@ -74,16 +76,10 @@ export default function RegistroProtocolo({ onRegistrado }) {
 
   const docentesSegundo = docentes.filter((d) => String(d.id) !== director);
 
-  function elegirTipoSegundo(tipo) {
-    setSegundoTipo(tipo);
-    setRegistrandoExterno(false);
-  }
-
   function externoRegistrado(creado) {
     setExternos((lista) => ordenarPorNombre([...lista, creado]));
     setSegundoTipo("externo");
     setSegundoExterno(String(creado.id));
-    setRegistrandoExterno(false);
   }
 
   async function agregarCompanero() {
@@ -250,7 +246,7 @@ export default function RegistroProtocolo({ onRegistrado }) {
 
           <p className="mt-4 text-xs text-slate-500">
             Un protocolo lleva uno o dos directores y al menos uno debe ser docente de ESCOM (Art. 35 y 49 del Documento
-            Rector). Un director externo solo puede ser el segundo.
+            Rector). Un director externo solo puede ser el segundo, y se muestra después de los docentes.
           </p>
 
           <div className="mt-3 grid gap-4 sm:grid-cols-2">
@@ -277,7 +273,7 @@ export default function RegistroProtocolo({ onRegistrado }) {
               <span className={claseLabel}>Segundo director</span>
               <select
                 value={segundoTipo}
-                onChange={(e) => elegirTipoSegundo(e.target.value)}
+                onChange={(e) => setSegundoTipo(e.target.value)}
                 disabled={enviando}
                 className={claseInput}
               >
@@ -325,19 +321,7 @@ export default function RegistroProtocolo({ onRegistrado }) {
                   ))}
                 </select>
               </label>
-              {!registrandoExterno && (
-                <button
-                  type="button"
-                  onClick={() => setRegistrandoExterno(true)}
-                  disabled={enviando}
-                  className={`mt-3 ${claseBotonSecundario}`}
-                >
-                  Mi director externo no está en la lista
-                </button>
-              )}
-              {registrandoExterno && (
-                <FormDirectorExterno onRegistrado={externoRegistrado} onCancelar={() => setRegistrandoExterno(false)} />
-              )}
+              <FormDirectorExterno onRegistrado={externoRegistrado} deshabilitado={enviando} />
             </div>
           )}
 
