@@ -1,8 +1,12 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import DialogoConfirmacion from "../../components/ui/DialogoConfirmacion";
 import Esqueleto from "../../components/ui/Esqueleto";
 import Etiqueta from "../../components/ui/Etiqueta";
+import { useAviso } from "../../components/ui/Avisos";
 import { IconoDocumento } from "../../components/iconos";
 import { api } from "../../lib/api";
+import { integrantesDe } from "../../lib/integrantes";
+import Integrantes from "./Integrantes";
 
 const ESTADOS = {
   registrado: {
@@ -36,15 +40,24 @@ const DICTAMEN = {
   no_aprobado: "No aprobado",
 };
 
-export default function MiProtocolo() {
+// `onSalir` avisa a la pantalla cuando el alumno se sale del equipo, para que
+// las demás secciones recarguen.
+export default function MiProtocolo({ actor, onSalir }) {
+  const aviso = useAviso();
   const [protocolos, setProtocolos] = useState(null);
   const [errorCarga, setErrorCarga] = useState(null);
+  const [confirmarSalir, setConfirmarSalir] = useState(false);
+  const [saliendo, setSaliendo] = useState(false);
 
-  useEffect(() => {
+  const cargar = useCallback(() => {
     api("/api/protocolos/mio")
       .then((data) => setProtocolos(Array.isArray(data) ? data : []))
       .catch((e) => setErrorCarga(e.message));
   }, []);
+
+  useEffect(() => {
+    cargar();
+  }, [cargar]);
 
   if (errorCarga) {
     return (
@@ -59,6 +72,27 @@ export default function MiProtocolo() {
   const actual = protocolos[0];
   const estado = ESTADOS[actual.estado] ?? { etiqueta: actual.estado, variante: "neutro", titulo: actual.titulo, texto: "" };
   const evaluaron = actual.sinodales.filter((s) => s.evaluo).length;
+  const equipo = integrantesDe(actual);
+  const responsable = actual.alumno;
+  const soyResponsable = responsable.id === actor?.id;
+  // Al registrar, el responsable agrega a sus compañeros sin que confirmen:
+  // mientras no empiece la evaluación, cualquiera de ellos puede salirse.
+  const puedeSalir = !soyResponsable && actual.estado === "registrado";
+
+  async function salirDelEquipo() {
+    setSaliendo(true);
+    try {
+      await api(`/api/protocolos/${actual.id}/integrantes/yo`, { method: "DELETE" });
+      setConfirmarSalir(false);
+      aviso.exito("Saliste del equipo. Ya puedes registrar tu propio protocolo o unirte a otro.");
+      cargar();
+      onSalir?.();
+    } catch (e) {
+      aviso.error(e.message);
+    } finally {
+      setSaliendo(false);
+    }
+  }
 
   return (
     <section aria-labelledby="mi-protocolo" className="min-w-0">
@@ -86,6 +120,29 @@ export default function MiProtocolo() {
           <Etiqueta variante={estado.variante}>{estado.etiqueta}</Etiqueta>
         </div>
 
+        {equipo.length > 1 && (
+          <div className="mt-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Equipo ({equipo.length} alumnos)
+            </p>
+            <Integrantes protocolo={actual} className="mt-1" />
+            <p className="mt-1 text-xs text-slate-500">
+              {soyResponsable
+                ? "Eres el responsable: registras el protocolo y envías las solicitudes del equipo."
+                : `El responsable del equipo es ${responsable.nombre}; solo él envía las solicitudes.`}
+            </p>
+            {puedeSalir && (
+              <button
+                type="button"
+                onClick={() => setConfirmarSalir(true)}
+                className="mt-2 text-xs font-semibold text-red-700 underline-offset-2 hover:underline"
+              >
+                Salirme del equipo
+              </button>
+            )}
+          </div>
+        )}
+
         <p className="mt-3 text-sm font-semibold text-slate-800">{estado.titulo}</p>
         <p className="mt-1 text-sm text-slate-600">{estado.texto}</p>
 
@@ -112,6 +169,18 @@ export default function MiProtocolo() {
           </div>
         )}
       </div>
+
+      <DialogoConfirmacion
+        abierto={confirmarSalir}
+        nivel="simple"
+        titulo="Salirme del equipo"
+        descripcion={`Dejarás de ser integrante de "${actual.titulo}". No podrás volver a este equipo.`}
+        etiquetaConfirmar="Salirme del equipo"
+        colorConfirmar="bg-red-600 hover:bg-red-700"
+        cargando={saliendo}
+        onConfirmar={salirDelEquipo}
+        onCancelar={() => !saliendo && setConfirmarSalir(false)}
+      />
     </section>
   );
 }

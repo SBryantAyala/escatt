@@ -6,6 +6,7 @@ import { useAviso } from "../../components/ui/Avisos";
 import { IconoDocumento } from "../../components/iconos";
 import { api, descargarArchivo } from "../../lib/api";
 import { tieneRol } from "../../lib/roles";
+import Integrantes from "./Integrantes";
 
 const ESTADOS = {
   pendiente: { etiqueta: "Pendiente", variante: "alerta" },
@@ -66,9 +67,7 @@ function Solicitud({ solicitud, puedeResolver, onResuelta, onDesactualizada }) {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="font-semibold text-slate-800">{solicitud.protocolo.titulo}</p>
-          <p className="mt-1 text-sm text-slate-600">
-            {solicitud.alumno.nombre} · {solicitud.alumno.boleta} · {solicitud.alumno.carrera}
-          </p>
+          <Integrantes protocolo={solicitud} className="mt-1" />
           <p className="mt-1 text-sm text-slate-700">
             {solicitud.director_saliente.nombre} → {solicitud.director_propuesto.nombre}
           </p>

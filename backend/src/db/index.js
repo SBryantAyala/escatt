@@ -60,6 +60,7 @@ export async function enTransaccion(fn) {
 //   elegibilidad   requisitos para TT por alumno y periodo
 //   protocolos            protocolos de TT (Módulo 2)
 //   protocolo_directores  1 o 2 directores por protocolo
+//   protocolo_integrantes alumnos del equipo de cada protocolo (incluye al responsable)
 //   protocolo_sinodales   3 sinodales por protocolo + su evaluación
 //   sesiones_catt         sesiones de la CATT; sesion_asistentes y acuerdos_catt cuelgan de ella
 //   bitacora       historial de acciones sensibles
@@ -566,6 +567,45 @@ async function migrarSesionesCatt(client) {
   `);
 }
 
+// Equipos de TT (Documento Rector, Art. 4: "preferentemente en equipo"): un
+// protocolo lo desarrollan uno o más alumnos. protocolo_integrantes lista a
+// todos; el responsable (quien registra y envía las solicitudes) es solo
+// protocolos.alumno_id, y la llave protocolos_responsable_integrante_fk
+// obliga a que tenga su fila en protocolo_integrantes (diferida: se revisa al
+// commit, así se inserta primero el protocolo y luego sus integrantes).
+// Idempotente: también agrega al responsable de los protocolos que ya
+// existían y quita la columna es_responsable de una versión anterior.
+async function migrarEquiposTT(client) {
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS protocolo_integrantes (
+      protocolo_id   INTEGER     NOT NULL REFERENCES protocolos(id) ON DELETE CASCADE,
+      alumno_id      INTEGER     NOT NULL REFERENCES alumnos(usuario_id),
+      agregado_en    TIMESTAMPTZ NOT NULL DEFAULT now(),
+      PRIMARY KEY (protocolo_id, alumno_id)
+    );
+
+    ALTER TABLE protocolo_integrantes DROP COLUMN IF EXISTS es_responsable;
+
+    CREATE INDEX IF NOT EXISTS protocolo_integrantes_alumno_idx
+      ON protocolo_integrantes (alumno_id);
+
+    INSERT INTO protocolo_integrantes (protocolo_id, alumno_id)
+    SELECT id, alumno_id FROM protocolos
+    ON CONFLICT (protocolo_id, alumno_id) DO NOTHING;
+  `);
+  const { rows } = await client.query(
+    "SELECT 1 FROM pg_constraint WHERE conname = 'protocolos_responsable_integrante_fk'",
+  );
+  if (!rows[0]) {
+    await client.query(`
+      ALTER TABLE protocolos
+        ADD CONSTRAINT protocolos_responsable_integrante_fk
+        FOREIGN KEY (id, alumno_id) REFERENCES protocolo_integrantes (protocolo_id, alumno_id)
+        DEFERRABLE INITIALLY DEFERRED
+    `);
+  }
+}
+
 async function initDb() {
   const client = await pool.connect();
   try {
@@ -577,6 +617,7 @@ async function initDb() {
     if (esquemaAnterior) await migrarEsquemaAnterior(client);
     await migrarAcademiasPresidenteColorIcono(client);
     await migrarProtocolos(client);
+    await migrarEquiposTT(client);
     await migrarSesionesCatt(client);
     // creado_en se agregó después del CREATE TABLE original de elegibilidad.
     await client.query(
