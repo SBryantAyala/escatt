@@ -62,8 +62,8 @@ puede reemplazar la fila con la respuesta tal cual.
   equipo"). `integrantes` los lista a todos, con el **responsable primero**; las
   pantallas deben mostrar a todos, no solo a `alumno`. `alumno` es el
   responsable (quien registra el protocolo y envía las solicitudes de cambio)
-  y se conserva por compatibilidad. Un protocolo individual tiene un solo
-  integrante.
+  y se conserva por compatibilidad; `es_responsable` se calcula de él. Un
+  protocolo individual tiene un solo integrante.
 - `academia` es `null` hasta que se turna (HU-19).
 - `sinodales` es `[]` hasta que el Presidente los asigna (HU-20).
 
@@ -90,15 +90,24 @@ Solo alumnos. **multipart/form-data** (con `api()` de `lib/api.js`, pasa un `For
 - `409` si la elegibilidad del periodo más reciente del alumno no es `elegible`.
 - `409` si ya tiene (o forma parte de) un protocolo `registrado`, `en_evaluacion` o `aprobado`.
 - `400` si faltan campos, hay 0 o más de 2 directores, o algún director no es docente activo.
-- Compañeros: `400` si hay más de `MAX_INTEGRANTES` alumnos contando al responsable (hoy 4, constante en `lib/equipo.js`; el cliente aún no confirma el máximo), un correo inválido, repetido o propio, o sin cuenta de alumno activa; `409` si algún compañero no tiene elegibilidad vigente (`elegible`, como el responsable) o ya está en un protocolo vigente. Se revisa otra vez dentro de la transacción.
+- Compañeros: `400` si un correo es inválido o es el propio, o si hay más de `MAX_INTEGRANTES` alumnos contando al responsable (hoy 4, constante en `lib/equipo.js`; el cliente aún no confirma el máximo). `409` si algún compañero no tiene cuenta de alumno activa, no es `elegible` en el **periodo del protocolo** (el de la elegibilidad del responsable) o ya está en un protocolo vigente. El mensaje es el mismo para los tres motivos, para no revelar la elegibilidad ni los protocolos de otro alumno. Se valida dentro de la transacción con las filas del equipo bloqueadas.
+- Los compañeros quedan en el equipo sin confirmar; pueden salirse con `DELETE /api/protocolos/:id/integrantes/yo` mientras el protocolo siga `registrado`.
 
 > Pendiente (HU-27): validar la ventana de registro con el Calendario de la CATT.
 
 ### `POST /api/protocolos/companeros/validar`
 Solo alumnos. Body JSON `{ "correo": "…" }`. Comprueba, antes de registrar, que
-el compañero puede entrar al equipo (mismas reglas de arriba) y responde
-`{ "correo", "nombre", "carrera" }` para confirmarlo en pantalla (sin boleta).
-`400`/`409` con el motivo si no puede.
+el compañero puede entrar al equipo (mismas reglas de arriba, con el periodo
+de quien pregunta) y responde `{ "correo", "nombre", "carrera" }` para
+confirmarlo en pantalla (sin boleta). `400` si el correo es inválido o es el
+propio; `409` si quien pregunta no puede registrar un protocolo, o con el
+mensaje genérico de arriba si el compañero no puede entrar.
+
+### `DELETE /api/protocolos/:id/integrantes/yo`
+Solo alumnos. Un compañero se sale del equipo (no confirmó al ser agregado).
+`204`. `409` si es el responsable o si el protocolo ya no está `registrado`;
+`404` si no existe el protocolo o no es integrante. Queda en la bitácora
+(`salir_equipo_protocolo`).
 
 ### `GET /api/protocolos/mio`
 Solo alumnos. Los protocolos de los que es integrante (responsable o
@@ -203,9 +212,9 @@ protocolos            id, alumno_id, titulo, resumen, periodo, visto_bueno_archi
                       academia_id, academia_asignada_por, academia_asignada_en,
                       estado, creado_en
 protocolo_directores  (protocolo_id, docente_id)                 -- 1 o 2
-protocolo_integrantes (protocolo_id, alumno_id), es_responsable, agregado_en
-                      -- un único responsable por protocolo (índice parcial);
-                      -- protocolos.alumno_id es ese responsable y siempre tiene su fila
+protocolo_integrantes (protocolo_id, alumno_id), agregado_en
+                      -- el responsable es protocolos.alumno_id y siempre tiene su fila:
+                      -- FK diferida protocolos (id, alumno_id) -> protocolo_integrantes
 protocolo_sinodales   (protocolo_id, docente_id), asignado_por, asignado_en,
                       dictamen ('aprobado'|'no_aprobado'|NULL), observaciones, evaluado_en
 ```

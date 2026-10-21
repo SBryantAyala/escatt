@@ -161,7 +161,7 @@ await enTransaccion(async (client) => {
     // `alumno` es el responsable del equipo; `integrantes`, sus compañeros.
     await client.query("DELETE FROM protocolo_integrantes WHERE protocolo_id = $1", [id]);
     await client.query(
-      "INSERT INTO protocolo_integrantes (protocolo_id, alumno_id, es_responsable) VALUES ($1, $2, true)",
+      "INSERT INTO protocolo_integrantes (protocolo_id, alumno_id) VALUES ($1, $2)",
       [id, alumnoId],
     );
     for (const correo of p.integrantes ?? []) {

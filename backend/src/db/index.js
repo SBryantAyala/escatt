@@ -60,7 +60,7 @@ export async function enTransaccion(fn) {
 //   elegibilidad   requisitos para TT por alumno y periodo
 //   protocolos            protocolos de TT (Módulo 2)
 //   protocolo_directores  1 o 2 directores por protocolo
-//   protocolo_integrantes alumnos del equipo de cada protocolo (uno es el responsable)
+//   protocolo_integrantes alumnos del equipo de cada protocolo (incluye al responsable)
 //   protocolo_sinodales   3 sinodales por protocolo + su evaluación
 //   solicitudes_cambio_titulo     el alumno pide cambiar el título de su protocolo
 //   protocolo_evaluaciones_historial  evaluaciones archivadas al reiniciar la evaluación
@@ -566,30 +566,41 @@ async function migrarCambioTitulo(client) {
 
 // Equipos de TT (Documento Rector, Art. 4: "preferentemente en equipo"): un
 // protocolo lo desarrollan uno o más alumnos. protocolo_integrantes lista a
-// todos, con exactamente un responsable; protocolos.alumno_id sigue siendo el
-// responsable (quien registra y envía las solicitudes), así que siempre tiene
-// su fila en protocolo_integrantes. Idempotente: también agrega al
-// responsable de los protocolos que ya existían.
+// todos; el responsable (quien registra y envía las solicitudes) es solo
+// protocolos.alumno_id, y la llave protocolos_responsable_integrante_fk
+// obliga a que tenga su fila en protocolo_integrantes (diferida: se revisa al
+// commit, así se inserta primero el protocolo y luego sus integrantes).
+// Idempotente: también agrega al responsable de los protocolos que ya
+// existían y quita la columna es_responsable de una versión anterior.
 async function migrarEquiposTT(client) {
   await client.query(`
     CREATE TABLE IF NOT EXISTS protocolo_integrantes (
       protocolo_id   INTEGER     NOT NULL REFERENCES protocolos(id) ON DELETE CASCADE,
       alumno_id      INTEGER     NOT NULL REFERENCES alumnos(usuario_id),
-      es_responsable BOOLEAN     NOT NULL DEFAULT false,
       agregado_en    TIMESTAMPTZ NOT NULL DEFAULT now(),
       PRIMARY KEY (protocolo_id, alumno_id)
     );
 
-    CREATE UNIQUE INDEX IF NOT EXISTS protocolo_integrantes_responsable_uq
-      ON protocolo_integrantes (protocolo_id) WHERE es_responsable;
+    ALTER TABLE protocolo_integrantes DROP COLUMN IF EXISTS es_responsable;
 
     CREATE INDEX IF NOT EXISTS protocolo_integrantes_alumno_idx
       ON protocolo_integrantes (alumno_id);
 
-    INSERT INTO protocolo_integrantes (protocolo_id, alumno_id, es_responsable)
-    SELECT id, alumno_id, true FROM protocolos
+    INSERT INTO protocolo_integrantes (protocolo_id, alumno_id)
+    SELECT id, alumno_id FROM protocolos
     ON CONFLICT (protocolo_id, alumno_id) DO NOTHING;
   `);
+  const { rows } = await client.query(
+    "SELECT 1 FROM pg_constraint WHERE conname = 'protocolos_responsable_integrante_fk'",
+  );
+  if (!rows[0]) {
+    await client.query(`
+      ALTER TABLE protocolos
+        ADD CONSTRAINT protocolos_responsable_integrante_fk
+        FOREIGN KEY (id, alumno_id) REFERENCES protocolo_integrantes (protocolo_id, alumno_id)
+        DEFERRABLE INITIALLY DEFERRED
+    `);
+  }
 }
 
 async function initDb() {

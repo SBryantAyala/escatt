@@ -72,7 +72,9 @@ export default function CambioTitulo({ actor }) {
   }
   if (!protocolo) return null;
 
-  const pendiente = solicitudes.find((s) => s.estado === "pendiente");
+  // /mias trae las solicitudes de todos los equipos en los que ha estado el
+  // alumno; solo cuenta la de su protocolo actual.
+  const pendiente = solicitudes.find((s) => s.estado === "pendiente" && s.protocolo.id === protocolo.id);
   const soyResponsable = protocolo.alumno.id === actor?.id;
   const puedeSolicitar = protocolo.estado !== "aprobado";
   // Con el protocolo aprobado el título ya no cambia (Art. 44); solo se
