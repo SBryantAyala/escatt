@@ -12,7 +12,8 @@ Este repositorio contiene **únicamente el código** del proyecto ESCATT.
 
 ```
 docs/
-└── api-protocolos.md   # contrato de API del Módulo 2 (HU-18 a HU-21) y esquema de protocolos
+├── api-protocolos.md   # contrato de API del Módulo 2 (HU-18 a HU-21) y esquema de protocolos
+└── api-sesiones.md     # contrato de API de sesiones y acuerdos de la CATT (y expresidente de academia)
 backend/
 ├── scripts/
 │   ├── crear-admin.js           # crea el primer Administrador del sistema

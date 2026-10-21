@@ -13,6 +13,7 @@ import elegibilidadRouter from "./routes/elegibilidad.js";
 import protocolosRouter from "./routes/protocolos.js";
 import cambiosDirectorRouter from "./routes/cambios-director.js";
 import directoresExternosRouter from "./routes/directores-externos.js";
+import sesionesRouter from "./routes/sesiones.js";
 
 const app = express();
 
@@ -40,6 +41,7 @@ app.use("/api/elegibilidad", elegibilidadRouter);
 app.use("/api/protocolos", protocolosRouter);
 app.use("/api/cambios-director", cambiosDirectorRouter);
 app.use("/api/directores-externos", directoresExternosRouter);
+app.use("/api/sesiones", sesionesRouter);
 
 // Punto único para registrar las rutas de cada pantalla.
 // Cada integrante agrega aquí SU router desde su rama feature/*:
@@ -64,6 +66,11 @@ app.use((err, _req, res, _next) => {
   // Errores propios marcados con `status` (p. ej. el fileFilter de multer en
   // routes/elegibilidad.js) responden con ese código en vez del 500 genérico.
   if (err.status) {
+    // Los errores del sistema (p. ej. ENOENT al descargar un archivo que ya no
+    // está) traen rutas del servidor en el mensaje: no se muestran.
+    if (err.syscall) {
+      return res.status(err.status).json({ error: err.status === 404 ? "El archivo ya no está disponible" : "No se pudo leer el archivo" });
+    }
     return res.status(err.status).json({ error: err.message });
   }
   console.error("[api] error:", err);

@@ -62,6 +62,7 @@ export async function enTransaccion(fn) {
 //   protocolo_directores  1 o 2 directores por protocolo
 //   protocolo_integrantes alumnos del equipo de cada protocolo (incluye al responsable)
 //   protocolo_sinodales   3 sinodales por protocolo + su evaluación
+//   sesiones_catt         sesiones de la CATT; sesion_asistentes y acuerdos_catt cuelgan de ella
 //   bitacora       historial de acciones sensibles
 //   credenciales   contraseña (scrypt) de cada usuario
 //   sesiones       tokens Bearer activos
@@ -606,6 +607,59 @@ async function migrarDirectoresExternos(client) {
   );
 }
 
+async function migrarSesionesCatt(client) {
+  await client.query(`
+    ALTER TABLE academias
+      ADD COLUMN IF NOT EXISTS expresidente_id INTEGER REFERENCES docentes(usuario_id) ON DELETE SET NULL;
+
+    CREATE TABLE IF NOT EXISTS sesiones_catt (
+      id             SERIAL      PRIMARY KEY,
+      tipo           TEXT        NOT NULL DEFAULT 'ordinaria' CHECK (tipo IN ('ordinaria', 'extraordinaria')),
+      fecha_hora     TIMESTAMPTZ NOT NULL,
+      lugar          TEXT,
+      estado         TEXT        NOT NULL DEFAULT 'convocada' CHECK (estado IN ('convocada', 'realizada', 'cancelada')),
+      orden_del_dia  TEXT,
+      presidida_por  TEXT,
+      minuta_archivo TEXT,
+      creada_por     INTEGER     REFERENCES usuarios(id) ON DELETE SET NULL,
+      creado_en      TIMESTAMPTZ NOT NULL DEFAULT now(),
+      actualizado_en TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+
+    CREATE INDEX IF NOT EXISTS sesiones_catt_fecha_idx ON sesiones_catt (fecha_hora DESC);
+
+    CREATE TABLE IF NOT EXISTS sesion_asistentes (
+      id         SERIAL  PRIMARY KEY,
+      sesion_id  INTEGER NOT NULL REFERENCES sesiones_catt(id) ON DELETE CASCADE,
+      usuario_id INTEGER REFERENCES usuarios(id) ON DELETE SET NULL,
+      nombre     TEXT    NOT NULL,
+      cargo      TEXT    NOT NULL,
+      asistio    BOOLEAN NOT NULL DEFAULT FALSE
+    );
+
+    CREATE INDEX IF NOT EXISTS sesion_asistentes_sesion_idx ON sesion_asistentes (sesion_id);
+
+    CREATE TABLE IF NOT EXISTS acuerdos_catt (
+      id              SERIAL      PRIMARY KEY,
+      sesion_id       INTEGER     NOT NULL REFERENCES sesiones_catt(id) ON DELETE CASCADE,
+      numero          INTEGER     NOT NULL,
+      descripcion     TEXT        NOT NULL,
+      responsable     TEXT,
+      fecha_compromiso DATE,
+      estado          TEXT        NOT NULL DEFAULT 'pendiente'
+                      CHECK (estado IN ('pendiente', 'en_proceso', 'cumplido', 'cancelado')),
+      observaciones   TEXT,
+      protocolo_id    INTEGER     REFERENCES protocolos(id) ON DELETE SET NULL,
+      cumplido_en     TIMESTAMPTZ,
+      creado_en       TIMESTAMPTZ NOT NULL DEFAULT now(),
+      actualizado_en  TIMESTAMPTZ NOT NULL DEFAULT now(),
+      UNIQUE (sesion_id, numero)
+    );
+
+    CREATE INDEX IF NOT EXISTS acuerdos_catt_estado_idx ON acuerdos_catt (estado, fecha_compromiso);
+  `);
+}
+
 // Equipos de TT (Documento Rector, Art. 4: "preferentemente en equipo"): un
 // protocolo lo desarrollan uno o más alumnos. protocolo_integrantes lista a
 // todos; el responsable (quien registra y envía las solicitudes) es solo
@@ -658,6 +712,7 @@ async function initDb() {
     await migrarProtocolos(client);
     await migrarEquiposTT(client);
     await migrarDirectoresExternos(client);
+    await migrarSesionesCatt(client);
     // creado_en se agregó después del CREATE TABLE original de elegibilidad.
     await client.query(
       "ALTER TABLE elegibilidad ADD COLUMN IF NOT EXISTS creado_en TIMESTAMPTZ NOT NULL DEFAULT now()",
