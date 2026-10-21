@@ -21,6 +21,8 @@ import CambioObligatorioPage from "./pages/CambiarPassword";
 import PanelInicio from "./pages/Panel/Inicio";
 import PanelLayout from "./pages/Panel";
 import ProtocoloPage from "./pages/Protocolo";
+import SesionesPage from "./pages/Sesiones";
+import SesionDetalle from "./pages/Sesiones/Detalle";
 import SeccionProximamente from "./pages/Panel/SeccionProximamente";
 import AltaPage from "./pages/Usuarios/Alta";
 import DetallePage from "./pages/Usuarios/Detalle";
@@ -1144,6 +1146,17 @@ function ProtocoloRoute() {
   return <ProtocoloPage actor={usuario} />;
 }
 
+function SesionesRoute() {
+  const { usuario } = useSesion();
+  return <SesionesPage actor={usuario} />;
+}
+
+function SesionDetalleRoute() {
+  const { usuario } = useSesion();
+  const { id } = useParams();
+  return <SesionDetalle actor={usuario} sesionId={id} />;
+}
+
 function AcademiaFichaRoute() {
   const { usuario } = useSesion();
   const { id } = useParams();
@@ -1285,6 +1298,22 @@ function AppRoutes() {
           element={
             <RequiereRol clave="academia-ficha">
               <AcademiaFichaRoute />
+            </RequiereRol>
+          }
+        />
+        <Route
+          path="sesiones"
+          element={
+            <RequiereRol clave="sesiones">
+              <SesionesRoute />
+            </RequiereRol>
+          }
+        />
+        <Route
+          path="sesiones/:id"
+          element={
+            <RequiereRol clave="sesion-detalle">
+              <SesionDetalleRoute />
             </RequiereRol>
           }
         />
