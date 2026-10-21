@@ -1,16 +1,13 @@
-import crypto from "node:crypto";
-import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 
 import { Router } from "express";
-import multer from "multer";
 
 import { enTransaccion, pool } from "../db/index.js";
 import { autenticar, exigeCambioResuelto, requiereRol } from "../lib/auth.js";
 import { ROLES_GESTION, ROLES_STAFF } from "../lib/roles.js";
 import { ruta } from "../lib/ruta.js";
-import { registrarBitacora } from "../lib/usuarios.js";
+import { crearSubida } from "../lib/subidas.js";
+import { nombreCompletoDe, registrarBitacora } from "../lib/usuarios.js";
 
 const router = Router();
 router.use(autenticar, exigeCambioResuelto);
@@ -30,27 +27,7 @@ const MAX_RESPONSABLE = 200;
 const MAX_OBSERVACIONES = 2000;
 const FECHA_VALIDA = /^\d{4}-\d{2}-\d{2}$/;
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const DIR_MINUTAS = path.join(__dirname, "..", "..", "uploads", "sesiones");
-fs.mkdirSync(DIR_MINUTAS, { recursive: true });
-
-const EXT_PERMITIDA = { "application/pdf": ".pdf", "image/jpeg": ".jpg", "image/png": ".png" };
-
-const upload = multer({
-  storage: multer.diskStorage({
-    destination: DIR_MINUTAS,
-    filename: (_req, file, cb) => cb(null, `${crypto.randomUUID()}${EXT_PERMITIDA[file.mimetype]}`),
-  }),
-  limits: { fileSize: 10 * 1024 * 1024 },
-  fileFilter: (_req, file, cb) => {
-    if (!EXT_PERMITIDA[file.mimetype]) {
-      const err = new Error("Formato no permitido; solo PDF, JPG o PNG");
-      err.status = 400;
-      return cb(err);
-    }
-    cb(null, true);
-  },
-});
+const minutas = crearSubida("sesiones");
 
 const texto = (v) => (typeof v === "string" ? v.trim() : "");
 
@@ -59,26 +36,21 @@ function idPositivo(valor) {
   return Number.isInteger(n) && n > 0 ? n : null;
 }
 
-function borrarMinuta(nombreArchivo) {
-  if (!nombreArchivo) return;
-  fs.unlink(path.join(DIR_MINUTAS, nombreArchivo), () => {});
-}
-
-function nombreCompleto(u) {
-  return [u.nombre, u.apellido_paterno, u.apellido_materno].filter(Boolean).join(" ");
-}
-
 function fechaHoraValida(valor) {
   if (typeof valor !== "string" || !valor.trim()) return null;
   const fecha = new Date(valor);
   return Number.isNaN(fecha.getTime()) ? null : fecha;
 }
 
+// Día "AAAA-MM-DD" que exista en el calendario. new Date() no basta: convierte
+// 2026-02-30 en 2 de marzo en lugar de rechazarlo.
 function fechaDeDia(valor) {
   if (valor == null || valor === "") return { valor: null };
-  if (typeof valor !== "string" || !FECHA_VALIDA.test(valor) || Number.isNaN(new Date(valor).getTime())) {
-    return { error: "fecha_compromiso debe tener el formato AAAA-MM-DD" };
-  }
+  const error = { error: "fecha_compromiso debe ser un día válido con el formato AAAA-MM-DD" };
+  if (typeof valor !== "string" || !FECHA_VALIDA.test(valor)) return error;
+  const [anio, mes, dia] = valor.split("-").map(Number);
+  const f = new Date(Date.UTC(anio, mes - 1, dia));
+  if (f.getUTCFullYear() !== anio || f.getUTCMonth() !== mes - 1 || f.getUTCDate() !== dia) return error;
   return { valor };
 }
 
@@ -88,47 +60,41 @@ function diaISO(fecha) {
   return `${f.getFullYear()}-${String(f.getMonth() + 1).padStart(2, "0")}-${String(f.getDate()).padStart(2, "0")}`;
 }
 
+// Presidentes y expresidentes inmediatos de las academias activas, con cuenta
+// activa. Cada persona aparece una sola vez: si tiene varios cargos (p. ej.
+// expresidente de una academia y presidente de otra) van juntos en `cargo`.
 async function integrantesAutomaticos(client = pool) {
   const { rows } = await client.query(
-    `SELECT ac.id AS academia_id, ac.nombre AS academia,
-            ac.presidente_id, ac.expresidente_id,
-            pu.nombre AS p_nombre, pu.apellido_paterno AS p_ap, pu.apellido_materno AS p_am,
-            eu.nombre AS e_nombre, eu.apellido_paterno AS e_ap, eu.apellido_materno AS e_am
-       FROM academias ac
-       LEFT JOIN usuarios pu ON pu.id = ac.presidente_id
-       LEFT JOIN usuarios eu ON eu.id = ac.expresidente_id
-      WHERE ac.activa
-      ORDER BY ac.nombre`,
+    `SELECT u.id, u.nombre, u.apellido_paterno, u.apellido_materno, c.cargo
+       FROM (SELECT ac.presidente_id AS usuario_id, 0 AS orden, ac.nombre AS academia,
+                    'Presidente de Academia · ' || ac.nombre AS cargo
+               FROM academias ac WHERE ac.activa AND ac.presidente_id IS NOT NULL
+             UNION ALL
+             SELECT ac.expresidente_id, 1, ac.nombre, 'Expresidente de Academia · ' || ac.nombre
+               FROM academias ac WHERE ac.activa AND ac.expresidente_id IS NOT NULL) c
+       JOIN usuarios u ON u.id = c.usuario_id AND u.estado = 'activa'
+      ORDER BY c.academia, c.orden`,
   );
-  const lista = [];
+  const porUsuario = new Map();
   for (const r of rows) {
-    if (r.presidente_id != null) {
-      lista.push({
-        usuario_id: r.presidente_id,
-        nombre: nombreCompleto({ nombre: r.p_nombre, apellido_paterno: r.p_ap, apellido_materno: r.p_am }),
-        cargo: `Presidente de Academia · ${r.academia}`,
-      });
-    }
-    if (r.expresidente_id != null) {
-      lista.push({
-        usuario_id: r.expresidente_id,
-        nombre: nombreCompleto({ nombre: r.e_nombre, apellido_paterno: r.e_ap, apellido_materno: r.e_am }),
-        cargo: `Expresidente de Academia · ${r.academia}`,
-      });
-    }
+    const previo = porUsuario.get(r.id);
+    if (previo) previo.cargo += ` y ${r.cargo}`;
+    else porUsuario.set(r.id, { usuario_id: r.id, nombre: nombreCompletoDe(r), cargo: r.cargo });
   }
-  return lista;
+  return [...porUsuario.values()];
 }
 
 const SELECT_RESUMEN = `
   SELECT s.id, s.tipo, s.fecha_hora, s.lugar, s.estado,
          (s.minuta_archivo IS NOT NULL) AS tiene_minuta,
-         (SELECT count(*)::int FROM sesion_asistentes a WHERE a.sesion_id = s.id) AS total_asistentes,
-         (SELECT count(*)::int FROM sesion_asistentes a WHERE a.sesion_id = s.id AND a.asistio) AS asistieron,
-         (SELECT count(*)::int FROM acuerdos_catt c WHERE c.sesion_id = s.id) AS total_acuerdos,
-         (SELECT count(*)::int FROM acuerdos_catt c
-           WHERE c.sesion_id = s.id AND c.estado = ANY($1)) AS acuerdos_abiertos
+         COALESCE(a.total, 0) AS total_asistentes, COALESCE(a.asistieron, 0) AS asistieron,
+         COALESCE(c.total, 0) AS total_acuerdos, COALESCE(c.abiertos, 0) AS acuerdos_abiertos
     FROM sesiones_catt s
+    LEFT JOIN (SELECT sesion_id, count(*)::int AS total, (count(*) FILTER (WHERE asistio))::int AS asistieron
+                 FROM sesion_asistentes GROUP BY sesion_id) a ON a.sesion_id = s.id
+    LEFT JOIN (SELECT sesion_id, count(*)::int AS total,
+                      (count(*) FILTER (WHERE estado = ANY($1)))::int AS abiertos
+                 FROM acuerdos_catt GROUP BY sesion_id) c ON c.sesion_id = s.id
 `;
 
 function serializarResumen(r) {
@@ -197,7 +163,7 @@ async function obtenerDetalle(id, client = pool) {
     tiene_minuta: s.tiene_minuta,
     creado_en: s.creado_en,
     creada_por: s.creada_por
-      ? { id: s.creada_por, nombre: nombreCompleto({ nombre: s.c_nombre, apellido_paterno: s.c_ap, apellido_materno: s.c_am }) }
+      ? { id: s.creada_por, nombre: nombreCompletoDe({ nombre: s.c_nombre, apellido_paterno: s.c_ap, apellido_materno: s.c_am }) }
       : null,
     asistentes: asistentes.map((a) => ({
       id: a.id,
@@ -210,8 +176,12 @@ async function obtenerDetalle(id, client = pool) {
   };
 }
 
+// Bloquea la sesión hasta el commit y la devuelve (o null si no existe).
 async function sesionAbierta(client, id) {
-  const { rows } = await client.query("SELECT estado FROM sesiones_catt WHERE id = $1 FOR UPDATE", [id]);
+  const { rows } = await client.query(
+    "SELECT estado, fecha_hora, minuta_archivo FROM sesiones_catt WHERE id = $1 FOR UPDATE",
+    [id],
+  );
   return rows[0] ?? null;
 }
 
@@ -309,12 +279,12 @@ router.post(
         [sesionId],
       );
       const roster = [...fijos.map((f) => ({ usuario_id: null, ...f })), ...automaticos];
-      for (const a of roster) {
-        await client.query(
-          "INSERT INTO sesion_asistentes (sesion_id, usuario_id, nombre, cargo) VALUES ($1, $2, $3, $4)",
-          [sesionId, a.usuario_id, a.nombre, a.cargo],
-        );
-      }
+      await client.query(
+        `INSERT INTO sesion_asistentes (sesion_id, usuario_id, nombre, cargo)
+         SELECT $1, u, n, c FROM unnest($2::int[], $3::text[], $4::text[]) WITH ORDINALITY AS r(u, n, c, o)
+         ORDER BY o`,
+        [sesionId, roster.map((a) => a.usuario_id), roster.map((a) => a.nombre), roster.map((a) => a.cargo)],
+      );
 
       await registrarBitacora(client, req.usuario.id, "crear_sesion", "sesiones_catt", sesionId, {
         tipo,
@@ -381,12 +351,9 @@ router.patch(
     }
 
     const resultado = await enTransaccion(async (client) => {
-      const { rows } = await client.query("SELECT estado FROM sesiones_catt WHERE id = $1 FOR UPDATE", [id]);
-      const sesion = rows[0];
-      if (!sesion) return { status: 404, error: "No existe esa sesión" };
-      if (sesion.estado === "cancelada") {
-        return { status: 409, error: "La sesión está cancelada y ya no se puede modificar" };
-      }
+      const sesion = await sesionAbierta(client, id);
+      const rechazo = rechazoDeSesion(sesion);
+      if (rechazo) return rechazo;
       if (sesion.estado === "realizada" && (cambios.tipo || cambios.fecha_hora)) {
         return { status: 409, error: "Una sesión realizada ya no puede cambiar de tipo ni de fecha" };
       }
@@ -584,6 +551,10 @@ router.post(
       const sesion = await sesionAbierta(client, id);
       const rechazo = rechazoDeSesion(sesion);
       if (rechazo) return rechazo;
+      // Se capturan durante la sesión o después, nunca antes de que empiece.
+      if (sesion.estado === "convocada" && new Date(sesion.fecha_hora) > new Date()) {
+        return { status: 409, error: "Los acuerdos se registran a partir de la fecha y hora de la sesión" };
+      }
       const { rows: num } = await client.query(
         "SELECT COALESCE(max(numero), 0) + 1 AS n FROM acuerdos_catt WHERE sesion_id = $1",
         [id],
@@ -652,11 +623,11 @@ router.patch(
 router.post(
   "/:id/minuta",
   requiereRol(...ROLES_GESTION),
-  upload.single("minuta"),
+  minutas.upload.single("minuta"),
   ruta(async (req, res) => {
     const archivo = req.file;
     const rechazar = (status, error) => {
-      borrarMinuta(archivo?.filename);
+      minutas.borrar(archivo?.filename);
       return res.status(status).json({ error });
     };
     const id = idPositivo(req.params.id);
@@ -664,11 +635,7 @@ router.post(
     if (!archivo) return rechazar(400, "Adjunta la minuta firmada (PDF, JPG o PNG)");
 
     const resultado = await enTransaccion(async (client) => {
-      const { rows } = await client.query(
-        "SELECT estado, minuta_archivo FROM sesiones_catt WHERE id = $1 FOR UPDATE",
-        [id],
-      );
-      const sesion = rows[0];
+      const sesion = await sesionAbierta(client, id);
       if (!sesion) return { status: 404, error: "No existe esa sesión" };
       if (sesion.estado !== "realizada") {
         return { status: 409, error: "La minuta solo se sube cuando la sesión ya fue realizada" };
@@ -682,7 +649,7 @@ router.post(
     });
 
     if (!resultado.ok) return rechazar(resultado.status, resultado.error);
-    borrarMinuta(resultado.previa);
+    minutas.borrar(resultado.previa);
     res.status(201).json(await obtenerDetalle(id));
   }),
 );
@@ -690,15 +657,23 @@ router.post(
 router.get(
   "/:id/minuta",
   requiereRol(...ROLES_LECTURA),
-  ruta(async (req, res) => {
+  ruta(async (req, res, next) => {
     const id = idPositivo(req.params.id);
     if (!id) return void res.status(400).json({ error: "El id debe ser un número entero positivo" });
     const { rows } = await pool.query("SELECT minuta_archivo FROM sesiones_catt WHERE id = $1", [id]);
     if (!rows[0]) return void res.status(404).json({ error: "No existe esa sesión" });
     if (!rows[0].minuta_archivo) return void res.status(404).json({ error: "Esa sesión no tiene minuta" });
     res.download(
-      path.join(DIR_MINUTAS, rows[0].minuta_archivo),
+      minutas.rutaDe(rows[0].minuta_archivo),
       `minuta-sesion-${id}${path.extname(rows[0].minuta_archivo)}`,
+      (err) => {
+        // Sin el callback, el error (p. ej. el archivo ya no está en disco)
+        // llega al manejador global con la ruta absoluta en el mensaje.
+        if (!err) return;
+        if (res.headersSent) return void res.end();
+        if (err.code === "ENOENT") return void res.status(404).json({ error: "El archivo de la minuta ya no está disponible" });
+        next(err);
+      },
     );
   }),
 );

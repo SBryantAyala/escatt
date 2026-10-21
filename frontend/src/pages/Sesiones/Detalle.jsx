@@ -21,6 +21,7 @@ import {
   TIPOS_SESION,
   estaVencido,
   formatearDia,
+  formatearFechaCorta,
   formatearFechaHora,
   valorParaInputFechaHora,
 } from "./formato";
@@ -132,13 +133,27 @@ function Asistencia({ sesion, puedeGestionar, ocupado, onGuardar, onAgregar, onQ
   const [presentes, setPresentes] = useState(() => new Set(sesion.asistentes.filter((a) => a.asistio).map((a) => a.id)));
   const [nombre, setNombre] = useState("");
   const [cargo, setCargo] = useState("");
+  // true mientras haya casillas marcadas sin guardar: otras acciones (agregar
+  // un invitado, registrar un acuerdo) también traen la sesión de nuevo y no
+  // deben borrar lo que el usuario lleva marcado.
+  const sucio = useRef(false);
   const editable = puedeGestionar && sesion.estado !== "cancelada";
 
   useEffect(() => {
-    setPresentes(new Set(sesion.asistentes.filter((a) => a.asistio).map((a) => a.id)));
+    const guardados = new Set(sesion.asistentes.filter((a) => a.asistio).map((a) => a.id));
+    setPresentes((previos) => {
+      if (!sucio.current) return guardados;
+      const vigentes = new Set(sesion.asistentes.map((a) => a.id));
+      const siguientes = new Set([...previos].filter((id) => vigentes.has(id)));
+      if (siguientes.size === guardados.size && [...siguientes].every((id) => guardados.has(id))) sucio.current = false;
+      return siguientes;
+    });
   }, [sesion.asistentes]);
 
+  const sinGuardar = sesion.asistentes.some((a) => a.asistio !== presentes.has(a.id));
+
   function alternar(id) {
+    sucio.current = true;
     setPresentes((previos) => {
       const siguientes = new Set(previos);
       if (siguientes.has(id)) siguientes.delete(id);
@@ -215,6 +230,7 @@ function Asistencia({ sesion, puedeGestionar, ocupado, onGuardar, onAgregar, onQ
           <button type="button" onClick={() => onGuardar([...presentes])} disabled={ocupado} className={`mt-3 ${claseBotonPrimario}`}>
             Guardar asistencia
           </button>
+          {sinGuardar && <p className="mt-2 text-xs font-semibold text-amber-700">Hay cambios de asistencia sin guardar.</p>}
 
           <form onSubmit={agregar} noValidate className="mt-6 border-t border-slate-100 pt-4">
             <p className="text-sm font-semibold text-slate-800">Agregar integrante o invitado</p>
@@ -248,6 +264,8 @@ function Acuerdos({ sesion, puedeGestionar, ocupado, protocolos, onCrear, onCamb
   const [compromiso, setCompromiso] = useState("");
   const [protocoloId, setProtocoloId] = useState("");
   const editable = puedeGestionar && sesion.estado !== "cancelada";
+  // Los acuerdos se registran durante la sesión o después, no antes.
+  const yaEmpezo = sesion.estado === "realizada" || new Date(sesion.fecha_hora) <= new Date();
 
   async function crear(e) {
     e.preventDefault();
@@ -292,7 +310,7 @@ function Acuerdos({ sesion, puedeGestionar, ocupado, protocolos, onCrear, onCamb
                 {a.responsable ? `Responsable: ${a.responsable}` : "Sin responsable"}
                 {a.fecha_compromiso && ` · Compromiso: ${formatearDia(a.fecha_compromiso)}`}
                 {a.protocolo && ` · Protocolo: ${a.protocolo.titulo}`}
-                {a.cumplido_en && ` · Cumplido el ${formatearDia(a.cumplido_en.slice(0, 10))}`}
+                {a.cumplido_en && ` · Cumplido el ${formatearFechaCorta(a.cumplido_en)}`}
               </p>
               {a.observaciones && <p className="mt-1 text-xs text-slate-600">{a.observaciones}</p>}
               {editable && (
@@ -318,7 +336,13 @@ function Acuerdos({ sesion, puedeGestionar, ocupado, protocolos, onCrear, onCamb
         })}
       </ul>
 
-      {editable && (
+      {editable && !yaEmpezo && (
+        <p className="mt-6 border-t border-slate-100 pt-4 text-sm text-slate-500">
+          Podrás registrar acuerdos a partir de la fecha y hora de la sesión.
+        </p>
+      )}
+
+      {editable && yaEmpezo && (
         <form onSubmit={crear} noValidate className="mt-6 border-t border-slate-100 pt-4">
           <p className="text-sm font-semibold text-slate-800">Registrar acuerdo</p>
           <label className="mt-3 block">

@@ -45,6 +45,9 @@ acta no cambie si después cambia un presidente:
   `Presidente de Academia · <academia>`), con su `usuario_id`.
 - Los **expresidentes inmediatos** de esas academias (Art. 8 VI; cargo
   `Expresidente de Academia · <academia>`), con su `usuario_id`.
+- Solo personas con cuenta `activa`, y **una vez cada una**: si alguien tiene
+  dos cargos (p. ej. expresidente de una academia y presidente de otra), sus
+  cargos van juntos en `cargo`, separados por " y ".
 - Los integrantes sin cuenta (Director, Subdirector Académico, Jefes de
   Departamento, etc.) **se heredan de la última sesión no cancelada**. Se
   agregan a mano con `POST /:id/asistentes`; `usuario_id` es `null`.
@@ -66,7 +69,8 @@ expresidentes) tal como se copiaría hoy.
 `PUT /api/academias/:id/expresidente { "docente_id": 12 | null }` (solo
 `catt_ejecutivo`) lo corrige a mano; sirve para las academias que cambiaron de
 presidente antes de que existiera el campo. `409` si es el presidente actual,
-`400` si el docente no existe. `GET /api/academias` y `GET /api/academias/:id`
+`400` si el docente no existe, no pertenece a esa academia o no tiene la
+cuenta activa (las mismas reglas que el presidente). `GET /api/academias` y `GET /api/academias/:id`
 traen `expresidente` (`{ id, nombre_completo, iniciales }` o `null`).
 
 ## Esquema
@@ -187,13 +191,14 @@ Body JSON:
 |---|---|---|
 | `descripcion` | sí | máx. 5000 |
 | `responsable` | no | texto libre, máx. 200 |
-| `fecha_compromiso` | no | `AAAA-MM-DD` |
+| `fecha_compromiso` | no | `AAAA-MM-DD`, un día que exista (`2026-02-30` es `400`) |
 | `observaciones` | no | máx. 2000 |
 | `protocolo_id` | no | protocolo al que se refiere; `400` si no existe |
 | `estado` | no | `pendiente` (por omisión); `400` si es `cumplido` |
 
 El `numero` es consecutivo dentro de la sesión. `201` con el detalle. `409` si
-la sesión está cancelada.
+la sesión está cancelada, o si está `convocada` y todavía no llega su
+`fecha_hora` (los acuerdos se capturan durante la sesión o después).
 
 ### `PATCH /api/sesiones/:id/acuerdos/:acuerdoId`
 Cualquiera de los campos anteriores. Al pasar a `cumplido` se guarda
@@ -207,7 +212,8 @@ sesión `realizada` (`409`). Si ya había una minuta, la reemplaza y borra el
 archivo anterior. `201` con el detalle.
 
 ### `GET /api/sesiones/:id/minuta`
-Descarga la minuta (usa `descargarArchivo()` de `lib/api.js`). `404` si no hay.
+Descarga la minuta (usa `descargarArchivo()` de `lib/api.js`). `404` si no hay,
+o si el archivo ya no está en el servidor.
 
 ## Bitácora
 

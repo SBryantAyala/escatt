@@ -56,6 +56,11 @@ function serializar(fila) {
   return { ...resto, activo: fila.estado === "activa", perfiles };
 }
 
+// "Nombre ApellidoP ApellidoM" sin huecos si falta algún apellido.
+export function nombreCompletoDe(u) {
+  return [u.nombre, u.apellido_paterno, u.apellido_materno].filter(Boolean).join(" ");
+}
+
 export async function obtenerUsuario(id, client = pool) {
   const { rows } = await client.query(`${SELECT_USUARIO} WHERE u.id = $1 ${GROUP_BY}`, [id]);
   return serializar(rows[0]);

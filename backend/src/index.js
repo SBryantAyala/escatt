@@ -64,6 +64,11 @@ app.use((err, _req, res, _next) => {
   // Errores propios marcados con `status` (p. ej. el fileFilter de multer en
   // routes/elegibilidad.js) responden con ese código en vez del 500 genérico.
   if (err.status) {
+    // Los errores del sistema (p. ej. ENOENT al descargar un archivo que ya no
+    // está) traen rutas del servidor en el mensaje: no se muestran.
+    if (err.syscall) {
+      return res.status(err.status).json({ error: err.status === 404 ? "El archivo ya no está disponible" : "No se pudo leer el archivo" });
+    }
     return res.status(err.status).json({ error: err.message });
   }
   console.error("[api] error:", err);

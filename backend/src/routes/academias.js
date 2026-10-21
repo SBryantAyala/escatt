@@ -5,7 +5,7 @@ import { CLAVES_COLOR_ACADEMIA, ICONOS_ACADEMIA, colorValido, iconoValido } from
 import { autenticar, exigeCambioResuelto, requiereRol } from "../lib/auth.js";
 import { tieneRol } from "../lib/roles.js";
 import { ruta } from "../lib/ruta.js";
-import { asignarRol, quitarRol, registrarBitacora } from "../lib/usuarios.js";
+import { asignarRol, nombreCompletoDe, quitarRol, registrarBitacora } from "../lib/usuarios.js";
 
 // Academias: el Secretario Ejecutivo es su dueño (alta, edición, presidente,
 // integrantes). El resto del personal CATT y el administrador consultan; el
@@ -22,10 +22,6 @@ const texto = (v) => (typeof v === "string" ? v.trim() : "");
 function idDeParams(req) {
   const id = Number(req.params.id);
   return Number.isInteger(id) && id > 0 ? id : null;
-}
-
-function nombreCompletoDe(u) {
-  return [u.nombre, u.apellido_paterno, u.apellido_materno].filter(Boolean).join(" ");
 }
 
 function inicialesDe(u) {
@@ -353,8 +349,17 @@ router.put(
     if (!acRows[0]) return void res.status(404).json({ error: "No existe esa academia" });
 
     if (docenteId !== null) {
-      const { rows: docRows } = await pool.query("SELECT 1 FROM docentes WHERE usuario_id = $1", [docenteId]);
-      if (!docRows[0]) return void res.status(400).json({ error: "Ese docente no existe" });
+      // Como en el presidente: docente de esta academia y con cuenta activa.
+      // El expresidente se convoca a cada sesión nueva de la CATT.
+      const { rows: docRows } = await pool.query(
+        `SELECT d.academia_id, u.estado FROM docentes d
+         JOIN usuarios u ON u.id = d.usuario_id WHERE d.usuario_id = $1`,
+        [docenteId],
+      );
+      const docente = docRows[0];
+      if (!docente || docente.academia_id !== id || docente.estado !== "activa") {
+        return void res.status(400).json({ error: "Ese docente no pertenece a esta academia o no está activo" });
+      }
       if (docenteId === acRows[0].presidente_id) {
         return void res.status(409).json({ error: "El presidente actual no puede ser el expresidente" });
       }
