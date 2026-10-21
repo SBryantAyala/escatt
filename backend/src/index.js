@@ -12,6 +12,7 @@ import bitacoraRouter from "./routes/bitacora.js";
 import elegibilidadRouter from "./routes/elegibilidad.js";
 import protocolosRouter from "./routes/protocolos.js";
 import cambiosDirectorRouter from "./routes/cambios-director.js";
+import directoresExternosRouter from "./routes/directores-externos.js";
 import sesionesRouter from "./routes/sesiones.js";
 
 const app = express();
@@ -39,6 +40,7 @@ app.use("/api/bitacora", bitacoraRouter);
 app.use("/api/elegibilidad", elegibilidadRouter);
 app.use("/api/protocolos", protocolosRouter);
 app.use("/api/cambios-director", cambiosDirectorRouter);
+app.use("/api/directores-externos", directoresExternosRouter);
 app.use("/api/sesiones", sesionesRouter);
 
 // Punto único para registrar las rutas de cada pantalla.
