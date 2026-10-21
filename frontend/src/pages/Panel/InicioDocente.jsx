@@ -7,6 +7,7 @@ import { IconoDocumento, IconoUsuarios } from "../../components/iconos";
 import { ICONO_ACADEMIA_COMPONENTE } from "../../components/iconosAcademia";
 import { colorDe } from "../../lib/academias";
 import { api } from "../../lib/api";
+import { resumenIntegrantes } from "../../lib/integrantes";
 import { etiquetaRolPrincipal, tieneRol } from "../../lib/roles";
 import { ESTADOS_PROTOCOLO, estadoDe } from "../Protocolo/estados";
 
@@ -107,9 +108,7 @@ function Pendientes({ porEvaluar }) {
               </span>
               <div className="min-w-0">
                 <p className="font-bold text-slate-800">{p.titulo}</p>
-                <p className="mt-1 text-sm text-slate-600">
-                  {p.alumno.nombre} · {p.alumno.carrera}
-                </p>
+                <p className="mt-1 text-sm text-slate-600">{resumenIntegrantes(p, ["carrera"])}</p>
                 <p className="mt-1 text-xs text-slate-500">
                   Eres sinodal · {p.sinodales.filter((s) => s.evaluo).length} de {p.sinodales.length} evaluaciones
                   entregadas
@@ -175,9 +174,7 @@ function Dirigidos({ dirigidos }) {
             <li key={p.id} className="flex items-start justify-between gap-3 px-4 py-3.5 sm:px-5">
               <div className="min-w-0">
                 <p className="truncate text-sm font-semibold text-slate-800">{p.titulo}</p>
-                <p className="mt-0.5 truncate text-xs text-slate-500">
-                  {p.alumno.nombre} · {p.alumno.boleta}
-                </p>
+                <p className="mt-0.5 text-xs text-slate-500">{resumenIntegrantes(p, ["boleta"])}</p>
               </div>
               <Etiqueta variante={estado.variante} className="shrink-0">
                 {estado.etiqueta}
