@@ -1,5 +1,6 @@
 // Equipo de un protocolo de TT: el responsable (protocolos.alumno_id) y los
-// compañeros que agregó, todos en protocolo_integrantes.
+// compañeros que agregó, todos en protocolo_integrantes. El responsable es
+// siempre protocolos.alumno_id; `es_responsable` se calcula de ahí al leer.
 
 // Máximo de alumnos por equipo, responsable incluido. El cliente todavía no
 // confirma el valor: es el único lugar que hay que cambiar.
@@ -18,8 +19,8 @@ export const sqlIntegrantes = (alias = "p") => `
               'nombre', concat_ws(' ', iu.nombre, iu.apellido_paterno, iu.apellido_materno),
               'boleta', ia.boleta,
               'carrera', ia.carrera,
-              'es_responsable', i.es_responsable)
-            ORDER BY i.es_responsable DESC, i.agregado_en, i.alumno_id)
+              'es_responsable', i.alumno_id = ${alias}.alumno_id)
+            ORDER BY i.alumno_id = ${alias}.alumno_id DESC, i.agregado_en, i.alumno_id)
      FROM protocolo_integrantes i
      JOIN alumnos ia  ON ia.usuario_id = i.alumno_id
      JOIN usuarios iu ON iu.id = i.alumno_id
@@ -29,6 +30,10 @@ export const esIntegrante = (usuarioId, integrantes) => (integrantes ?? []).some
 
 // Protocolo vigente más reciente del que la persona es integrante (o null).
 // `alumno_id` es el responsable.
+//
+// Uno "no_aprobado" no cuenta: el equipo puede registrar otro. Cuando exista
+// el reenvío de un protocolo corregido (HU-23), ese endpoint debe comprobar
+// con esta función que ningún integrante tenga ya otro protocolo vigente.
 export async function protocoloVigenteDe(client, usuarioId, { bloquear = false } = {}) {
   const { rows } = await client.query(
     `SELECT p.id, p.alumno_id, p.titulo, p.estado
@@ -42,9 +47,10 @@ export async function protocoloVigenteDe(client, usuarioId, { bloquear = false }
   return rows[0] ?? null;
 }
 
-// Lista de correos desde un campo multipart repetido, "a@x,b@x" o un arreglo
-// JSON. null si algún valor no parece un correo.
-export function listaDeCorreos(valor) {
+// Lista desde un campo multipart repetido, "a,b" o un arreglo JSON, sin
+// repetidos. `normalizar` convierte cada valor y devuelve null si no es
+// válido; la lista entera es null si algún valor no lo es.
+export function parsearLista(valor, normalizar) {
   let crudo = valor;
   if (crudo === undefined || crudo === null || crudo === "") return [];
   if (typeof crudo === "string") {
@@ -60,37 +66,63 @@ export function listaDeCorreos(valor) {
     }
   }
   if (!Array.isArray(crudo)) return null;
-  const correos = crudo.map((c) => (typeof c === "string" ? c.trim().toLowerCase() : ""));
-  if (!correos.every((c) => CORREO_VALIDO.test(c))) return null;
-  return [...new Set(correos)];
+  const valores = crudo.map((v) => normalizar(typeof v === "string" ? v.trim() : v));
+  if (valores.some((v) => v === null)) return null;
+  return [...new Set(valores)];
 }
 
-// Valida a un compañero para el equipo y devuelve { alumno } o { status, error }.
-// Debe ser un alumno con cuenta activa, con elegibilidad vigente (la del
-// periodo más reciente, como el responsable) y sin otro protocolo vigente.
-export async function validarCompanero(client, correo) {
+export const listaDeCorreos = (valor) =>
+  parsearLista(valor, (v) => (typeof v === "string" && CORREO_VALIDO.test(v) ? v.toLowerCase() : null));
+
+// Mismo mensaje para cualquier motivo: quien registra no debe enterarse de la
+// elegibilidad ni de los protocolos de otro alumno.
+const noSePuedeAgregar = (correo, periodo) =>
+  `No se puede agregar a ${correo} al equipo: debe ser un alumno con cuenta activa, ` +
+  `con elegibilidad para TT validada en el periodo ${periodo} y sin otro protocolo vigente`;
+
+// Valida a los compañeros del equipo para el periodo del protocolo y devuelve
+// { companeros } o { status, error }. Cada uno debe ser un alumno con cuenta
+// activa, elegible en ese periodo y sin otro protocolo vigente.
+//
+// Con `bloquear` (dentro de la transacción del registro, después de bloquear
+// sus filas de alumnos) deja bloqueadas sus filas de usuarios y elegibilidad
+// hasta el commit, para que nadie desactive su cuenta ni cambie su
+// elegibilidad mientras tanto. Sin `bloquear` sirve para validar antes.
+export async function validarEquipo(client, correos, { periodo, bloquear = false }) {
+  if (correos.length === 0) return { companeros: [] };
   const { rows } = await client.query(
-    `SELECT u.id, concat_ws(' ', u.nombre, u.apellido_paterno, u.apellido_materno) AS nombre,
+    `SELECT u.id, lower(u.correo) AS correo,
+            concat_ws(' ', u.nombre, u.apellido_paterno, u.apellido_materno) AS nombre,
             a.boleta, a.carrera
-       FROM usuarios u JOIN alumnos a ON a.usuario_id = u.id
-      WHERE lower(u.correo) = lower($1) AND u.estado = 'activa'`,
-    [correo],
+       FROM usuarios u
+       JOIN alumnos a      ON a.usuario_id = u.id
+       JOIN elegibilidad e ON e.alumno_id = u.id AND e.periodo = $2 AND e.estado = 'elegible'
+      WHERE lower(u.correo) = ANY($1) AND u.estado = 'activa'
+      ORDER BY u.id${bloquear ? " FOR SHARE OF u, e" : ""}`,
+    [correos, periodo],
   );
-  const alumno = rows[0];
-  if (!alumno) {
-    return { status: 400, error: `No hay una cuenta de alumno activa con el correo ${correo}` };
-  }
+  const porCorreo = new Map(rows.map((r) => [r.correo, r]));
+  const faltante = correos.find((c) => !porCorreo.has(c));
+  if (faltante) return { status: 409, error: noSePuedeAgregar(faltante, periodo) };
 
-  const { rows: eleg } = await client.query(
-    "SELECT estado FROM elegibilidad WHERE alumno_id = $1 ORDER BY periodo DESC LIMIT 1",
-    [alumno.id],
+  const { rows: ocupados } = await client.query(
+    `SELECT DISTINCT i.alumno_id
+       FROM protocolo_integrantes i JOIN protocolos p ON p.id = i.protocolo_id
+      WHERE i.alumno_id = ANY($1) AND p.estado = ANY($2)`,
+    [rows.map((r) => r.id), ESTADOS_VIGENTES],
   );
-  if (eleg[0]?.estado !== "elegible") {
-    return { status: 409, error: `${alumno.nombre} no tiene la elegibilidad para TT validada por la CATT` };
-  }
+  const ocupado = rows.find((r) => ocupados.some((o) => o.alumno_id === r.id));
+  if (ocupado) return { status: 409, error: noSePuedeAgregar(ocupado.correo, periodo) };
 
-  if (await protocoloVigenteDe(client, alumno.id)) {
-    return { status: 409, error: `${alumno.nombre} ya forma parte de un protocolo vigente` };
-  }
-  return { alumno };
+  return { companeros: correos.map((c) => porCorreo.get(c)) };
+}
+
+// Periodo en el que el alumno puede registrar protocolo: el de su registro de
+// elegibilidad más reciente, si es "elegible". null si no puede.
+export async function periodoElegibleDe(client, alumnoId) {
+  const { rows } = await client.query(
+    "SELECT periodo, estado FROM elegibilidad WHERE alumno_id = $1 ORDER BY periodo DESC LIMIT 1",
+    [alumnoId],
+  );
+  return rows[0]?.estado === "elegible" ? rows[0].periodo : null;
 }
