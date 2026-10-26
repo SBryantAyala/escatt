@@ -13,6 +13,7 @@ Este repositorio contiene **únicamente el código** del proyecto ESCATT.
 ```
 docs/
 ├── api-protocolos.md   # contrato de API del Módulo 2 (HU-18 a HU-21) y esquema de protocolos
+├── api-revocacion-con-aviso.md  # revocar a un docente con asignaciones vigentes (HU-7)
 ├── api-cambios-titulo.md  # contrato de API del cambio de título del protocolo
 └── api-sesiones.md     # contrato de API de sesiones y acuerdos de la CATT (y expresidente de academia)
 backend/
