@@ -14,6 +14,7 @@ Este repositorio contiene **únicamente el código** del proyecto ESCATT.
 docs/
 ├── api-protocolos.md   # contrato de API del Módulo 2 (HU-18 a HU-21) y esquema de protocolos
 ├── api-cambios-titulo.md  # contrato de API del cambio de título del protocolo
+├── api-padron-y-externos.md  # padrón de boletas, alumnos de otras escuelas y revocación con aviso
 └── api-sesiones.md     # contrato de API de sesiones y acuerdos de la CATT (y expresidente de academia)
 backend/
 ├── scripts/
@@ -63,8 +64,8 @@ dé 404 a nivel servidor — react-router toma el control desde ahí.
   persona puede tener varios (p. ej. docente + presidente de academia).
 - Roles: `admin_sistema`, `catt_ejecutivo`, `catt_auxiliar`, `catt_consulta`,
   `docente`, `presidente_academia`, `alumno`.
-- Solo los alumnos se registran solos (`@alumno.ipn.mx`). La CATT da de alta a
-  alumnos y docentes; el Administrador del sistema da de alta al personal CATT.
+- Solo los alumnos de ESCOM se registran solos (`@alumno.ipn.mx`). La CATT da de alta a
+  alumnos (también de otras escuelas, con escuela de origen y sin boleta obligatoria) y docentes; el Administrador del sistema da de alta al personal CATT.
   Las cuentas nuevas nacen con contraseña temporal.
 - Lo normal es **revocar** una cuenta (baja lógica: conserva el historial y se
   puede reactivar). **Eliminar** borra la cuenta de forma permanente y solo se

@@ -32,7 +32,13 @@ const PESTANAS = [
     titulo: "Alumnos",
     etiquetaAlta: "Registrar alumno",
     identificador: { label: "Boleta", campo: "boleta" },
-    extra: { label: "Carrera / plan", valor: (u) => `${u.carrera ?? "—"} · ${u.plan_estudios ?? "—"}` },
+    extra: {
+      label: "Carrera / plan",
+      valor: (u) =>
+        u.procedencia === "externa"
+          ? `${u.carrera ?? "—"} · ${u.escuela_origen ?? "—"}`
+          : `${u.carrera ?? "—"} · ${u.plan_estudios ?? "—"}`,
+    },
     pertenece: (u) => u.perfiles?.includes("alumno"),
     // Quién da de alta en esta pestaña (el backend valida igual).
     altaPor: ROLES_GESTION,

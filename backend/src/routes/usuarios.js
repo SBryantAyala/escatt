@@ -141,6 +141,12 @@ router.post(
       return res.status(403).json({ error: "Tu rol no tiene permiso para dar de alta usuarios" });
     }
 
+    const procedencia = texto(c.procedencia) || "escom";
+    if (perfil === "alumno" && !["escom", "externa"].includes(procedencia)) {
+      return res.status(400).json({ error: 'procedencia inválida: debe ser "escom" o "externa"' });
+    }
+    const externa = perfil === "alumno" && procedencia === "externa";
+
     const datos = {
       nombre: texto(c.nombre),
       apellido_paterno: texto(c.apellido_paterno),
@@ -152,7 +158,9 @@ router.post(
     const faltantes = ["nombre", "apellido_paterno", "apellido_materno", "correo"].filter(
       (k) => !datos[k],
     );
-    if (perfil === "alumno") {
+    if (externa) {
+      for (const k of ["escuela_origen", "carrera"]) if (!texto(c[k])) faltantes.push(k);
+    } else if (perfil === "alumno") {
       for (const k of ["boleta", "carrera", "plan_estudios"]) if (!texto(c[k])) faltantes.push(k);
     } else {
       if (!texto(c.numero_empleado)) faltantes.push("numero_empleado");
@@ -166,7 +174,14 @@ router.post(
     if (!CORREO_RE.test(datos.correo)) {
       return res.status(400).json({ error: "El correo no tiene un formato válido" });
     }
-    if (perfil === "alumno") {
+    if (externa) {
+      const limites = [["escuela_origen", 200], ["carrera", 120], ["boleta", 30]];
+      for (const [k, max] of limites) {
+        if (texto(c[k]).length > max) {
+          return res.status(400).json({ error: `${k} admite hasta ${max} caracteres` });
+        }
+      }
+    } else if (perfil === "alumno") {
       if (!/^\d{10}$/.test(texto(c.boleta))) {
         return res.status(400).json({ error: "La boleta debe tener 10 dígitos" });
       }
@@ -209,9 +224,16 @@ router.post(
 
         if (perfil === "alumno") {
           await client.query(
-            `INSERT INTO alumnos (usuario_id, boleta, carrera, plan_estudios)
-             VALUES ($1, $2, $3, $4)`,
-            [nuevoId, texto(c.boleta), texto(c.carrera), texto(c.plan_estudios)],
+            `INSERT INTO alumnos (usuario_id, boleta, carrera, plan_estudios, procedencia, escuela_origen)
+             VALUES ($1, $2, $3, $4, $5, $6)`,
+            [
+              nuevoId,
+              opcional(c.boleta),
+              texto(c.carrera),
+              externa ? null : texto(c.plan_estudios),
+              procedencia,
+              externa ? texto(c.escuela_origen) : null,
+            ],
           );
           await asignarRol(client, nuevoId, "alumno", req.usuario.id);
         } else {
@@ -275,7 +297,21 @@ router.put(
     if (tiene(c, "telefono")) comunes.telefono = opcional(c.telefono);
 
     const alumno = {};
-    if (objetivo.perfiles.includes("alumno")) {
+    if (objetivo.perfiles.includes("alumno") && objetivo.procedencia === "externa") {
+      for (const [k, max] of [["escuela_origen", 200], ["carrera", 120]]) {
+        if (!tiene(c, k)) continue;
+        if (!texto(c[k]) || texto(c[k]).length > max) {
+          return res.status(400).json({ error: `${k} es obligatorio (máx. ${max} caracteres)` });
+        }
+        alumno[k] = texto(c[k]);
+      }
+      if (tiene(c, "boleta")) {
+        if (texto(c.boleta).length > 30) {
+          return res.status(400).json({ error: "boleta admite hasta 30 caracteres" });
+        }
+        alumno.boleta = opcional(c.boleta);
+      }
+    } else if (objetivo.perfiles.includes("alumno")) {
       if (tiene(c, "boleta")) {
         if (!/^\d{10}$/.test(texto(c.boleta))) {
           return res.status(400).json({ error: "La boleta debe tener 10 dígitos" });
@@ -382,24 +418,22 @@ async function cambiarEstado(req, res, estado, accion) {
       .json({ error: `Primero cambia al presidente de la academia ${objetivo.academia}` });
     return;
   }
-  // HU-7: un docente con asignaciones vigentes (director, sinodal, seguimiento
-  // o titular) no se puede revocar: 409 con la lista. Hoy la lista siempre
-  // sale vacía porque el Módulo 2 aún no existe (ver asignacionesVigentes).
-  if (estado === "revocada" && objetivo.perfiles.includes("docente")) {
-    const asignaciones = await asignacionesVigentes(pool, objetivo.id);
-    if (asignaciones.length > 0) {
-      res.status(409).json({
-        error: "No se puede revocar: el docente tiene asignaciones vigentes",
-        asignaciones,
-      });
-      return;
-    }
-  }
+  const asignaciones =
+    estado === "revocada" && objetivo.perfiles.includes("docente")
+      ? await asignacionesVigentes(pool, objetivo.id)
+      : [];
 
   await enTransaccion(async (client) => {
     await client.query("UPDATE usuarios SET estado = $1 WHERE id = $2", [estado, objetivo.id]);
     if (estado === "revocada") await cerrarSesionesDe(objetivo.id, client);
-    await registrarBitacora(client, req.usuario.id, accion, "usuarios", objetivo.id);
+    await registrarBitacora(
+      client,
+      req.usuario.id,
+      accion,
+      "usuarios",
+      objetivo.id,
+      asignaciones.length > 0 ? { asignaciones_afectadas: asignaciones.length } : undefined,
+    );
   });
   res.json(await obtenerUsuario(objetivo.id));
 }
@@ -528,6 +562,19 @@ router.get(
     if (!objetivo) return;
     const motivos = await motivosHistorial(pool, objetivo.id);
     res.json({ puede_eliminar: motivos.length === 0, motivos });
+  }),
+);
+
+router.get(
+  "/:id/asignaciones",
+  ruta(async (req, res) => {
+    const objetivo = await cargarObjetivo(req, res);
+    if (!objetivo) return;
+    if (!tieneRol(req.usuario, ...ROLES_GESTION, "admin_sistema")) {
+      return res.status(403).json({ error: "Tu rol no tiene permiso para consultar las asignaciones" });
+    }
+    const asignaciones = objetivo.perfiles.includes("docente") ? await asignacionesVigentes(pool, objetivo.id) : [];
+    res.json({ asignaciones });
   }),
 );
 
