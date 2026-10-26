@@ -1,8 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import DialogoConfirmacion from "../../components/ui/DialogoConfirmacion";
 import Esqueleto from "../../components/ui/Esqueleto";
 import { useAviso } from "../../components/ui/Avisos";
 import { api } from "../../lib/api";
 import { claseArchivo } from "./estilos";
+
+async function contarFilas(archivo) {
+  const texto = (await archivo.text()).replace(/^\uFEFF/, "");
+  const lineas = texto.split(/\r?\n/).filter((l) => l.trim());
+  if (lineas.length === 0) return 0;
+  const conEncabezado = !/^\s*"?\d{10}"?\s*([,;\t]|$)/.test(lineas[0]);
+  return lineas.length - (conEncabezado ? 1 : 0);
+}
 
 function formatearFecha(iso) {
   return new Date(iso).toLocaleDateString("es-MX", { dateStyle: "medium" });
@@ -16,6 +25,7 @@ export default function PanelPadron({ puedeCargar, onCargado }) {
   const [archivo, setArchivo] = useState(null);
   const [enviando, setEnviando] = useState(false);
   const [errores, setErrores] = useState(null);
+  const [confirmando, setConfirmando] = useState(null);
 
   const cargar = useCallback(() => {
     api("/api/padron")
@@ -27,9 +37,14 @@ export default function PanelPadron({ puedeCargar, onCargado }) {
     cargar();
   }, [cargar]);
 
-  async function subir(e) {
+  async function revisar(e) {
     e.preventDefault();
     if (!archivo) return aviso.error("Elige el archivo CSV con las boletas.");
+    setErrores(null);
+    setConfirmando({ nombre: archivo.name, filas: await contarFilas(archivo) });
+  }
+
+  async function subir() {
     setEnviando(true);
     setErrores(null);
     try {
@@ -46,6 +61,7 @@ export default function PanelPadron({ puedeCargar, onCargado }) {
       aviso.error(err.message);
     } finally {
       setEnviando(false);
+      setConfirmando(null);
     }
   }
 
@@ -73,7 +89,7 @@ export default function PanelPadron({ puedeCargar, onCargado }) {
       </p>
 
       {puedeCargar && (
-        <form onSubmit={subir} className="mt-3 space-y-3">
+        <form onSubmit={revisar} className="mt-3 space-y-3">
           <div>
             <label htmlFor="padron-archivo" className="mb-1.5 block text-sm font-semibold text-slate-800">
               Archivo CSV
@@ -107,6 +123,21 @@ export default function PanelPadron({ puedeCargar, onCargado }) {
           </button>
         </form>
       )}
+      <DialogoConfirmacion
+        abierto={Boolean(confirmando)}
+        titulo={estado?.cargado ? "¿Reemplazar el padrón?" : "¿Cargar el padrón?"}
+        descripcion={
+          confirmando
+            ? estado?.cargado
+              ? `Se reemplazarán las ${estado.total.toLocaleString("es-MX")} boletas actuales (${estado.archivo}) por las ${confirmando.filas.toLocaleString("es-MX")} de «${confirmando.nombre}». El cotejo de todas las solicitudes pasa a usar el padrón nuevo.`
+              : `Se cargará el padrón con ${confirmando.filas.toLocaleString("es-MX")} boletas de «${confirmando.nombre}».`
+            : undefined
+        }
+        etiquetaConfirmar={estado?.cargado ? "Reemplazar" : "Cargar"}
+        cargando={enviando}
+        onConfirmar={subir}
+        onCancelar={() => !enviando && setConfirmando(null)}
+      />
     </section>
   );
 }
