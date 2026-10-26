@@ -12,6 +12,7 @@ import VistaCambiosTitulo from "./VistaCambiosTitulo";
 import VistaDirector from "./VistaDirector";
 import VistaDocente from "./VistaDocente";
 import VistaSinodal from "./VistaSinodal";
+import VistaTurnar from "./VistaTurnar";
 import VistaValidacion from "./VistaValidacion";
 
 const DESCRIPCION_PROXIMAMENTE =
@@ -58,6 +59,7 @@ export default function ProtocoloPage({ actor }) {
   return (
     <div className="space-y-10">
       {esPersonal && <VistaValidacion actor={actor} />}
+      {tieneRol(actor, "catt_ejecutivo") && <VistaTurnar />}
       {esPersonal && <VistaCambiosDirector actor={actor} />}
       {esPersonal && <VistaCambiosTitulo actor={actor} />}
       {esDirector && <VistaSinodal />}
