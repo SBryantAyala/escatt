@@ -24,8 +24,10 @@ function formatearFecha(iso) {
 // `onEnviado` avisa a la pantalla cuando el alumno sube evidencia nueva: su
 // elegibilidad vigente pasa a "en revisión" y el registro de protocolo debe
 // recargarse.
-export default function VistaAlumno({ onEnviado }) {
+export default function VistaAlumno({ actor, onEnviado }) {
   const aviso = useAviso();
+  const externa = actor?.procedencia === "externa";
+  const nombreEvidencia = externa ? "carta de participación" : "kárdex";
   const [historial, setHistorial] = useState(null);
   const [cargando, setCargando] = useState(true);
   const [errorCarga, setErrorCarga] = useState(null);
@@ -50,7 +52,7 @@ export default function VistaAlumno({ onEnviado }) {
     e.preventDefault();
     const archivo = inputArchivoRef.current?.files?.[0];
     if (!periodo.trim()) return aviso.error("Indica el periodo (ej. 2026-1)");
-    if (!archivo) return aviso.error("Adjunta tu kárdex o boleta (PDF, JPG o PNG)");
+    if (!archivo) return aviso.error(`Adjunta tu ${nombreEvidencia} (PDF, JPG o PNG)`);
 
     const datos = new FormData();
     datos.append("periodo", periodo.trim());
@@ -72,7 +74,7 @@ export default function VistaAlumno({ onEnviado }) {
   }
 
   function verEvidencia(registro) {
-    descargarArchivo(`/api/elegibilidad/${registro.id}/evidencia`, `evidencia-${registro.periodo}`).catch(
+    descargarArchivo(`/api/elegibilidad/${registro.id}/evidencia`, `${externa ? "carta" : "kardex"}-${registro.periodo}`).catch(
       (e) => aviso.error(e.message),
     );
   }
@@ -89,18 +91,28 @@ export default function VistaAlumno({ onEnviado }) {
         </div>
       </div>
 
-      <div className="mt-6 rounded-2xl border border-sky-100 bg-sky-50/60 p-5 text-sm text-slate-700">
-        <p className="font-semibold text-slate-800">Requisitos para cursar TT-I (Art. 6 del Documento Rector)</p>
-        <ul className="mt-2 list-disc space-y-1 pl-5">
-          <li>Haber aprobado todas las UA de los niveles I y II del ISC.</li>
-          <li>Haber aprobado 10 o más UA del nivel III del ISC.</li>
-          <li>Tener un Protocolo aprobado.</li>
-        </ul>
-        <p className="mt-3 rounded-xl bg-amber-50 p-3 text-amber-900 ring-1 ring-amber-200">
-          <span className="font-semibold">Solicita tu kárdex con anticipación.</span> Tramitarlo puede tardar varios
-          días, así que no esperes al cierre del periodo para pedirlo.
-        </p>
-      </div>
+      {externa ? (
+        <div className="mt-6 rounded-2xl border border-sky-100 bg-sky-50/60 p-5 text-sm text-slate-700">
+          <p className="font-semibold text-slate-800">Participación como alumno de otra escuela</p>
+          <p className="mt-2">
+            Sube la carta de participación en la CATT que te dio tu escuela. En lugar de kárdex, la CATT revisa esa
+            carta para validar tu elegibilidad.
+          </p>
+        </div>
+      ) : (
+        <div className="mt-6 rounded-2xl border border-sky-100 bg-sky-50/60 p-5 text-sm text-slate-700">
+          <p className="font-semibold text-slate-800">Requisitos para cursar TT-I (Art. 6 del Documento Rector)</p>
+          <ul className="mt-2 list-disc space-y-1 pl-5">
+            <li>Haber aprobado todas las UA de los niveles I y II del ISC.</li>
+            <li>Haber aprobado 10 o más UA del nivel III del ISC.</li>
+            <li>Tener un Protocolo aprobado.</li>
+          </ul>
+          <p className="mt-3 rounded-xl bg-amber-50 p-3 text-amber-900 ring-1 ring-amber-200">
+            <span className="font-semibold">Solicita tu kárdex con anticipación.</span> Tramitarlo puede tardar varios
+            días, así que no esperes al cierre del periodo para pedirlo.
+          </p>
+        </div>
+      )}
 
       <form onSubmit={enviar} className={`mt-6 rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 ${enviando ? "opacity-70" : ""}`}>
         <h3 className="text-base font-bold text-slate-800">Subir evidencia</h3>
@@ -118,7 +130,9 @@ export default function VistaAlumno({ onEnviado }) {
             />
           </label>
           <label className="block min-w-0">
-            <span className={claseLabel}>Kárdex o boleta global (PDF, JPG o PNG)</span>
+            <span className={claseLabel}>
+              {externa ? "Carta de participación" : "Kárdex"} (PDF, JPG o PNG)
+            </span>
             <input
               ref={inputArchivoRef}
               type="file"
@@ -183,7 +197,7 @@ export default function VistaAlumno({ onEnviado }) {
                     onClick={() => verEvidencia(r)}
                     className="min-h-10 shrink-0 rounded-full border border-slate-200 px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
                   >
-                    Ver mi evidencia
+                    {externa ? "Ver mi carta" : "Ver mi kárdex"}
                   </button>
                 )}
               </div>
