@@ -32,7 +32,7 @@ export default function ProtocoloPage({ actor }) {
     return (
       <div className="space-y-10">
         <MiProtocolo key={`mi-${version}`} actor={actor} onSalir={() => setVersion((v) => v + 1)} />
-        <VistaAlumno onEnviado={() => setVersion((v) => v + 1)} />
+        <VistaAlumno actor={actor} onEnviado={() => setVersion((v) => v + 1)} />
         <RegistroProtocolo key={`registro-${version}`} onRegistrado={() => setVersion((v) => v + 1)} />
         <CambioDirector key={`cambio-${version}`} actor={actor} />
         <CambioTitulo key={`titulo-${version}`} actor={actor} />

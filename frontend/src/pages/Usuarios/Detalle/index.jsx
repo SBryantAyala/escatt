@@ -56,7 +56,13 @@ const GENERAL_FIELD_DEFS = [
 function camposDePerfil(usuario) {
   const perfiles = usuario?.perfiles ?? [];
   const campos = [];
-  if (perfiles.includes("alumno")) {
+  if (perfiles.includes("alumno") && usuario.procedencia === "externa") {
+    campos.push(
+      { seccion: "Datos de alumno", key: "escuela_origen", label: "Escuela de origen", minLength: 2 },
+      { seccion: "Datos de alumno", key: "carrera", label: "Carrera", minLength: 2 },
+      { seccion: "Datos de alumno", key: "boleta", label: "Boleta de su escuela", optional: true },
+    );
+  } else if (perfiles.includes("alumno")) {
     campos.push(
       {
         seccion: "Datos de alumno",
