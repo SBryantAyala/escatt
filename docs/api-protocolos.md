@@ -165,8 +165,16 @@ Body JSON `{ "sinodales": [28, 31, 14] }` → ficha con `estado: "en_evaluacion"
 - Solo el Presidente de la academia a la que se turnó el protocolo (`403`).
 - Exactamente 3 ids distintos (`400`).
 - Cada uno debe ser docente activo de esa academia y no ser director del protocolo (`400`).
-- Reemplaza la terna completa; se puede corregir mientras ningún sinodal haya
-  evaluado. Después, o si el protocolo ya tiene dictamen, `409`.
+- Sirve para la primera asignación y para **sustituir** a un sinodal. Quien se
+  queda conserva su dictamen; solo entran los nuevos, sin evaluar.
+- Un sinodal que ya evaluó y sigue activo no se puede sustituir (`409`, el
+  mensaje lo nombra). Si su cuenta fue revocada (renuncia), sí: su evaluación
+  se archiva en `protocolo_evaluaciones_historial` (con `solicitud_id` nulo).
+- Si el protocolo ya tiene dictamen, `409`.
+- La bitácora registra `asignar_sinodales` o `reemplazar_sinodales` (con
+  quiénes salen y entran).
+- Cada sinodal de la ficha trae `activo` (`false` si su cuenta está revocada),
+  para que el Presidente vea a quién sustituir.
 
 ## HU-21 — Evaluar protocolo (sinodal)
 
