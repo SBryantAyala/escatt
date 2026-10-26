@@ -87,7 +87,7 @@ export default function InicioAlumno({ usuario }) {
               <div>
                 <p className="font-bold text-slate-800">Aún no has subido tu kárdex o boleta</p>
                 <p className="mt-1 max-w-md text-sm text-slate-600">
-                  Sube tu evidencia para que la CATT revise si cumples los requisitos del Art. 6 para cursar TT-I.
+                  Sube tu kárdex (tramitarlo tarda días, pídelo con anticipación) para que la CATT revise si cumples los requisitos del Art. 6 para cursar TT-I.
                 </p>
               </div>
             </div>
