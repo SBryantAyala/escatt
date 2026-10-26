@@ -56,7 +56,13 @@ const GENERAL_FIELD_DEFS = [
 function camposDePerfil(usuario) {
   const perfiles = usuario?.perfiles ?? [];
   const campos = [];
-  if (perfiles.includes("alumno")) {
+  if (perfiles.includes("alumno") && usuario.procedencia === "externa") {
+    campos.push(
+      { seccion: "Datos de alumno", key: "escuela_origen", label: "Escuela de origen", minLength: 2 },
+      { seccion: "Datos de alumno", key: "carrera", label: "Carrera", minLength: 2 },
+      { seccion: "Datos de alumno", key: "boleta", label: "Boleta de su escuela", optional: true },
+    );
+  } else if (perfiles.includes("alumno")) {
     campos.push(
       {
         seccion: "Datos de alumno",
@@ -423,6 +429,7 @@ export default function UserProfileForm({ actor, userId, onVolver }) {
   const [procesandoPeligro, setProcesandoPeligro] = useState(false);
   const [passwordTemporal, setPasswordTemporal] = useState(null);
   const [historial, setHistorial] = useState(null); // { puede_eliminar, motivos }
+  const [asignaciones, setAsignaciones] = useState(null);
 
   // Normaliza academia_id a texto para que el <select> lo compare bien.
   const aFormulario = (u) => ({ ...u, academia_id: u.academia_id != null ? String(u.academia_id) : "" });
@@ -501,7 +508,13 @@ export default function UserProfileForm({ actor, userId, onVolver }) {
 
   function pedirConfirmacion(accion) {
     setPasswordTemporal(null);
+    setAsignaciones(null);
     setAccionPeligro(accion);
+    if (accion === "revocar" && originalData?.perfiles?.includes("docente")) {
+      api(`/api/usuarios/${userId}/asignaciones`)
+        .then((datos) => setAsignaciones(datos.asignaciones ?? []))
+        .catch(() => setAsignaciones([]));
+    }
   }
 
   // El botón "Eliminar cuenta" siempre se puede pulsar (una vez cargado el
@@ -554,15 +567,7 @@ export default function UserProfileForm({ actor, userId, onVolver }) {
         aviso.exito(`Se reactivó el acceso de ${nombre}.`);
       }
     } catch (err) {
-      // HU-7: al revocar a un docente con asignaciones vigentes el backend
-      // responde 409 con la lista; se muestra completa para que se sepa qué
-      // reasignar antes de volver a intentarlo.
-      const asignaciones = err.datos?.asignaciones;
-      const detalle =
-        Array.isArray(asignaciones) && asignaciones.length > 0
-          ? `: ${asignaciones.map((a) => a.descripcion ?? a.rol).join("; ")}`
-          : "";
-      aviso.error(`${err.message || "No se pudo completar la acción."}${detalle}`);
+      aviso.error(err.message || "No se pudo completar la acción.");
       setAccionPeligro(null);
     } finally {
       setProcesandoPeligro(false);
@@ -802,6 +807,22 @@ export default function UserProfileForm({ actor, userId, onVolver }) {
         etiquetaConfirmar={configConfirmacion?.etiquetaConfirmar}
         colorConfirmar={configConfirmacion?.colorConfirmar}
         textoEsperado={originalData.correo}
+        detalle={
+          accionPeligro === "revocar" && asignaciones?.length > 0 ? (
+            <div className="mt-3 rounded-xl bg-amber-50 p-3 text-sm text-amber-900 ring-1 ring-amber-200">
+              <p className="font-semibold">Tiene asignaciones vigentes:</p>
+              <ul className="mt-1 list-disc space-y-0.5 pl-5">
+                {asignaciones.map((a) => (
+                  <li key={`${a.rol}-${a.protocolo_id}`}>{a.descripcion}</li>
+                ))}
+              </ul>
+              <p className="mt-2">
+                La revocación procede. Avisa al Presidente de su Academia para sustituirlo como sinodal; si dirige un
+                protocolo, el alumno puede pedir el cambio de director.
+              </p>
+            </div>
+          ) : undefined
+        }
         motivoBloqueo={
           accionPeligro === "eliminar-bloqueada"
             ? `No se puede eliminar porque tiene historial: ${

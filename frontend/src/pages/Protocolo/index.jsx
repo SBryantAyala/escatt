@@ -12,6 +12,8 @@ import VistaCambiosTitulo from "./VistaCambiosTitulo";
 import VistaDirector from "./VistaDirector";
 import VistaDocente from "./VistaDocente";
 import VistaSinodal from "./VistaSinodal";
+import VistaSinodalesPresidente from "./VistaSinodalesPresidente";
+import VistaTurnar from "./VistaTurnar";
 import VistaValidacion from "./VistaValidacion";
 
 const DESCRIPCION_PROXIMAMENTE =
@@ -32,7 +34,7 @@ export default function ProtocoloPage({ actor }) {
     return (
       <div className="space-y-10">
         <MiProtocolo key={`mi-${version}`} actor={actor} onSalir={() => setVersion((v) => v + 1)} />
-        <VistaAlumno onEnviado={() => setVersion((v) => v + 1)} />
+        <VistaAlumno actor={actor} onEnviado={() => setVersion((v) => v + 1)} />
         <RegistroProtocolo key={`registro-${version}`} onRegistrado={() => setVersion((v) => v + 1)} />
         <CambioDirector key={`cambio-${version}`} actor={actor} />
         <CambioTitulo key={`titulo-${version}`} actor={actor} />
@@ -50,7 +52,7 @@ export default function ProtocoloPage({ actor }) {
   }
 
   // El docente sin funciones de la CATT ve "Mis protocolos" con pestañas.
-  if (!esPersonal) return <VistaDocente />;
+  if (!esPersonal) return <VistaDocente actor={actor} />;
 
   // Personal CATT o admin que además es docente (docente comisionado): ve
   // todas sus vistas, una debajo de la otra. La de sinodal va antes que la
@@ -58,8 +60,10 @@ export default function ProtocoloPage({ actor }) {
   return (
     <div className="space-y-10">
       {esPersonal && <VistaValidacion actor={actor} />}
+      {tieneRol(actor, "catt_ejecutivo") && <VistaTurnar />}
       {esPersonal && <VistaCambiosDirector actor={actor} />}
       {esPersonal && <VistaCambiosTitulo actor={actor} />}
+      {tieneRol(actor, "presidente_academia") && <VistaSinodalesPresidente actor={actor} />}
       {esDirector && <VistaSinodal />}
       {esDirector && <VistaDirector />}
     </div>
