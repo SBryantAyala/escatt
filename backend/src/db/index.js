@@ -750,6 +750,29 @@ async function migrarEquiposTT(client) {
   }
 }
 
+async function migrarAlumnosExternos(client) {
+  await client.query(`
+    ALTER TABLE alumnos
+      ADD COLUMN IF NOT EXISTS procedencia TEXT NOT NULL DEFAULT 'escom',
+      ADD COLUMN IF NOT EXISTS escuela_origen TEXT,
+      ALTER COLUMN boleta DROP NOT NULL,
+      ALTER COLUMN plan_estudios DROP NOT NULL
+  `);
+  await client.query("ALTER TABLE alumnos DROP CONSTRAINT IF EXISTS alumnos_carrera_check");
+  await client.query("ALTER TABLE alumnos DROP CONSTRAINT IF EXISTS alumnos_boleta_key");
+  await agregarCheck(client, "alumnos", "alumnos_procedencia_check", "procedencia IN ('escom', 'externa')");
+  await agregarCheck(
+    client,
+    "alumnos",
+    "alumnos_datos_segun_procedencia",
+    `(procedencia = 'escom' AND carrera IN ('ISC', 'IIA', 'LCD') AND boleta IS NOT NULL AND plan_estudios IS NOT NULL)
+     OR (procedencia = 'externa' AND escuela_origen IS NOT NULL AND carrera <> '')`,
+  );
+  await client.query(
+    "CREATE UNIQUE INDEX IF NOT EXISTS alumnos_boleta_escom_uq ON alumnos (boleta) WHERE procedencia = 'escom'",
+  );
+}
+
 async function migrarPadronBoletas(client) {
   await client.query(`
     CREATE TABLE IF NOT EXISTS padron_boletas (
@@ -783,6 +806,7 @@ async function initDb() {
     await migrarCambioTitulo(client);
     await migrarDirectoresExternos(client);
     await migrarSesionesCatt(client);
+    await migrarAlumnosExternos(client);
     await migrarPadronBoletas(client);
     // creado_en se agregó después del CREATE TABLE original de elegibilidad.
     await client.query(

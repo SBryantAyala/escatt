@@ -9,6 +9,7 @@ import multer from "multer";
 import { enTransaccion, pool } from "../db/index.js";
 import { autenticar, exigeCambioResuelto, requiereRol } from "../lib/auth.js";
 import { aplicarDictamen } from "../lib/dictamen.js";
+import { sqlCarreraVisible } from "../lib/alumnos.js";
 import {
   ESTADOS_VIGENTES,
   MAX_INTEGRANTES,
@@ -114,7 +115,7 @@ const SELECT_FICHA = `
   SELECT p.id, p.titulo, p.resumen, p.periodo, p.estado, p.creado_en,
          (p.visto_bueno_archivo IS NOT NULL) AS tiene_visto_bueno,
          p.academia_asignada_en,
-         p.alumno_id, a.boleta, a.carrera,
+         p.alumno_id, a.boleta, ${sqlCarreraVisible("a")} AS carrera,
          au.nombre, au.apellido_paterno, au.apellido_materno,
          ac.id AS academia_id, ac.nombre AS academia_nombre,
          ac.color AS academia_color, ac.icono AS academia_icono,
@@ -237,7 +238,7 @@ router.get(
 
     const { rows } = await pool.query(
       `SELECT p.id, p.titulo, p.estado, p.creado_en,
-              a.boleta, a.carrera,
+              a.boleta, ${sqlCarreraVisible("a")} AS carrera,
               u.nombre, u.apellido_paterno, u.apellido_materno,
               ${SQL_DIRECTORES} AS directores,
               ${sqlIntegrantes("p")}

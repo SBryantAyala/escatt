@@ -1,3 +1,5 @@
+import { sqlCarreraVisible } from "./alumnos.js";
+
 // Equipo de un protocolo de TT: el responsable (protocolos.alumno_id) y los
 // compañeros que agregó, todos en protocolo_integrantes. El responsable es
 // siempre protocolos.alumno_id; `es_responsable` se calcula de ahí al leer.
@@ -18,7 +20,7 @@ export const sqlIntegrantes = (alias = "p") => `
               'id', i.alumno_id,
               'nombre', concat_ws(' ', iu.nombre, iu.apellido_paterno, iu.apellido_materno),
               'boleta', ia.boleta,
-              'carrera', ia.carrera,
+              'carrera', ${sqlCarreraVisible("ia")},
               'es_responsable', i.alumno_id = ${alias}.alumno_id)
             ORDER BY i.alumno_id = ${alias}.alumno_id DESC, i.agregado_en, i.alumno_id)
      FROM protocolo_integrantes i
@@ -93,7 +95,7 @@ export async function validarEquipo(client, correos, { periodo, bloquear = false
   const { rows } = await client.query(
     `SELECT u.id, lower(u.correo) AS correo,
             concat_ws(' ', u.nombre, u.apellido_paterno, u.apellido_materno) AS nombre,
-            a.boleta, a.carrera
+            a.boleta, ${sqlCarreraVisible("a")} AS carrera
        FROM usuarios u
        JOIN alumnos a      ON a.usuario_id = u.id
        JOIN elegibilidad e ON e.alumno_id = u.id AND e.periodo = $2 AND e.estado = 'elegible'
