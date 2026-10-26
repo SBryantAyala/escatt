@@ -14,6 +14,7 @@ Este repositorio contiene **únicamente el código** del proyecto ESCATT.
 docs/
 ├── api-protocolos.md   # contrato de API del Módulo 2 (HU-18 a HU-21) y esquema de protocolos
 ├── api-cambios-titulo.md  # contrato de API del cambio de título del protocolo
+├── api-padron-y-externos.md  # padrón de boletas para cotejar el kárdex
 └── api-sesiones.md     # contrato de API de sesiones y acuerdos de la CATT (y expresidente de academia)
 backend/
 ├── scripts/

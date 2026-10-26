@@ -51,12 +51,21 @@ const SELECT_CON_ALUMNO = `
          e.alumno_id,
          a.boleta, a.carrera,
          u.nombre, u.apellido_paterno, u.apellido_materno,
-         vp.nombre AS validado_por_nombre, vp.apellido_paterno AS validado_por_apellido
+         vp.nombre AS validado_por_nombre, vp.apellido_paterno AS validado_por_apellido,
+         (pb.boleta IS NOT NULL) AS en_padron, pb.nombre AS nombre_padron,
+         (SELECT count(*)::int FROM padron_boletas) AS padron_total
   FROM elegibilidad e
   JOIN alumnos a    ON a.usuario_id = e.alumno_id
+  LEFT JOIN padron_boletas pb ON pb.boleta = a.boleta
   JOIN usuarios u   ON u.id = e.alumno_id
   LEFT JOIN usuarios vp ON vp.id = e.validado_por
 `;
+
+function estadoPadron(fila) {
+  if (fila.padron_total === 0) return { estado: "sin_padron", nombre: null };
+  if (fila.en_padron) return { estado: "coincide", nombre: fila.nombre_padron };
+  return { estado: "no_coincide", nombre: null };
+}
 
 function serializar(fila) {
   return {
@@ -67,6 +76,7 @@ function serializar(fila) {
     validado_en: fila.validado_en,
     creado_en: fila.creado_en,
     tiene_evidencia: fila.tiene_evidencia,
+    padron: estadoPadron(fila),
     validado_por: fila.validado_por_nombre
       ? `${fila.validado_por_nombre} ${fila.validado_por_apellido}`.trim()
       : null,
