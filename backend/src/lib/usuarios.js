@@ -8,7 +8,7 @@
 //     estado, activo, debe_cambiar_password, creado_por, creado_en,
 //     roles:    ["docente", "catt_ejecutivo", ...],
 //     perfiles: ["docente", "personal_catt", ...],
-//     boleta, carrera, plan_estudios,                    // perfil alumno
+//     boleta, carrera, plan_estudios, procedencia, escuela_origen, // perfil alumno
 //     numero_empleado,                                   // empleados
 //     academia_id, academia, academia_color, cedula_profesional, extension, // perfil docente
 //     cargo                                              // perfil personal_catt
@@ -20,7 +20,7 @@ import { pool } from "../db/index.js";
 const SELECT_USUARIO = `
   SELECT u.id, u.nombre, u.apellido_paterno, u.apellido_materno, u.correo, u.telefono,
          u.estado, u.debe_cambiar_password, u.creado_por, u.creado_en,
-         a.boleta, a.carrera, a.plan_estudios,
+         a.boleta, a.carrera, a.plan_estudios, a.procedencia, a.escuela_origen,
          e.numero_empleado,
          d.academia_id, ac.nombre AS academia, ac.color AS academia_color,
          d.cedula_profesional, d.extension,
@@ -104,17 +104,29 @@ export async function registrarBitacora(client, actorId, accion, entidad, entida
   );
 }
 
-// Asignaciones vigentes de un docente: protocolos en curso donde es director,
-// sinodal, profesor de seguimiento o titular. Mientras existan, su cuenta no
-// se puede revocar (HU-7): la ruta responde 409 con esta lista.
-//
-// Pendiente (Módulo 2): todavía no hay tablas de protocolos ni de asignaciones,
-// así que por ahora no hay nada que bloquear y devuelve []. Cuando existan,
-// esta es la ÚNICA función que falta completar: debe devolver objetos con la
-// forma { rol: "director" | "sinodal" | ..., descripcion: "texto legible" }
-// y tanto la ruta como la pantalla de Detalle ya los muestran.
-export async function asignacionesVigentes(_client, _usuarioId) {
-  return [];
+export async function asignacionesVigentes(client, usuarioId) {
+  const { rows } = await client.query(
+    `SELECT 'director' AS rol, p.id AS protocolo_id, p.titulo, p.estado, NULL::boolean AS pendiente
+       FROM protocolo_directores d JOIN protocolos p ON p.id = d.protocolo_id
+      WHERE d.docente_id = $1 AND p.estado IN ('registrado', 'en_evaluacion', 'aprobado')
+     UNION ALL
+     SELECT 'sinodal', p.id, p.titulo, p.estado, (s.dictamen IS NULL)
+       FROM protocolo_sinodales s JOIN protocolos p ON p.id = s.protocolo_id
+      WHERE s.docente_id = $1 AND p.estado IN ('registrado', 'en_evaluacion')
+      ORDER BY 3, 1`,
+    [usuarioId],
+  );
+  return rows.map((r) => ({
+    rol: r.rol,
+    protocolo_id: r.protocolo_id,
+    titulo: r.titulo,
+    estado: r.estado,
+    pendiente: r.pendiente,
+    descripcion:
+      r.rol === "director"
+        ? `Director de «${r.titulo}»`
+        : `Sinodal de «${r.titulo}» (${r.pendiente ? "evaluación pendiente" : "ya evaluó"})`,
+  }));
 }
 
 // Motivos por los que una cuenta NO se puede eliminar (solo revocar).

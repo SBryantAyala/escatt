@@ -9,6 +9,7 @@ import multer from "multer";
 import { enTransaccion, pool } from "../db/index.js";
 import { autenticar, exigeCambioResuelto, requiereRol } from "../lib/auth.js";
 import { aplicarDictamen } from "../lib/dictamen.js";
+import { sqlCarreraVisible } from "../lib/alumnos.js";
 import {
   ESTADOS_VIGENTES,
   MAX_INTEGRANTES,
@@ -114,7 +115,7 @@ const SELECT_FICHA = `
   SELECT p.id, p.titulo, p.resumen, p.periodo, p.estado, p.creado_en,
          (p.visto_bueno_archivo IS NOT NULL) AS tiene_visto_bueno,
          p.academia_asignada_en,
-         p.alumno_id, a.boleta, a.carrera,
+         p.alumno_id, a.boleta, ${sqlCarreraVisible("a")} AS carrera,
          au.nombre, au.apellido_paterno, au.apellido_materno,
          ac.id AS academia_id, ac.nombre AS academia_nombre,
          ac.color AS academia_color, ac.icono AS academia_icono,
@@ -129,7 +130,8 @@ const SELECT_FICHA = `
                    json_build_object(
                      'id', s.docente_id,
                      'nombre', concat_ws(' ', su.nombre, su.apellido_paterno, su.apellido_materno),
-                     'evaluo', s.dictamen IS NOT NULL)
+                     'evaluo', s.dictamen IS NOT NULL,
+                     'activo', su.estado = 'activa')
                    ORDER BY su.apellido_paterno, su.nombre)
             FROM protocolo_sinodales s
             JOIN usuarios su ON su.id = s.docente_id
@@ -237,7 +239,7 @@ router.get(
 
     const { rows } = await pool.query(
       `SELECT p.id, p.titulo, p.estado, p.creado_en,
-              a.boleta, a.carrera,
+              a.boleta, ${sqlCarreraVisible("a")} AS carrera,
               u.nombre, u.apellido_paterno, u.apellido_materno,
               ${SQL_DIRECTORES} AS directores,
               ${sqlIntegrantes("p")}
@@ -787,9 +789,10 @@ router.patch(
 
 // PUT /api/protocolos/:id/sinodales { sinodales: [id, id, id] } -> el
 // Presidente de la Academia a la que se turnó asigna (o reemplaza) los 3
-// sinodales y el protocolo pasa a "en_evaluacion". Se pueden reemplazar
-// mientras ningún sinodal haya entregado su evaluación. Los candidatos son
-// los integrantes de GET /api/academias/:id.
+// sinodales y el protocolo pasa a "en_evaluacion". Se puede reemplazar a
+// un sinodal que no haya evaluado o cuya cuenta ya no esté activa (renuncia);
+// los demás conservan su evaluación. Los candidatos son los integrantes de
+// GET /api/academias/:id.
 router.put(
   "/:id/sinodales",
   ruta(async (req, res) => {
@@ -802,7 +805,7 @@ router.put(
 
     const resultado = await enTransaccion(async (client) => {
       const { rows: prot } = await client.query(
-        `SELECT p.estado, p.academia_id, ac.presidente_id
+        `SELECT p.estado, p.titulo, p.academia_id, ac.presidente_id
            FROM protocolos p LEFT JOIN academias ac ON ac.id = p.academia_id
           WHERE p.id = $1 FOR UPDATE OF p`,
         [id],
@@ -816,12 +819,20 @@ router.put(
         return { status: 409, error: "El protocolo ya tiene dictamen; no se pueden cambiar los sinodales" };
       }
 
-      const { rows: evaluados } = await client.query(
-        "SELECT 1 FROM protocolo_sinodales WHERE protocolo_id = $1 AND dictamen IS NOT NULL LIMIT 1",
+      const { rows: actuales } = await client.query(
+        `SELECT s.docente_id, s.dictamen, s.observaciones, s.evaluado_en, u.estado,
+                concat_ws(' ', u.nombre, u.apellido_paterno, u.apellido_materno) AS nombre
+           FROM protocolo_sinodales s JOIN usuarios u ON u.id = s.docente_id
+          WHERE s.protocolo_id = $1`,
         [id],
       );
-      if (evaluados.length > 0) {
-        return { status: 409, error: "Un sinodal ya entregó su evaluación; no se pueden cambiar los sinodales" };
+      const salen = actuales.filter((a) => !sinodales.includes(a.docente_id));
+      const bloqueado = salen.find((a) => a.dictamen !== null && a.estado === "activa");
+      if (bloqueado) {
+        return {
+          status: 409,
+          error: `${bloqueado.nombre} ya entregó su evaluación; solo se puede sustituir a un sinodal que no ha evaluado o que ya no está activo`,
+        };
       }
 
       const { rows: miembros } = await client.query(
@@ -841,15 +852,40 @@ router.put(
         return { status: 400, error: "Un director del protocolo no puede ser su sinodal" };
       }
 
-      await client.query("DELETE FROM protocolo_sinodales WHERE protocolo_id = $1", [id]);
-      for (const docenteId of sinodales) {
+      for (const saliente of salen) {
+        if (saliente.dictamen !== null) {
+          await client.query(
+            `INSERT INTO protocolo_evaluaciones_historial
+               (protocolo_id, docente_id, dictamen, observaciones, evaluado_en, titulo)
+             VALUES ($1, $2, $3, $4, $5, $6)`,
+            [id, saliente.docente_id, saliente.dictamen, saliente.observaciones, saliente.evaluado_en, p.titulo],
+          );
+        }
+      }
+      await client.query("DELETE FROM protocolo_sinodales WHERE protocolo_id = $1 AND docente_id <> ALL($2)", [
+        id,
+        sinodales,
+      ]);
+      const vigentes = new Set(actuales.filter((a) => sinodales.includes(a.docente_id)).map((a) => a.docente_id));
+      const entran = sinodales.filter((d) => !vigentes.has(d));
+      for (const docenteId of entran) {
         await client.query(
           "INSERT INTO protocolo_sinodales (protocolo_id, docente_id, asignado_por) VALUES ($1, $2, $3)",
           [id, docenteId, req.usuario.id],
         );
       }
       await client.query("UPDATE protocolos SET estado = 'en_evaluacion' WHERE id = $1", [id]);
-      await registrarBitacora(client, req.usuario.id, "asignar_sinodales", "protocolos", id, { sinodales });
+      const reemplazo = actuales.length > 0;
+      await registrarBitacora(
+        client,
+        req.usuario.id,
+        reemplazo ? "reemplazar_sinodales" : "asignar_sinodales",
+        "protocolos",
+        id,
+        reemplazo
+          ? { sinodales, salen: salen.map((a) => a.docente_id), entran, evaluaciones_archivadas: salen.filter((a) => a.dictamen !== null).length }
+          : { sinodales },
+      );
       return null;
     });
     if (resultado) return res.status(resultado.status).json({ error: resultado.error });
