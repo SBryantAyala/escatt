@@ -18,6 +18,7 @@ export default function DialogoConfirmacion({
   etiquetaConfirmar = "Confirmar",
   textoEsperado,
   motivoBloqueo,
+  detalle,
   cargando = false,
   colorConfirmar,
   onConfirmar,
@@ -89,6 +90,7 @@ export default function DialogoConfirmacion({
           {titulo}
         </h2>
         {descripcion && <p className="mt-2 text-sm text-slate-600">{descripcion}</p>}
+        {detalle}
 
         {nivel === "escribir" && (
           <label className="mt-4 block">

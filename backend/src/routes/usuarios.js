@@ -382,24 +382,22 @@ async function cambiarEstado(req, res, estado, accion) {
       .json({ error: `Primero cambia al presidente de la academia ${objetivo.academia}` });
     return;
   }
-  // HU-7: un docente con asignaciones vigentes (director, sinodal, seguimiento
-  // o titular) no se puede revocar: 409 con la lista. Hoy la lista siempre
-  // sale vacía porque el Módulo 2 aún no existe (ver asignacionesVigentes).
-  if (estado === "revocada" && objetivo.perfiles.includes("docente")) {
-    const asignaciones = await asignacionesVigentes(pool, objetivo.id);
-    if (asignaciones.length > 0) {
-      res.status(409).json({
-        error: "No se puede revocar: el docente tiene asignaciones vigentes",
-        asignaciones,
-      });
-      return;
-    }
-  }
+  const asignaciones =
+    estado === "revocada" && objetivo.perfiles.includes("docente")
+      ? await asignacionesVigentes(pool, objetivo.id)
+      : [];
 
   await enTransaccion(async (client) => {
     await client.query("UPDATE usuarios SET estado = $1 WHERE id = $2", [estado, objetivo.id]);
     if (estado === "revocada") await cerrarSesionesDe(objetivo.id, client);
-    await registrarBitacora(client, req.usuario.id, accion, "usuarios", objetivo.id);
+    await registrarBitacora(
+      client,
+      req.usuario.id,
+      accion,
+      "usuarios",
+      objetivo.id,
+      asignaciones.length > 0 ? { asignaciones_afectadas: asignaciones.length } : undefined,
+    );
   });
   res.json(await obtenerUsuario(objetivo.id));
 }
@@ -528,6 +526,19 @@ router.get(
     if (!objetivo) return;
     const motivos = await motivosHistorial(pool, objetivo.id);
     res.json({ puede_eliminar: motivos.length === 0, motivos });
+  }),
+);
+
+router.get(
+  "/:id/asignaciones",
+  ruta(async (req, res) => {
+    const objetivo = await cargarObjetivo(req, res);
+    if (!objetivo) return;
+    if (!tieneRol(req.usuario, ...ROLES_GESTION, "admin_sistema")) {
+      return res.status(403).json({ error: "Tu rol no tiene permiso para consultar las asignaciones" });
+    }
+    const asignaciones = objetivo.perfiles.includes("docente") ? await asignacionesVigentes(pool, objetivo.id) : [];
+    res.json({ asignaciones });
   }),
 );
 
