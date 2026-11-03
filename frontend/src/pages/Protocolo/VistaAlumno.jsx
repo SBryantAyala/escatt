@@ -96,6 +96,10 @@ export default function VistaAlumno({ onEnviado }) {
           <li>Haber aprobado 10 o más UA del nivel III del ISC.</li>
           <li>Tener un Protocolo aprobado.</li>
         </ul>
+        <p className="mt-3 rounded-xl bg-amber-50 p-3 text-amber-900 ring-1 ring-amber-200">
+          <span className="font-semibold">Solicita tu kárdex con anticipación.</span> Tramitarlo puede tardar varios
+          días, así que no esperes al cierre del periodo para pedirlo.
+        </p>
       </div>
 
       <form onSubmit={enviar} className={`mt-6 rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 ${enviando ? "opacity-70" : ""}`}>

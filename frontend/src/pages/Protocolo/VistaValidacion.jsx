@@ -4,7 +4,8 @@ import Etiqueta from "../../components/ui/Etiqueta";
 import { useAviso } from "../../components/ui/Avisos";
 import { IconoDocumento } from "../../components/iconos";
 import { api, descargarArchivo } from "../../lib/api";
-import { tieneRol } from "../../lib/roles";
+import { ROLES_GESTION, tieneRol } from "../../lib/roles";
+import PanelPadron from "./PanelPadron";
 
 // Pantalla: validar elegibilidad de alumnos para TT (HU-13). El Secretario
 // Ejecutivo marca elegible/no elegible; el resto del personal CATT y el
@@ -14,6 +15,12 @@ const ESTADOS = {
   pendiente: { etiqueta: "En revisión", variante: "alerta" },
   elegible: { etiqueta: "Elegible", variante: "exito" },
   no_elegible: { etiqueta: "No elegible", variante: "peligro" },
+};
+
+const COTEJO = {
+  coincide: { etiqueta: "Boleta en el padrón", variante: "exito" },
+  no_coincide: { etiqueta: "Boleta no está en el padrón", variante: "alerta" },
+  sin_padron: { etiqueta: "Sin padrón para cotejar", variante: "neutro" },
 };
 
 const FILTROS = [
@@ -30,6 +37,7 @@ function formatearFecha(iso) {
 export default function VistaValidacion({ actor }) {
   const aviso = useAviso();
   const puedeValidar = tieneRol(actor, "catt_ejecutivo");
+  const puedeCargarPadron = tieneRol(actor, ...ROLES_GESTION);
   const [registros, setRegistros] = useState(null);
   const [cargando, setCargando] = useState(true);
   const [errorCarga, setErrorCarga] = useState(null);
@@ -91,6 +99,8 @@ export default function VistaValidacion({ actor }) {
         </div>
       </div>
 
+      <PanelPadron puedeCargar={puedeCargarPadron} onCargado={cargar} />
+
       <div className="mt-6 flex flex-wrap gap-2">
         {FILTROS.map((f) => (
           <button
@@ -136,11 +146,17 @@ export default function VistaValidacion({ actor }) {
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="font-semibold text-slate-800">{r.alumno.nombre}</span>
                       <Etiqueta variante={estado.variante}>{estado.etiqueta}</Etiqueta>
+                      {COTEJO[r.padron?.estado] && (
+                        <Etiqueta variante={COTEJO[r.padron.estado].variante}>{COTEJO[r.padron.estado].etiqueta}</Etiqueta>
+                      )}
                     </div>
                     <p className="mt-1 text-xs text-slate-500">
                       Boleta {r.alumno.boleta} · {r.alumno.carrera} · Periodo {r.periodo} · Enviado el{" "}
                       {formatearFecha(r.creado_en)}
                     </p>
+                    {r.padron?.estado === "coincide" && r.padron.nombre && (
+                      <p className="mt-1 text-xs text-slate-500">Nombre en el padrón: {r.padron.nombre}</p>
+                    )}
                     {r.estado !== "pendiente" && (
                       <p className="mt-1 text-xs text-slate-500">
                         Validado por {r.validado_por} el {formatearFecha(r.validado_en)}

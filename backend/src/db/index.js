@@ -750,6 +750,24 @@ async function migrarEquiposTT(client) {
   }
 }
 
+async function migrarPadronBoletas(client) {
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS padron_boletas (
+      boleta  TEXT PRIMARY KEY,
+      nombre  TEXT,
+      carrera TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS padron_cargas (
+      id         SERIAL      PRIMARY KEY,
+      archivo    TEXT        NOT NULL,
+      total      INTEGER     NOT NULL,
+      cargado_por INTEGER    REFERENCES usuarios(id) ON DELETE SET NULL,
+      cargado_en TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+  `);
+}
+
 async function initDb() {
   const client = await pool.connect();
   try {
@@ -765,6 +783,7 @@ async function initDb() {
     await migrarCambioTitulo(client);
     await migrarDirectoresExternos(client);
     await migrarSesionesCatt(client);
+    await migrarPadronBoletas(client);
     // creado_en se agregó después del CREATE TABLE original de elegibilidad.
     await client.query(
       "ALTER TABLE elegibilidad ADD COLUMN IF NOT EXISTS creado_en TIMESTAMPTZ NOT NULL DEFAULT now()",
