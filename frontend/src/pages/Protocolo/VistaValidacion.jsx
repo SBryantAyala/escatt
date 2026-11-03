@@ -60,7 +60,7 @@ export default function VistaValidacion({ actor }) {
   }, [cargar]);
 
   function verEvidencia(r) {
-    descargarArchivo(`/api/elegibilidad/${r.id}/evidencia`, `evidencia-${r.alumno.boleta}-${r.periodo}`).catch(
+    descargarArchivo(`/api/elegibilidad/${r.id}/evidencia`, `${r.tipo_evidencia === "carta" ? "carta" : "kardex"}-${r.id}-${r.periodo}`).catch(
       (e) => aviso.error(e.message),
     );
   }
@@ -149,10 +149,13 @@ export default function VistaValidacion({ actor }) {
                       {COTEJO[r.padron?.estado] && (
                         <Etiqueta variante={COTEJO[r.padron.estado].variante}>{COTEJO[r.padron.estado].etiqueta}</Etiqueta>
                       )}
+                      {r.alumno.procedencia === "externa" && <Etiqueta variante="info">Otra escuela</Etiqueta>}
                     </div>
                     <p className="mt-1 text-xs text-slate-500">
-                      Boleta {r.alumno.boleta} · {r.alumno.carrera} · Periodo {r.periodo} · Enviado el{" "}
-                      {formatearFecha(r.creado_en)}
+                      {[r.alumno.boleta ? `Boleta ${r.alumno.boleta}` : null, r.alumno.carrera, `Periodo ${r.periodo}`]
+                        .filter(Boolean)
+                        .join(" · ")}{" "}
+                      · Enviado el {formatearFecha(r.creado_en)}
                     </p>
                     {r.padron?.estado === "coincide" && r.padron.nombre && (
                       <p className="mt-1 text-xs text-slate-500">Nombre en el padrón: {r.padron.nombre}</p>
@@ -164,14 +167,14 @@ export default function VistaValidacion({ actor }) {
                     )}
                     {r.motivo && <p className="mt-2 text-sm text-red-700"><span className="font-semibold">Motivo: </span>{r.motivo}</p>}
                   </div>
-                  <div className="flex shrink-0 flex-wrap gap-2">
+                  <div className="flex min-w-0 flex-wrap gap-2">
                     {r.tiene_evidencia && (
                       <button
                         type="button"
                         onClick={() => verEvidencia(r)}
                         className="min-h-10 rounded-full border border-slate-200 px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
                       >
-                        Ver evidencia
+                        {r.tipo_evidencia === "carta" ? "Ver carta de participación" : "Ver kárdex"}
                       </button>
                     )}
                     {puedeValidar && r.estado === "pendiente" && (

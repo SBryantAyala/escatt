@@ -24,6 +24,8 @@ const CAMPOS_INICIALES = {
   apellido_materno: "",
   correo: "",
   telefono: "",
+  procedencia: "escom",
+  escuela_origen: "",
   boleta: "",
   carrera: "",
   plan_estudios: "",
@@ -186,10 +188,17 @@ export default function AltaPage({ actor, perfilInicial = "alumno", academiaPres
       apellido_materno: t(form.apellido_materno),
       correo: t(form.correo),
       telefono: t(form.telefono),
-      ...(perfil === "alumno" && {
+      ...(perfil === "alumno" && form.procedencia === "escom" && {
+        procedencia: "escom",
         boleta: t(form.boleta),
         carrera: form.carrera,
         plan_estudios: form.plan_estudios,
+      }),
+      ...(perfil === "alumno" && form.procedencia === "externa" && {
+        procedencia: "externa",
+        escuela_origen: t(form.escuela_origen),
+        carrera: t(form.carrera),
+        ...(t(form.boleta) && { boleta: t(form.boleta) }),
       }),
       ...(perfil === "docente" && {
         numero_empleado: t(form.numero_empleado),
@@ -216,6 +225,12 @@ export default function AltaPage({ actor, perfilInicial = "alumno", academiaPres
   };
 
   const titulo = PERFILES.find((p) => p.valor === perfil)?.etiqueta ?? "usuario";
+  const externa = perfil === "alumno" && form.procedencia === "externa";
+
+  const cambiarProcedencia = (valor) => {
+    setForm((f) => ({ ...f, procedencia: valor, boleta: "", carrera: "", plan_estudios: "", escuela_origen: "" }));
+    setError(null);
+  };
 
   return (
     <div className="alta-usuario mx-auto max-w-4xl overflow-hidden rounded-[20px] bg-white shadow-md ring-1 ring-slate-100">
@@ -277,7 +292,7 @@ export default function AltaPage({ actor, perfilInicial = "alumno", academiaPres
               required
               value={form.correo}
               onChange={set("correo")}
-              placeholder={perfil === "alumno" ? "usuario@alumno.ipn.mx" : "usuario@ipn.mx"}
+              placeholder={perfil === "alumno" ? (externa ? "correo@su-escuela.edu.mx" : "usuario@alumno.ipn.mx") : "usuario@ipn.mx"}
               className={claseInput}
             />
           </Campo>
@@ -291,6 +306,43 @@ export default function AltaPage({ actor, perfilInicial = "alumno", academiaPres
             <EncabezadoSeccion numero="02" titulo={perfil === "alumno" ? "Datos académicos" : perfil === "docente" ? "Información docente" : "Asignación en la CATT"} Icono={IconoAcademia} academico />
             <div className="space-y-5">
             {perfil === "alumno" && (
+              <fieldset className="min-w-0">
+                <legend className={claseLabel}>Procedencia del alumno</legend>
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    { valor: "escom", etiqueta: "ESCOM" },
+                    { valor: "externa", etiqueta: "Otra escuela" },
+                  ].map((o) => (
+                    <label
+                      key={o.valor}
+                      className={`flex min-h-11 cursor-pointer items-center gap-2 rounded-full border px-4 text-sm font-semibold transition ${
+                        form.procedencia === o.valor
+                          ? "border-blue-300 bg-blue-50 text-blue-800"
+                          : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="procedencia"
+                        value={o.valor}
+                        checked={form.procedencia === o.valor}
+                        onChange={() => cambiarProcedencia(o.valor)}
+                        className="h-4 w-4 accent-[#1878B6]"
+                      />
+                      {o.etiqueta}
+                    </label>
+                  ))}
+                </div>
+                {externa && (
+                  <p className="mt-2 text-sm text-slate-600">
+                    Participa con una carta de la CATT en lugar de kárdex. Su correo puede ser de cualquier dominio y
+                    puede formar equipo con alumnos de ESCOM.
+                  </p>
+                )}
+              </fieldset>
+            )}
+
+            {perfil === "alumno" && !externa && (
               <>
                 <Campo label="Boleta (10 dígitos)">
                   <input
@@ -328,6 +380,36 @@ export default function AltaPage({ actor, perfilInicial = "alumno", academiaPres
                         </option>
                       ))}
                     </Selector>
+                  </Campo>
+                </div>
+              </>
+            )}
+
+            {externa && (
+              <>
+                <Campo label="Escuela de origen">
+                  <input
+                    required
+                    maxLength={200}
+                    placeholder="Ej. UAM Azcapotzalco"
+                    value={form.escuela_origen}
+                    onChange={set("escuela_origen")}
+                    className={claseInput}
+                  />
+                </Campo>
+                <div className="grid gap-5 sm:grid-cols-2">
+                  <Campo label="Carrera">
+                    <input
+                      required
+                      maxLength={120}
+                      placeholder="Ej. Ingeniería en Computación"
+                      value={form.carrera}
+                      onChange={set("carrera")}
+                      className={claseInput}
+                    />
+                  </Campo>
+                  <Campo label="Boleta o matrícula en su escuela" opcional>
+                    <input maxLength={30} value={form.boleta} onChange={set("boleta")} className={claseInput} />
                   </Campo>
                 </div>
               </>

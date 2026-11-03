@@ -1,4 +1,4 @@
-# Padrón de boletas
+# Padrón de boletas y alumnos de otras escuelas
 
 Los errores son siempre `{ "error": "texto legible" }`. Todas las rutas
 requieren `Authorization: Bearer <token>`.
@@ -28,4 +28,30 @@ mismo objeto que el `GET`.
 
 ### Cotejo en `GET /api/elegibilidad`
 Cada solicitud trae `padron: { estado, nombre }` con `estado` igual a
-`coincide`, `no_coincide` o `sin_padron` (no hay padrón cargado).
+`coincide`, `no_coincide`, `sin_padron` (no hay padrón cargado) o `no_aplica`
+(alumno de otra escuela), y `tipo_evidencia`: `kardex` o `carta`.
+
+## Alumnos de otras escuelas
+
+Los da de alta la CATT; no se autorregistran. Participan con una **carta de
+participación** en lugar de kárdex y pueden formar equipo con alumnos de ESCOM.
+
+### `POST /api/usuarios` con `perfil: "alumno"` y `procedencia: "externa"`
+Campos: `escuela_origen` (obligatoria, hasta 200), `carrera` (texto libre,
+obligatoria, hasta 120), `boleta` (opcional, hasta 30, formato libre), más los
+datos personales. El correo puede ser de cualquier dominio. No llevan plan de
+estudios. `procedencia` omitida equivale a `"escom"` y mantiene las reglas
+anteriores (boleta de 10 dígitos, carrera y plan del catálogo).
+
+`PUT /api/usuarios/:id` permite editar `escuela_origen`, `carrera` y `boleta`
+de un alumno externo.
+
+### Efectos
+- `GET /api/usuarios` y la sesión traen `procedencia` y `escuela_origen`.
+- `POST /api/elegibilidad` pide la carta (`400` con el mensaje «carta de
+  participación» si falta el archivo).
+- En protocolos, equipos y cambios, la carrera de un alumno externo se muestra
+  como `carrera · escuela de origen`.
+- Esquema: `alumnos.procedencia` (`escom` | `externa`), `alumnos.escuela_origen`;
+  `boleta` y `plan_estudios` admiten `NULL`; la boleta es única solo entre
+  alumnos de ESCOM. Tablas `padron_boletas` y `padron_cargas`.

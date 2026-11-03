@@ -57,9 +57,19 @@ export default function MiCuentaPage({ usuario, onUsuarioActualizado }) {
           <Dato label="Correo" valor={usuario.correo} />
           {usuario.perfiles?.includes("alumno") && (
             <>
-              <Dato label="Boleta" valor={usuario.boleta} />
-              <Dato label="Carrera" valor={usuario.carrera} />
-              <Dato label="Plan de estudios" valor={usuario.plan_estudios} />
+              {usuario.procedencia === "externa" ? (
+                <>
+                  <Dato label="Escuela de origen" valor={usuario.escuela_origen} />
+                  <Dato label="Carrera" valor={usuario.carrera} />
+                  {usuario.boleta && <Dato label="Boleta en su escuela" valor={usuario.boleta} />}
+                </>
+              ) : (
+                <>
+                  <Dato label="Boleta" valor={usuario.boleta} />
+                  <Dato label="Carrera" valor={usuario.carrera} />
+                  <Dato label="Plan de estudios" valor={usuario.plan_estudios} />
+                </>
+              )}
             </>
           )}
           {usuario.numero_empleado && (

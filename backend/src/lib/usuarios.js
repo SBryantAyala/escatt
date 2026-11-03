@@ -8,7 +8,7 @@
 //     estado, activo, debe_cambiar_password, creado_por, creado_en,
 //     roles:    ["docente", "catt_ejecutivo", ...],
 //     perfiles: ["docente", "personal_catt", ...],
-//     boleta, carrera, plan_estudios,                    // perfil alumno
+//     boleta, carrera, plan_estudios, procedencia, escuela_origen, // perfil alumno
 //     numero_empleado,                                   // empleados
 //     academia_id, academia, academia_color, cedula_profesional, extension, // perfil docente
 //     cargo                                              // perfil personal_catt
@@ -20,7 +20,7 @@ import { pool } from "../db/index.js";
 const SELECT_USUARIO = `
   SELECT u.id, u.nombre, u.apellido_paterno, u.apellido_materno, u.correo, u.telefono,
          u.estado, u.debe_cambiar_password, u.creado_por, u.creado_en,
-         a.boleta, a.carrera, a.plan_estudios,
+         a.boleta, a.carrera, a.plan_estudios, a.procedencia, a.escuela_origen,
          e.numero_empleado,
          d.academia_id, ac.nombre AS academia, ac.color AS academia_color,
          d.cedula_profesional, d.extension,

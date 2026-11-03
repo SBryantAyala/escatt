@@ -7,6 +7,7 @@ import { Router } from "express";
 import multer from "multer";
 
 import { pool } from "../db/index.js";
+import { sqlCarreraVisible } from "../lib/alumnos.js";
 import { autenticar, exigeCambioResuelto, requiereRol } from "../lib/auth.js";
 import { ROLES_STAFF, tieneRol } from "../lib/roles.js";
 import { ruta } from "../lib/ruta.js";
@@ -49,19 +50,20 @@ const SELECT_CON_ALUMNO = `
   SELECT e.id, e.periodo, e.estado, e.motivo, e.validado_en, e.creado_en,
          (e.evidencia_url IS NOT NULL) AS tiene_evidencia,
          e.alumno_id,
-         a.boleta, a.carrera,
+         a.boleta, ${sqlCarreraVisible("a")} AS carrera, a.procedencia, a.escuela_origen,
          u.nombre, u.apellido_paterno, u.apellido_materno,
          vp.nombre AS validado_por_nombre, vp.apellido_paterno AS validado_por_apellido,
          (pb.boleta IS NOT NULL) AS en_padron, pb.nombre AS nombre_padron,
          (SELECT count(*)::int FROM padron_boletas) AS padron_total
   FROM elegibilidad e
   JOIN alumnos a    ON a.usuario_id = e.alumno_id
-  LEFT JOIN padron_boletas pb ON pb.boleta = a.boleta
+  LEFT JOIN padron_boletas pb ON pb.boleta = a.boleta AND a.procedencia = 'escom'
   JOIN usuarios u   ON u.id = e.alumno_id
   LEFT JOIN usuarios vp ON vp.id = e.validado_por
 `;
 
 function estadoPadron(fila) {
+  if (fila.procedencia === "externa") return { estado: "no_aplica", nombre: null };
   if (fila.padron_total === 0) return { estado: "sin_padron", nombre: null };
   if (fila.en_padron) return { estado: "coincide", nombre: fila.nombre_padron };
   return { estado: "no_coincide", nombre: null };
@@ -76,6 +78,7 @@ function serializar(fila) {
     validado_en: fila.validado_en,
     creado_en: fila.creado_en,
     tiene_evidencia: fila.tiene_evidencia,
+    tipo_evidencia: fila.procedencia === "externa" ? "carta" : "kardex",
     padron: estadoPadron(fila),
     validado_por: fila.validado_por_nombre
       ? `${fila.validado_por_nombre} ${fila.validado_por_apellido}`.trim()
@@ -85,6 +88,8 @@ function serializar(fila) {
       nombre: [fila.nombre, fila.apellido_paterno, fila.apellido_materno].filter(Boolean).join(" "),
       boleta: fila.boleta,
       carrera: fila.carrera,
+      procedencia: fila.procedencia,
+      escuela_origen: fila.escuela_origen,
     },
   };
 }
@@ -120,7 +125,8 @@ router.post(
       return res.status(400).json({ error: "periodo es obligatorio (máx. 20 caracteres)" });
     }
     if (!req.file) {
-      return res.status(400).json({ error: "Debes adjuntar tu kárdex o boleta (PDF, JPG o PNG)" });
+      const documento = req.usuario.procedencia === "externa" ? "tu carta de participación en la CATT" : "tu kárdex";
+      return res.status(400).json({ error: `Debes adjuntar ${documento} (PDF, JPG o PNG)` });
     }
 
     const { rows: existentes } = await pool.query(

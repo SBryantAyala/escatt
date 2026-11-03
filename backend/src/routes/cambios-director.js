@@ -7,6 +7,7 @@ import { Router } from "express";
 import multer from "multer";
 
 import { enTransaccion, pool } from "../db/index.js";
+import { sqlCarreraVisible } from "../lib/alumnos.js";
 import { autenticar, exigeCambioResuelto, requiereRol } from "../lib/auth.js";
 import { ESTADOS_VIGENTES, protocoloVigenteDe, sqlIntegrantes } from "../lib/equipo.js";
 import { ROLES_STAFF, tieneRol } from "../lib/roles.js";
@@ -62,7 +63,7 @@ const SELECT_SOLICITUD = `
   SELECT s.id, s.protocolo_id, s.estado, s.motivo, s.creado_en, s.resuelta_en,
          s.observaciones_resolucion, s.solicitante_id,
          p.titulo AS protocolo_titulo, p.estado AS protocolo_estado,
-         a.boleta, a.carrera,
+         a.boleta, ${sqlCarreraVisible("a")} AS carrera,
          concat_ws(' ', au.nombre, au.apellido_paterno, au.apellido_materno) AS alumno_nombre,
          s.director_saliente_id, s.director_saliente_externo_id,
          COALESCE(NULLIF(concat_ws(' ', su.nombre, su.apellido_paterno, su.apellido_materno), ''), se.nombre) AS saliente_nombre,
