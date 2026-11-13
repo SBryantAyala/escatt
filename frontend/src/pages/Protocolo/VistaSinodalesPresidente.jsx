@@ -39,6 +39,18 @@ function TarjetaProtocolo({ protocolo, miembros, onGuardado }) {
       !actuales.every((s) => elegidos.includes(String(s.id))));
   const reemplazo = actuales.length > 0;
   const directoresIds = new Set(protocolo.directores.filter((d) => !d.externo).map((d) => String(d.id)));
+  const idsMiembros = new Set(miembros.map((m) => String(m.id)));
+  // Sinodal asignado originalmente a cada posición que no aparece entre los docentes activos de la
+  // academia (p. ej. cuenta revocada). Solo se ofrece en su propia posición para que el select lo muestre.
+  const fueraDeLista = Array.from({ length: SINODALES }, (_, i) => {
+    const s = actuales[i];
+    return s && !idsMiembros.has(String(s.id)) ? s : null;
+  });
+
+  function elegir(i, valor) {
+    setError(null);
+    setElegidos((prev) => prev.map((v, j) => (j === i ? valor : v)));
+  }
 
   function revisar(e) {
     e.preventDefault();
@@ -67,7 +79,10 @@ function TarjetaProtocolo({ protocolo, miembros, onGuardado }) {
     }
   }
 
-  const nombreDe = (id) => miembros.find((m) => String(m.id) === id)?.nombre_completo ?? "";
+  const nombreDe = (id) =>
+    miembros.find((m) => String(m.id) === id)?.nombre_completo ??
+    actuales.find((s) => String(s.id) === id)?.nombre ??
+    "";
 
   return (
     <li className="rounded-2xl border border-slate-200 bg-white p-4">
@@ -99,6 +114,7 @@ function TarjetaProtocolo({ protocolo, miembros, onGuardado }) {
             {elegidos.map((valor, i) => {
               const actual = actuales.find((s) => String(s.id) === valor);
               const fijo = actual && bloqueados.has(actual.id);
+              const propio = fueraDeLista[i];
               return (
                 <div key={i} className="min-w-0">
                   <label htmlFor={`${idBase}-${i}`} className="mb-1.5 block text-xs font-semibold text-slate-600">
@@ -108,10 +124,15 @@ function TarjetaProtocolo({ protocolo, miembros, onGuardado }) {
                     id={`${idBase}-${i}`}
                     value={valor}
                     disabled={fijo || enviando}
-                    onChange={(e) => setElegidos((prev) => prev.map((v, j) => (j === i ? e.target.value : v)))}
+                    onChange={(e) => elegir(i, e.target.value)}
                     className={claseInput}
                   >
                     <option value="">Elige un docente</option>
+                    {propio && (
+                      <option value={propio.id}>
+                        {propio.activo ? propio.nombre : `${propio.nombre} (cuenta revocada)`}
+                      </option>
+                    )}
                     {miembros.map((m) => (
                       <option key={m.id} value={m.id} disabled={directoresIds.has(String(m.id))}>
                         {m.nombre_completo}
