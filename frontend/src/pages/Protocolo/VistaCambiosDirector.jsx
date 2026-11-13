@@ -9,6 +9,7 @@ import { nombreDirector } from "../../lib/directores";
 import { tieneRol } from "../../lib/roles";
 import Integrantes from "./Integrantes";
 import { claseBotonPrimarioBase, claseBotonSecundario } from "./estilos";
+import { formatearFecha } from "../../lib/fechas";
 
 const ESTADOS = {
   pendiente: { etiqueta: "Pendiente", variante: "alerta" },
@@ -17,10 +18,6 @@ const ESTADOS = {
 };
 
 const MAX_OBSERVACIONES = 2000;
-
-function formatearFecha(iso) {
-  return new Date(iso).toLocaleDateString("es-MX", { dateStyle: "medium" });
-}
 
 function DetalleExterno({ director, etiqueta }) {
   const aviso = useAviso();

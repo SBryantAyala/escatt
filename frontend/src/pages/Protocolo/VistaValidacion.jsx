@@ -6,6 +6,7 @@ import { IconoDocumento } from "../../components/iconos";
 import { api, descargarArchivo } from "../../lib/api";
 import { ROLES_GESTION, tieneRol } from "../../lib/roles";
 import PanelPadron from "./PanelPadron";
+import { formatearFecha } from "../../lib/fechas";
 
 // Pantalla: validar elegibilidad de alumnos para TT (HU-13). El Secretario
 // Ejecutivo marca elegible/no elegible; el resto del personal CATT y el
@@ -29,10 +30,6 @@ const FILTROS = [
   { id: "no_elegible", etiqueta: "No elegibles" },
   { id: "todos", etiqueta: "Todos" },
 ];
-
-function formatearFecha(iso) {
-  return new Date(iso).toLocaleDateString("es-MX", { dateStyle: "medium" });
-}
 
 export default function VistaValidacion({ actor }) {
   const aviso = useAviso();

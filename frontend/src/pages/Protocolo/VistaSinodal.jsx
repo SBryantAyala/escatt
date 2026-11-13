@@ -9,6 +9,7 @@ import { nombreDirector } from "../../lib/directores";
 import { estadoDe } from "./estados";
 import Integrantes from "./Integrantes";
 import { claseBotonPrimario } from "./estilos";
+import { formatearFecha } from "../../lib/fechas";
 
 // Pantalla: protocolos que evalúo como sinodal (HU-21). Consume
 // GET /api/protocolos/por-evaluar (ya filtra por la sesión y trae primero los
@@ -24,10 +25,6 @@ const DICTAMENES = {
 };
 
 const MAX_OBSERVACIONES = 5000;
-
-function formatearFecha(iso) {
-  return new Date(iso).toLocaleDateString("es-MX", { dateStyle: "medium" });
-}
 
 function FormularioEvaluacion({ protocolo, onEntregada }) {
   const aviso = useAviso();

@@ -6,6 +6,7 @@ import { api } from "../../lib/api";
 import { nombreDirector } from "../../lib/directores";
 import { estadoDe } from "./estados";
 import Integrantes from "./Integrantes";
+import { formatearFecha } from "../../lib/fechas";
 
 // Pantalla: protocolos que dirijo y su estado (HU-25). Solo lectura: el
 // director da seguimiento, no edita el protocolo. Consume
@@ -13,10 +14,6 @@ import Integrantes from "./Integrantes";
 //
 // `encabezado={false}` la deja sin título cuando vive dentro de las pestañas
 // de "Mis protocolos" (VistaDocente); `onCargado` le avisa la lista actual.
-
-function formatearFecha(iso) {
-  return new Date(iso).toLocaleDateString("es-MX", { dateStyle: "medium" });
-}
 
 export default function VistaDirector({ encabezado = true, onCargado }) {
   const [protocolos, setProtocolos] = useState(null);

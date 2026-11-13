@@ -4,6 +4,7 @@ import Esqueleto from "../../components/ui/Esqueleto";
 import { useAviso } from "../../components/ui/Avisos";
 import { api } from "../../lib/api";
 import { claseArchivo, claseBotonPrimario } from "./estilos";
+import { formatearFecha } from "../../lib/fechas";
 
 async function contarFilas(archivo) {
   const texto = (await archivo.text()).replace(/^\uFEFF/, "");
@@ -11,10 +12,6 @@ async function contarFilas(archivo) {
   if (lineas.length === 0) return 0;
   const conEncabezado = !/^\s*"?\d{10}"?\s*([,;\t]|$)/.test(lineas[0]);
   return lineas.length - (conEncabezado ? 1 : 0);
-}
-
-function formatearFecha(iso) {
-  return new Date(iso).toLocaleDateString("es-MX", { dateStyle: "medium" });
 }
 
 export default function PanelPadron({ puedeCargar, onCargado }) {

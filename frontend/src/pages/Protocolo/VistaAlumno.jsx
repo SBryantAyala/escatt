@@ -6,6 +6,7 @@ import { IconoDocumento } from "../../components/iconos";
 import { api, descargarArchivo } from "../../lib/api";
 import { AZUL_MEDIO } from "../../lib/theme";
 import { claseInput, claseLabel } from "./estilos";
+import { formatearFecha } from "../../lib/fechas";
 
 // Pantalla: elegibilidad del alumno para TT (HU-12). Sube evidencia
 // (kárdex/boleta) por periodo y ve el estado de cada envío.
@@ -16,10 +17,6 @@ const ESTADOS = {
   no_elegible: { etiqueta: "No elegible", variante: "peligro" },
 };
 
-
-function formatearFecha(iso) {
-  return new Date(iso).toLocaleDateString("es-MX", { dateStyle: "medium" });
-}
 
 // `onEnviado` avisa a la pantalla cuando el alumno sube evidencia nueva: su
 // elegibilidad vigente pasa a "en revisión" y el registro de protocolo debe

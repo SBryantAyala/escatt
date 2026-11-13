@@ -5,6 +5,7 @@ import { useAviso } from "../../components/ui/Avisos";
 import { IconoDocumento } from "../../components/iconos";
 import { api, descargarArchivo } from "../../lib/api";
 import { claseBotonPrimarioBase } from "./estilos";
+import { formatearFecha } from "../../lib/fechas";
 
 const ESTADOS = {
   pendiente: { etiqueta: "En revisión", variante: "alerta" },
@@ -32,10 +33,6 @@ const AVISO_REINICIO = {
   no_aprobado:
     "Si la CATT lo aprueba, tu protocolo vuelve a evaluación con los mismos sinodales, que lo evalúan de nuevo con el título nuevo.",
 };
-
-function formatearFecha(iso) {
-  return new Date(iso).toLocaleDateString("es-MX", { dateStyle: "medium" });
-}
 
 export default function CambioTitulo({ actor }) {
   const aviso = useAviso();

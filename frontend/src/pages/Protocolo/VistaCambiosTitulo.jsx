@@ -9,6 +9,7 @@ import { api, descargarArchivo } from "../../lib/api";
 import { tieneRol } from "../../lib/roles";
 import { estadoDe } from "./estados";
 import { claseBotonPrimarioBase } from "./estilos";
+import { formatearFecha } from "../../lib/fechas";
 
 const ESTADOS = {
   pendiente: { etiqueta: "Pendiente", variante: "alerta" },
@@ -25,10 +26,6 @@ const MAX_OBSERVACIONES = 2000;
 
 const claseBotonSecundario =
   "min-h-10 rounded-full border border-slate-200 px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50";
-
-function formatearFecha(iso) {
-  return new Date(iso).toLocaleDateString("es-MX", { dateStyle: "medium" });
-}
 
 function ListaEvaluaciones({ evaluaciones, conTitulo = false }) {
   return (

@@ -7,6 +7,7 @@ import { api, descargarArchivo } from "../../lib/api";
 import { claveDirector, nombreDirector, ordenarPorNombre, separarClave } from "../../lib/directores";
 import FormDirectorExterno from "./FormDirectorExterno";
 import { claseArchivo, claseBotonPrimarioBase, claseBotonSecundario, claseInput, claseLabel } from "./estilos";
+import { formatearFecha } from "../../lib/fechas";
 
 const ESTADOS_VIGENTES = ["registrado", "en_evaluacion", "aprobado"];
 
@@ -17,10 +18,6 @@ const ESTADOS = {
 };
 
 const MAX_MOTIVO = 2000;
-
-function formatearFecha(iso) {
-  return new Date(iso).toLocaleDateString("es-MX", { dateStyle: "medium" });
-}
 
 export default function CambioDirector({ actor }) {
   const aviso = useAviso();

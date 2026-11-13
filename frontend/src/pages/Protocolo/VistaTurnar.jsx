@@ -7,10 +7,7 @@ import { api } from "../../lib/api";
 import { nombreDirector } from "../../lib/directores";
 import { claseBotonPrimarioBase, claseInput } from "./estilos";
 import Integrantes from "./Integrantes";
-
-function formatearFecha(iso) {
-  return new Date(iso).toLocaleDateString("es-MX", { dateStyle: "medium" });
-}
+import { formatearFecha } from "../../lib/fechas";
 
 function TarjetaTurno({ protocolo, academias, onTurnado }) {
   const aviso = useAviso();
