@@ -5,6 +5,7 @@ import Esqueleto from "../../components/ui/Esqueleto";
 import Etiqueta from "../../components/ui/Etiqueta";
 import { IconoCuenta, IconoDocumento } from "../../components/iconos";
 import { api } from "../../lib/api";
+import { formatearFecha } from "../../lib/fechas";
 
 // Home del alumno: a diferencia del Inicio genérico (accesos rápidos por
 // rol), aquí el centro es lo único que de verdad le importa hoy a un alumno:
@@ -31,10 +32,6 @@ const ESTADOS = {
     texto: "Revisa el motivo y, cuando estés listo, sube evidencia para un periodo posterior.",
   },
 };
-
-function formatearFecha(iso) {
-  return new Date(iso).toLocaleDateString("es-MX", { dateStyle: "medium" });
-}
 
 export default function InicioAlumno({ usuario }) {
   const [historial, setHistorial] = useState(null);

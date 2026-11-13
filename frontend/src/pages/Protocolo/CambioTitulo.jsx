@@ -4,6 +4,8 @@ import Etiqueta from "../../components/ui/Etiqueta";
 import { useAviso } from "../../components/ui/Avisos";
 import { IconoDocumento } from "../../components/iconos";
 import { api, descargarArchivo } from "../../lib/api";
+import { claseBotonPrimarioBase } from "./estilos";
+import { formatearFecha } from "../../lib/fechas";
 
 const ESTADOS = {
   pendiente: { etiqueta: "En revisión", variante: "alerta" },
@@ -31,10 +33,6 @@ const AVISO_REINICIO = {
   no_aprobado:
     "Si la CATT lo aprueba, tu protocolo vuelve a evaluación con los mismos sinodales, que lo evalúan de nuevo con el título nuevo.",
 };
-
-function formatearFecha(iso) {
-  return new Date(iso).toLocaleDateString("es-MX", { dateStyle: "medium" });
-}
 
 export default function CambioTitulo({ actor }) {
   const aviso = useAviso();
@@ -213,7 +211,7 @@ export default function CambioTitulo({ actor }) {
             <button
               type="submit"
               disabled={enviando}
-              className="mt-5 min-h-11 rounded-full bg-[#1878B6] px-6 text-sm font-semibold text-white transition hover:bg-[#0F5C8C] disabled:opacity-60"
+              className={`mt-5 min-h-11 px-6 ${claseBotonPrimarioBase}`}
             >
               {enviando ? "Enviando…" : "Enviar solicitud"}
             </button>

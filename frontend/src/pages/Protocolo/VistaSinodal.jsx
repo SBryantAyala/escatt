@@ -8,6 +8,8 @@ import { api, descargarArchivo } from "../../lib/api";
 import { nombreDirector } from "../../lib/directores";
 import { estadoDe } from "./estados";
 import Integrantes from "./Integrantes";
+import { claseBotonPrimario } from "./estilos";
+import { formatearFecha } from "../../lib/fechas";
 
 // Pantalla: protocolos que evalúo como sinodal (HU-21). Consume
 // GET /api/protocolos/por-evaluar (ya filtra por la sesión y trae primero los
@@ -23,10 +25,6 @@ const DICTAMENES = {
 };
 
 const MAX_OBSERVACIONES = 5000;
-
-function formatearFecha(iso) {
-  return new Date(iso).toLocaleDateString("es-MX", { dateStyle: "medium" });
-}
 
 function FormularioEvaluacion({ protocolo, onEntregada }) {
   const aviso = useAviso();
@@ -121,7 +119,7 @@ function FormularioEvaluacion({ protocolo, onEntregada }) {
       <div className="mt-3 flex flex-wrap items-center gap-3">
         <button
           type="submit"
-          className="min-h-11 rounded-full bg-[#1878B6] px-5 text-sm font-semibold text-white transition hover:bg-[#0F5C8C]"
+          className={claseBotonPrimario}
         >
           Entregar evaluación
         </button>

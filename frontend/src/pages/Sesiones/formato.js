@@ -17,9 +17,7 @@ export function formatearFechaHora(iso) {
   return new Date(iso).toLocaleString("es-MX", { dateStyle: "long", timeStyle: "short" });
 }
 
-export function formatearFechaCorta(iso) {
-  return new Date(iso).toLocaleDateString("es-MX", { dateStyle: "medium" });
-}
+export { formatearFecha as formatearFechaCorta } from "../../lib/fechas";
 
 export function formatearDia(dia) {
   if (!dia) return null;

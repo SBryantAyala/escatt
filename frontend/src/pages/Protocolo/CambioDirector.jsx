@@ -6,7 +6,8 @@ import { IconoDocumento } from "../../components/iconos";
 import { api, descargarArchivo } from "../../lib/api";
 import { claveDirector, nombreDirector, ordenarPorNombre, separarClave } from "../../lib/directores";
 import FormDirectorExterno from "./FormDirectorExterno";
-import { claseArchivo, claseBotonSecundario, claseInput, claseLabel } from "./estilos";
+import { claseArchivo, claseBotonPrimarioBase, claseBotonSecundario, claseInput, claseLabel } from "./estilos";
+import { formatearFecha } from "../../lib/fechas";
 
 const ESTADOS_VIGENTES = ["registrado", "en_evaluacion", "aprobado"];
 
@@ -17,10 +18,6 @@ const ESTADOS = {
 };
 
 const MAX_MOTIVO = 2000;
-
-function formatearFecha(iso) {
-  return new Date(iso).toLocaleDateString("es-MX", { dateStyle: "medium" });
-}
 
 export default function CambioDirector({ actor }) {
   const aviso = useAviso();
@@ -229,7 +226,7 @@ export default function CambioDirector({ actor }) {
           <button
             type="submit"
             disabled={enviando}
-            className="mt-5 min-h-11 rounded-full bg-[#1878B6] px-6 text-sm font-semibold text-white transition hover:bg-[#0F5C8C] disabled:opacity-60"
+            className={`mt-5 min-h-11 px-6 ${claseBotonPrimarioBase}`}
           >
             {enviando ? "Enviando…" : "Enviar solicitud"}
           </button>

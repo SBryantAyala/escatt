@@ -5,24 +5,23 @@ import { useAviso } from "../../components/ui/Avisos";
 import { IconoDocumento } from "../../components/iconos";
 import { api } from "../../lib/api";
 import { nombreDirector } from "../../lib/directores";
-import { claseInput } from "./estilos";
+import { claseBotonPrimarioBase, claseBotonSecundario, claseInput } from "./estilos";
 import Integrantes from "./Integrantes";
-
-function formatearFecha(iso) {
-  return new Date(iso).toLocaleDateString("es-MX", { dateStyle: "medium" });
-}
+import { formatearFecha } from "../../lib/fechas";
 
 function TarjetaTurno({ protocolo, academias, onTurnado }) {
   const aviso = useAviso();
   const [academiaId, setAcademiaId] = useState(protocolo.academia ? String(protocolo.academia.id) : "");
   const [enviando, setEnviando] = useState(false);
+  const [error, setError] = useState(null);
   const idSelect = `turnar-academia-${protocolo.id}`;
   const turnado = Boolean(protocolo.academia);
   const sinCambio = turnado && academiaId === String(protocolo.academia.id);
 
   async function turnar(e) {
     e.preventDefault();
-    if (!academiaId) return aviso.error("Elige la Academia a la que se turna el protocolo.");
+    if (!academiaId) return setError("Elige la Academia a la que se turna el protocolo.");
+    setError(null);
     setEnviando(true);
     try {
       await api(`/api/protocolos/${protocolo.id}/academia`, { method: "PATCH", body: { academia_id: Number(academiaId) } });
@@ -49,33 +48,43 @@ function TarjetaTurno({ protocolo, academias, onTurnado }) {
         {turnado && <Etiqueta variante="info">{protocolo.academia.nombre}</Etiqueta>}
       </div>
 
-      <form onSubmit={turnar} className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
-        <div className="min-w-0 flex-1">
-          <label htmlFor={idSelect} className="mb-1.5 block text-sm font-semibold text-slate-800">
-            {turnado ? "Cambiar de Academia" : "Turnar a la Academia"}
-          </label>
-          <select
-            id={idSelect}
-            value={academiaId}
-            onChange={(e) => setAcademiaId(e.target.value)}
-            disabled={enviando}
-            className={claseInput}
+      <form onSubmit={turnar} className="mt-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+          <div className="min-w-0 flex-1">
+            <label htmlFor={idSelect} className="mb-1.5 block text-sm font-semibold text-slate-800">
+              {turnado ? "Cambiar de Academia" : "Turnar a la Academia"}
+            </label>
+            <select
+              id={idSelect}
+              value={academiaId}
+              onChange={(e) => {
+                setError(null);
+                setAcademiaId(e.target.value);
+              }}
+              disabled={enviando}
+              className={claseInput}
+            >
+              <option value="">Elige una Academia</option>
+              {academias.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.nombre}
+                </option>
+              ))}
+            </select>
+          </div>
+          <button
+            type="submit"
+            disabled={enviando || sinCambio}
+            className={`min-h-13 px-6 text-sm ${claseBotonPrimarioBase}`}
           >
-            <option value="">Elige una Academia</option>
-            {academias.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.nombre}
-              </option>
-            ))}
-          </select>
+            {enviando ? "Guardando…" : turnado ? "Cambiar" : "Turnar"}
+          </button>
         </div>
-        <button
-          type="submit"
-          disabled={enviando || sinCambio}
-          className="min-h-13 rounded-full bg-[#1878B6] px-6 text-sm font-semibold text-white transition hover:bg-[#0F5C8C] disabled:opacity-60"
-        >
-          {enviando ? "Guardando…" : turnado ? "Cambiar" : "Turnar"}
-        </button>
+        {error && (
+          <p role="alert" className="mt-2 text-sm text-red-700">
+            {error}
+          </p>
+        )}
       </form>
     </li>
   );
@@ -118,9 +127,12 @@ export default function VistaTurnar() {
       </div>
 
       {errorCarga && (
-        <p role="alert" className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-          No se pudieron cargar los protocolos. {errorCarga}
-        </p>
+        <div className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+          <p role="alert">No se pudieron cargar los protocolos. {errorCarga}</p>
+          <button type="button" onClick={cargar} className={`mt-3 bg-white ${claseBotonSecundario}`}>
+            Reintentar
+          </button>
+        </div>
       )}
 
       {!protocolos && !errorCarga && (

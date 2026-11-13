@@ -7,3 +7,9 @@ export const claseArchivo = `${claseInput} px-3 py-2.5 file:mr-3 file:rounded-fu
 
 export const claseBotonSecundario =
   "min-h-10 rounded-full border border-slate-200 px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-60";
+
+// Botón primario sin tamaño, para los casos que necesitan otro alto o padding.
+export const claseBotonPrimarioBase =
+  "rounded-full bg-[#1878B6] text-sm font-semibold text-white transition hover:bg-[#0F5C8C] disabled:opacity-60";
+
+export const claseBotonPrimario = `min-h-11 px-5 ${claseBotonPrimarioBase}`;

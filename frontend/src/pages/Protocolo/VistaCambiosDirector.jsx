@@ -8,7 +8,8 @@ import { api, descargarArchivo } from "../../lib/api";
 import { nombreDirector } from "../../lib/directores";
 import { tieneRol } from "../../lib/roles";
 import Integrantes from "./Integrantes";
-import { claseBotonSecundario } from "./estilos";
+import { claseBotonPrimarioBase, claseBotonSecundario } from "./estilos";
+import { formatearFecha } from "../../lib/fechas";
 
 const ESTADOS = {
   pendiente: { etiqueta: "Pendiente", variante: "alerta" },
@@ -17,10 +18,6 @@ const ESTADOS = {
 };
 
 const MAX_OBSERVACIONES = 2000;
-
-function formatearFecha(iso) {
-  return new Date(iso).toLocaleDateString("es-MX", { dateStyle: "medium" });
-}
 
 function DetalleExterno({ director, etiqueta }) {
   const aviso = useAviso();
@@ -144,7 +141,7 @@ function Solicitud({ solicitud, puedeResolver, onResuelta, onDesactualizada }) {
             <button
               type="button"
               onClick={() => setAprobando(true)}
-              className="min-h-10 rounded-full bg-[#1878B6] px-4 text-sm font-semibold text-white transition hover:bg-[#0F5C8C]"
+              className={`min-h-10 px-4 ${claseBotonPrimarioBase}`}
             >
               Aprobar
             </button>
