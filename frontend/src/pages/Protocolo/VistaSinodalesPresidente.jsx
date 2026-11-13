@@ -6,7 +6,7 @@ import { useAviso } from "../../components/ui/Avisos";
 import { IconoDocumento } from "../../components/iconos";
 import { api } from "../../lib/api";
 import { nombreDirector } from "../../lib/directores";
-import { claseInput } from "./estilos";
+import { claseBotonPrimario, claseInput } from "./estilos";
 import { estadoDe } from "./estados";
 import Integrantes from "./Integrantes";
 
@@ -162,7 +162,7 @@ function TarjetaProtocolo({ protocolo, miembros, onGuardado }) {
           <button
             type="submit"
             disabled={enviando || (reemplazo && !hayCambio)}
-            className="mt-4 min-h-11 rounded-full bg-[#1878B6] px-5 text-sm font-semibold text-white transition hover:bg-[#0F5C8C] disabled:opacity-60"
+            className={`mt-4 ${claseBotonPrimario}`}
           >
             {reemplazo ? "Guardar cambios" : "Asignar sinodales"}
           </button>

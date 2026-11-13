@@ -5,7 +5,7 @@ import { useAviso } from "../../components/ui/Avisos";
 import { IconoDocumento } from "../../components/iconos";
 import { api } from "../../lib/api";
 import { nombreDirector } from "../../lib/directores";
-import { claseInput } from "./estilos";
+import { claseBotonPrimarioBase, claseInput } from "./estilos";
 import Integrantes from "./Integrantes";
 
 function formatearFecha(iso) {
@@ -72,7 +72,7 @@ function TarjetaTurno({ protocolo, academias, onTurnado }) {
         <button
           type="submit"
           disabled={enviando || sinCambio}
-          className="min-h-13 rounded-full bg-[#1878B6] px-6 text-sm font-semibold text-white transition hover:bg-[#0F5C8C] disabled:opacity-60"
+          className={`min-h-11 px-6 ${claseBotonPrimarioBase}`}
         >
           {enviando ? "Guardando…" : turnado ? "Cambiar" : "Turnar"}
         </button>

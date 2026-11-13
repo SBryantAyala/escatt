@@ -3,7 +3,7 @@ import DialogoConfirmacion from "../../components/ui/DialogoConfirmacion";
 import Esqueleto from "../../components/ui/Esqueleto";
 import { useAviso } from "../../components/ui/Avisos";
 import { api } from "../../lib/api";
-import { claseArchivo } from "./estilos";
+import { claseArchivo, claseBotonPrimario } from "./estilos";
 
 async function contarFilas(archivo) {
   const texto = (await archivo.text()).replace(/^\uFEFF/, "");
@@ -117,7 +117,7 @@ export default function PanelPadron({ puedeCargar, onCargado }) {
           <button
             type="submit"
             disabled={enviando}
-            className="min-h-11 rounded-full bg-[#1878B6] px-5 text-sm font-semibold text-white transition hover:bg-[#0F5C8C] disabled:opacity-60"
+            className={claseBotonPrimario}
           >
             {enviando ? "Cargando…" : estado?.cargado ? "Reemplazar padrón" : "Cargar padrón"}
           </button>

@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import { useAviso } from "../../components/ui/Avisos";
 import { api } from "../../lib/api";
-import { claseArchivo, claseBotonSecundario, claseInput, claseLabel } from "./estilos";
+import { claseArchivo, claseBotonPrimarioBase, claseBotonSecundario, claseInput, claseLabel } from "./estilos";
 
 const CORREO_VALIDO = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -145,7 +145,7 @@ export default function FormDirectorExterno({ onRegistrado, deshabilitado = fals
           type="button"
           onClick={registrar}
           disabled={bloqueado}
-          className="min-h-10 rounded-full bg-[#1878B6] px-5 text-sm font-semibold text-white transition hover:bg-[#0F5C8C] disabled:opacity-60"
+          className={`min-h-10 px-5 ${claseBotonPrimarioBase}`}
         >
           {enviando ? "Registrando…" : "Registrar director externo"}
         </button>
