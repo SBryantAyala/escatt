@@ -139,12 +139,54 @@ await page.getByRole("dialog").getByRole("button", { name: "Revocar acceso" }).c
 await page.getByText(/Se revocó el acceso de/).waitFor();
 check(sql("SELECT estado FROM usuarios WHERE id=15") === "revocada", "se revoca aunque tenga asignaciones");
 await ctx.close();
+// Docente activo y libre (sin dirigir ni evaluar) en la academia de Sandra, para poder sustituir
+// a un sinodal sin quitar al revocado. Misma contraseña demo: copia las credenciales de Sandra.
+const libre = sql("INSERT INTO usuarios (nombre, apellido_paterno, apellido_materno, correo, estado) VALUES ('Docente', 'Libre', 'Pruebas', 'docente.libre@ipn.mx', 'activa') RETURNING id").split("\n")[0];
+sql(`INSERT INTO empleados (usuario_id, numero_empleado) VALUES (${libre}, '999901')`);
+sql(`INSERT INTO docentes (usuario_id, academia_id) VALUES (${libre}, (SELECT academia_id FROM docentes WHERE usuario_id=${sandra}))`);
+sql(`INSERT INTO usuario_roles (usuario_id, rol_id) SELECT ${libre}, id FROM roles WHERE clave='docente'`);
+sql(`INSERT INTO credenciales (usuario_id, password_hash, password_salt) SELECT ${libre}, password_hash, password_salt FROM credenciales WHERE usuario_id=${sandra}`);
 ({ ctx, page } = await abrir(browser, "sandra.diaz@ipn.mx", "DocenteDemo1"));
+// Protocolo editable de la academia de Sandra donde el docente 15 (recién revocado) es sinodal.
+const protRevocado = sql(
+  `SELECT ps.protocolo_id FROM protocolo_sinodales ps JOIN protocolos p ON p.id=ps.protocolo_id WHERE ps.docente_id=15 AND p.academia_id=(SELECT academia_id FROM docentes WHERE usuario_id=${sandra}) AND p.estado IN ('registrado','en_evaluacion') ORDER BY ps.protocolo_id LIMIT 1`,
+);
 await page.goto(`${BASE}/panel/protocolo?tab=academia`);
-await page.getByText("Cuenta revocada").first().waitFor().catch(() => {});
-const visibleRevocada = await page.getByText("Cuenta revocada").count();
-check(visibleRevocada >= 0, "el Presidente ve el estado de los sinodales");
+await page.locator(`#sinodales-${protRevocado}-0`).waitFor();
+// Cada posición muestra la etiqueta «Cuenta revocada» bajo su select; ubica la posición por ella.
+const posRevocada = await page.evaluate((p) => {
+  for (let i = 0; i < 3; i++) {
+    const sel = document.querySelector(`#sinodales-${p}-${i}`);
+    if (sel?.parentElement.textContent.includes("Cuenta revocada")) {
+      const op = sel.selectedOptions[0];
+      return { i, valor: op?.value ?? "", texto: op?.textContent ?? "" };
+    }
+  }
+  return null;
+}, protRevocado);
+check(
+  Boolean(protRevocado) && posRevocada !== null && posRevocada.texto.includes("(cuenta revocada)") && posRevocada.valor !== "",
+  `el select del sinodal revocado lo muestra como «(cuenta revocada)», no «Elige un docente» (protocolo ${protRevocado || "?"}: ${JSON.stringify(posRevocada)})`,
+);
+// Sustituye a otro sinodal activo que no haya evaluado por el docente libre; el revocado se queda.
+const pendientes = sql(`SELECT ps.docente_id FROM protocolo_sinodales ps JOIN usuarios u ON u.id=ps.docente_id WHERE ps.protocolo_id=${protRevocado} AND ps.dictamen IS NULL AND u.estado='activa'`).split("\n");
+const posCambio = await page.evaluate(({ p, ids }) => [0, 1, 2].find((i) => ids.includes(document.querySelector(`#sinodales-${p}-${i}`).value)), { p: protRevocado, ids: pendientes });
+await page.locator(`#sinodales-${protRevocado}-${posCambio}`).selectOption(libre);
+const tarjetaRev = page.locator("li").filter({ has: page.locator(`#sinodales-${protRevocado}-0`) });
+await tarjetaRev.getByRole("button", { name: "Guardar cambios" }).click();
+await page.getByRole("dialog").waitFor();
+const descripcion = (await page.locator("#dialogo-confirmacion-titulo + p").innerText()).trim();
+await page.keyboard.press("Escape");
+const corte = descripcion.indexOf(". Quien salga");
+const nombres = (corte >= 0 ? descripcion.slice(0, corte) : descripcion).split(",").map((n) => n.trim());
+const nombreRevocado = (posRevocada?.texto ?? "").replace(" (cuenta revocada)", "").trim();
+check(
+  nombres.length === 3 && nombres.every(Boolean) && nombreRevocado !== "" && nombres.includes(nombreRevocado),
+  `el diálogo de confirmación muestra 3 nombres no vacíos, incluido el revocado (${JSON.stringify(descripcion)})`,
+);
 await ctx.close();
+// Deja la base como estaba: el borrado arrastra credenciales, sesiones, roles, empleado y docente.
+sql(`DELETE FROM usuarios WHERE id=${libre}`);
 sql("UPDATE usuarios SET estado='activa' WHERE id=15");
 
 console.log("E. alumno de otra escuela");
