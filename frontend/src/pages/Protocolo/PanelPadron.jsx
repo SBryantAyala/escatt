@@ -23,6 +23,7 @@ export default function PanelPadron({ puedeCargar, onCargado }) {
   const [enviando, setEnviando] = useState(false);
   const [errores, setErrores] = useState(null);
   const [confirmando, setConfirmando] = useState(null);
+  const [errorFormulario, setErrorFormulario] = useState(null);
 
   const cargar = useCallback(() => {
     api("/api/padron")
@@ -36,9 +37,16 @@ export default function PanelPadron({ puedeCargar, onCargado }) {
 
   async function revisar(e) {
     e.preventDefault();
-    if (!archivo) return aviso.error("Elige el archivo CSV con las boletas.");
+    if (!archivo) return setErrorFormulario("Elige el archivo CSV con las boletas.");
+    setErrorFormulario(null);
     setErrores(null);
-    setConfirmando({ nombre: archivo.name, filas: await contarFilas(archivo) });
+    let filas;
+    try {
+      filas = await contarFilas(archivo);
+    } catch {
+      return aviso.error("No se pudo leer el archivo.");
+    }
+    setConfirmando({ nombre: archivo.name, filas });
   }
 
   async function subir() {
@@ -96,7 +104,10 @@ export default function PanelPadron({ puedeCargar, onCargado }) {
               id="padron-archivo"
               type="file"
               accept=".csv,.txt,text/csv,text/plain"
-              onChange={(e) => setArchivo(e.target.files?.[0] ?? null)}
+              onChange={(e) => {
+                setErrorFormulario(null);
+                setArchivo(e.target.files?.[0] ?? null);
+              }}
               className={claseArchivo}
             />
             <p className="mt-1.5 text-xs text-slate-500">
@@ -110,6 +121,11 @@ export default function PanelPadron({ puedeCargar, onCargado }) {
                 <li key={linea}>{linea}</li>
               ))}
             </ul>
+          )}
+          {errorFormulario && (
+            <p role="alert" className="text-sm text-red-700">
+              {errorFormulario}
+            </p>
           )}
           <button
             type="submit"

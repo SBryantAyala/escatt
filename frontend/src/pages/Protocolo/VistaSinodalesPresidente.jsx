@@ -6,7 +6,7 @@ import { useAviso } from "../../components/ui/Avisos";
 import { IconoDocumento } from "../../components/iconos";
 import { api } from "../../lib/api";
 import { nombreDirector } from "../../lib/directores";
-import { claseBotonPrimario, claseInput } from "./estilos";
+import { claseBotonPrimario, claseBotonSecundario, claseInput } from "./estilos";
 import { estadoDe } from "./estados";
 import Integrantes from "./Integrantes";
 
@@ -73,7 +73,7 @@ function TarjetaProtocolo({ protocolo, miembros, onGuardado }) {
       onGuardado();
     } catch (err) {
       setConfirmando(false);
-      setError(err.message);
+      aviso.error(err.message);
     } finally {
       setEnviando(false);
     }
@@ -234,9 +234,12 @@ export default function VistaSinodalesPresidente({ actor, encabezado = true, onC
       )}
 
       {errorCarga && (
-        <p role="alert" className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-          No se pudieron cargar los protocolos. {errorCarga}
-        </p>
+        <div className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+          <p role="alert">No se pudieron cargar los protocolos. {errorCarga}</p>
+          <button type="button" onClick={cargar} className={`mt-3 bg-white ${claseBotonSecundario}`}>
+            Reintentar
+          </button>
+        </div>
       )}
 
       {!protocolos && !errorCarga && (
