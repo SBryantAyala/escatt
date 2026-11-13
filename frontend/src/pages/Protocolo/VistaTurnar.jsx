@@ -75,7 +75,7 @@ function TarjetaTurno({ protocolo, academias, onTurnado }) {
           <button
             type="submit"
             disabled={enviando || sinCambio}
-            className={`min-h-11 px-6 ${claseBotonPrimarioBase}`}
+            className={`min-h-13 px-6 text-sm ${claseBotonPrimarioBase}`}
           >
             {enviando ? "Guardando…" : turnado ? "Cambiar" : "Turnar"}
           </button>
